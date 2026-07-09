@@ -2,84 +2,49 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Megaphone, FileText, Settings, Server, Factory, Wallet } from "lucide-react";
-import { SyncButton } from "@/components/SyncButton";
+import { Users, Megaphone } from "lucide-react";
+
+const NAV = [
+  { href: "/crm", label: "CRM", icon: Users, match: (p: string | null) => p?.startsWith("/crm") },
+  { href: "/campaigns", label: "Campaigns", icon: Megaphone, match: (p: string | null) => p?.startsWith("/campaigns") },
+];
 
 export function Sidebar() {
   const pathname = usePathname();
 
   return (
     <aside className="w-64 h-screen border-r border-border bg-card flex flex-col shrink-0">
-      <div className="h-16 flex items-center justify-center px-6 border-b border-border">
-        <img src="/logo_long_2.png" alt="Luxvance Logo" className="h-6 w-auto object-contain" />
+      <div className="h-16 flex items-center px-6 border-b border-border">
+        <span className="text-lg font-bold tracking-tight text-foreground">
+          LUX<span className="text-[#FFD60A]">V</span>ANCE
+        </span>
       </div>
-      <nav className="flex-1 p-4 space-y-1">
-        <Link 
-          href="/" 
-          className={`flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-            pathname === "/" ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:bg-secondary hover:text-secondary-foreground"
-          }`}
-        >
-          <LayoutDashboard className="w-4 h-4 mr-3" />
-          Dashboard
-        </Link>
-        <Link 
-          href="/campaigns" 
-          className={`flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-            pathname?.startsWith("/campaigns") ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:bg-secondary hover:text-secondary-foreground"
-          }`}
-        >
-          <Megaphone className="w-4 h-4 mr-3" />
-          Campaign Monitor
-        </Link>
-        <Link 
-          href="/factory" 
-          className={`flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-            pathname?.startsWith("/factory") ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:bg-secondary hover:text-secondary-foreground"
-          }`}
-        >
-          <Factory className="w-4 h-4 mr-3" />
-          Campaign Factory
-        </Link>
-        <Link 
-          href="/briefs" 
-          className={`flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-            pathname?.startsWith("/briefs") ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:bg-secondary hover:text-secondary-foreground"
-          }`}
-        >
-          <FileText className="w-4 h-4 mr-3" />
-          Brief Generator
-        </Link>
-        <Link 
-          href="/infrastructure" 
-          className={`flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-            pathname?.startsWith("/infrastructure") ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:bg-secondary hover:text-secondary-foreground"
-          }`}
-        >
-          <Server className="w-4 h-4 mr-3" />
-          Infrastructure
-        </Link>
-        <Link 
-          href="/finance" 
-          className={`flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-            pathname?.startsWith("/finance") ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:bg-secondary hover:text-secondary-foreground"
-          }`}
-        >
-          <Wallet className="w-4 h-4 mr-3" />
-          Finance
-        </Link>
+      <div className="px-4 pt-5 pb-2">
+        <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Cockpit</span>
+      </div>
+      <nav className="flex-1 px-4 space-y-1">
+        {NAV.map(({ href, label, icon: Icon, match }) => {
+          const active = match(pathname);
+          return (
+            <Link
+              key={href}
+              href={href}
+              className={`flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                active
+                  ? "bg-[#FFD60A]/10 text-[#FFD60A]"
+                  : "text-muted-foreground hover:bg-secondary hover:text-secondary-foreground"
+              }`}
+            >
+              <Icon className="w-4 h-4 mr-3" />
+              {label}
+            </Link>
+          );
+        })}
       </nav>
-      <div className="p-4 border-t border-border space-y-1">
-        <SyncButton />
-        <Link 
-          href="/settings" 
-          className={`flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-            pathname?.startsWith("/settings") ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:bg-secondary hover:text-secondary-foreground"
-          }`}
-        >
-          <Settings className="w-4 h-4 mr-3" />
-          Settings
-        </Link>
+      <div className="p-4 border-t border-border">
+        <p className="text-[11px] text-muted-foreground leading-relaxed">
+          Prospects who replied · live follow-up cadence. Sends are approved in Slack.
+        </p>
       </div>
     </aside>
   );

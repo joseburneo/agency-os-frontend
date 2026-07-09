@@ -1,40 +1,40 @@
 @import "tailwindcss";
 
 :root {
-  /* Luxvance V3 Futuristic Theme */
-  --background: #050505; /* Abyss Black */
-  --foreground: #fafafa;
-  
-  --card: rgba(14, 14, 18, 0.7); /* Frosted Glass Base */
-  --card-foreground: #fafafa;
-  
-  --popover: #050505;
-  --popover-foreground: #fafafa;
-  
-  --primary: #8B5CF6; /* Electric Neon Purple */
-  --primary-foreground: #ffffff;
-  
-  --secondary: #06B6D4; /* Reactive Cyan */
-  --secondary-foreground: #000000;
-  
+  /* Luxvance Portal Theme — navy + gold (matches builds.luxvance.com) */
+  --background: #0A0E1A; /* Deep navy */
+  --foreground: #F5F5F7;
+
+  --card: rgba(255, 255, 255, 0.035); /* Panel over navy */
+  --card-foreground: #F5F5F7;
+
+  --popover: #0E1424;
+  --popover-foreground: #F5F5F7;
+
+  --primary: #FFD60A; /* Luxvance Gold */
+  --primary-foreground: #0A0E1A;
+
+  --secondary: rgba(255, 255, 255, 0.06); /* Subtle hover panel */
+  --secondary-foreground: #F5F5F7;
+
   --muted: rgba(255, 255, 255, 0.05);
-  --muted-foreground: #a1a1aa;
-  
-  --accent: rgba(139, 92, 246, 0.15); /* Purple tint */
-  --accent-foreground: #8B5CF6;
-  
-  --warning: #C9A84C; /* Luxvance Gold Accent */
-  --warning-foreground: #1A1A1A;
+  --muted-foreground: #8A93A6;
+
+  --accent: rgba(255, 214, 10, 0.12); /* Gold tint */
+  --accent-foreground: #FFD60A;
+
+  --warning: #FFD60A; /* Luxvance Gold Accent */
+  --warning-foreground: #0A0E1A;
 
   --destructive: #ef4444;
   --destructive-foreground: #fef2f2;
 
-  --border: rgba(255, 255, 255, 0.08); /* Faint LED-like border */
+  --border: rgba(255, 255, 255, 0.08); /* Faint hairline border */
   --input: rgba(255, 255, 255, 0.05);
-  --ring: #8B5CF6;
+  --ring: #FFD60A;
 
   /* Typography */
-  --font-lv-sans: var(--font-geist-sans), "Helvetica Neue", sans-serif;
+  --font-lv-sans: var(--font-geist-sans), "Inter", "Helvetica Neue", sans-serif;
   --font-lv-serif: var(--font-geist-mono), monospace;
 }
 
@@ -60,9 +60,9 @@ body {
   background-color: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
-  /* Optional generic ambient backdrop */
-  background-image: radial-gradient(circle at top right, rgba(139, 92, 246, 0.05), transparent 400px), 
-                    radial-gradient(circle at bottom left, rgba(6, 182, 212, 0.05), transparent 400px);
+  /* Subtle gold ambient backdrop */
+  background-image: radial-gradient(circle at top right, rgba(255, 214, 10, 0.05), transparent 420px),
+                    radial-gradient(circle at bottom left, rgba(255, 214, 10, 0.03), transparent 420px);
 }
 
 /* Base Glassmorphism classes for components that use bg-card */
