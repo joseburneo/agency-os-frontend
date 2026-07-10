@@ -61,6 +61,7 @@ type Detail = Card & {
   build_slug: string | null;
   build_published: boolean;
   live_channel: string;
+  can_send_email: boolean;
   reply_campaign: string;
   notes: string;
   next: {
@@ -129,6 +130,21 @@ function rotEdge(card: Card): string {
   if (d >= 3) return "border-l-2 border-l-[#f59e0b]";
   if (d >= 1) return "border-l-2 border-l-[#FFD60A]";
   return "border-l-2 border-l-transparent";
+}
+
+// What to actually do with this prospect right now, in plain words. Replaces the raw
+// cadence goal (which reads as noise when the ball is in our court).
+function actNow(d: Detail): { title: string; detail: string; tone: "green" | "gold" | "muted" } {
+  if (d.status === "meeting_booked") return { title: "Meeting booked", detail: "Out of the queue. Prep for the call.", tone: "green" };
+  if (d.status === "stopped" || d.status === "exhausted") return { title: "Closed", detail: "No action needed.", tone: "muted" };
+  if (d.waiting_on === "us") {
+    if (d.wants_meeting) return { title: "They want to meet", detail: "Reply with two time slots, or use Book to send the calendar link.", tone: "green" };
+    return { title: "They are waiting on your reply", detail: d.heat_reason ? `Answer their last message. ${d.heat_reason}.` : "Answer their last message below.", tone: "gold" };
+  }
+  if (d.next.next_channel && d.next.next_touch_at) {
+    return { title: "Waiting on them", detail: `You replied last. Next nudge: ${d.next.next_channel}, ${isDue(d.next.next_touch_at) ? "due now" : fmtDate(d.next.next_touch_at)}.`, tone: "muted" };
+  }
+  return { title: "Waiting on them", detail: "You replied last. No follow-up scheduled.", tone: "muted" };
 }
 
 const CHANNEL_META: Record<string, { label: string; cls: string }> = {
@@ -238,7 +254,6 @@ type ThreadMsg = { from_me: boolean; at: string | null; subject: string; text: s
 
 function Conversation({ id, themName, fallback }: { id: number; themName: string; fallback?: string }) {
   const [msgs, setMsgs] = useState<ThreadMsg[] | null>(null);
-  const endRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     setMsgs(null);
     fetch(`${API}/api/crm/prospect/${id}/thread`)
@@ -246,9 +261,6 @@ function Conversation({ id, themName, fallback }: { id: number; themName: string
       .then((j) => setMsgs(j.messages || []))
       .catch(() => setMsgs([]));
   }, [id]);
-  // Autoscroll to the newest message so Jose sees the latest reply immediately,
-  // not the oldest at the top.
-  useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [msgs]);
 
   if (msgs === null) return <div className="text-sm text-muted-foreground p-2">Loading conversation…</div>;
   if (msgs.length === 0) {
@@ -256,10 +268,13 @@ function Conversation({ id, themName, fallback }: { id: number; themName: string
       ? <div className="bg-card border border-border rounded-xl p-4 text-sm text-foreground whitespace-pre-wrap">{fallback}</div>
       : <div className="text-sm text-muted-foreground p-2">No email thread found in Instantly.</div>;
   }
+  // Newest on top: Jose sees the latest reply first, no scrolling.
+  const ordered = [...msgs].reverse();
   return (
     <div className="space-y-3">
-      {msgs.map((m, i) => {
-        const who = m.from_me ? "Jose" : themName;
+      {ordered.map((m, i) => {
+        const who = m.from_me ? "You" : themName;
+        const latest = i === 0;
         return (
           <div key={i} className={`flex gap-2.5 ${m.from_me ? "flex-row-reverse" : ""}`}>
             <div className={`shrink-0 w-8 h-8 rounded-full grid place-items-center text-[11px] font-semibold ${
@@ -267,17 +282,18 @@ function Conversation({ id, themName, fallback }: { id: number; themName: string
               {m.from_me ? "JB" : initials(themName)}
             </div>
             <div className={`max-w-[82%] rounded-2xl px-3.5 py-2.5 text-sm border ${
-              m.from_me ? "bg-[#FFD60A]/8 border-[#FFD60A]/25" : "bg-card border-border"}`}>
+              m.from_me ? "bg-[#FFD60A]/8 border-[#FFD60A]/25"
+              : latest ? "bg-card border-[#FFD60A]/40 ring-1 ring-[#FFD60A]/20" : "bg-card border-border"}`}>
               <div className="flex items-center gap-2 mb-1">
                 <span className={`text-[11px] font-semibold ${m.from_me ? "text-[#FFD60A]" : "text-foreground"}`}>{who}</span>
                 <span className="text-[11px] text-muted-foreground tabular-nums">{timeAgo(m.at)}</span>
+                {latest && !m.from_me && <span className="text-[10px] text-[#FFD60A] font-medium">latest</span>}
               </div>
               <div className="text-foreground whitespace-pre-wrap leading-relaxed">{m.text}</div>
             </div>
           </div>
         );
       })}
-      <div ref={endRef} />
     </div>
   );
 }
@@ -291,7 +307,6 @@ function ReplyComposer({ d, onSent }: { d: Detail; onSent: () => void }) {
   const id = d.id;
   const [chan, setChan] = useState<Chan>("email");
   const [drafts, setDrafts] = useState<Record<Chan, string>>({ email: "", linkedin: "", whatsapp: "", call: "" });
-  const [meta, setMeta] = useState<Record<Chan, DraftResp | null>>({ email: null, linkedin: null, whatsapp: null, call: null });
   const [drafting, setDrafting] = useState(false);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState<string | null>(null);
@@ -307,7 +322,7 @@ function ReplyComposer({ d, onSent }: { d: Detail; onSent: () => void }) {
     const q = intent ? `?channel=${chan}&intent=${intent}` : `?channel=${chan}`;
     fetch(`${API}/api/crm/prospect/${id}/draft${q}`)
       .then((r) => r.json())
-      .then((j: DraftResp) => { setMeta((p) => ({ ...p, [chan]: j })); setDraft(chan, j.draft || ""); })
+      .then((j: DraftResp) => { setDraft(chan, j.draft || ""); })
       .catch(() => {})
       .finally(() => setDrafting(false));
   };
@@ -340,100 +355,105 @@ function ReplyComposer({ d, onSent }: { d: Detail; onSent: () => void }) {
       .finally(() => setCoBusy(false));
   };
 
-  const meMeta = meta[chan];
-  const canSend = chan === "email" && meMeta?.can_send;
-  const draftLabel = chan === "email" ? "Draft email" : chan === "linkedin" ? "Draft LinkedIn note" : chan === "whatsapp" ? "Draft WhatsApp" : "Call talking points";
+  const canSendEmail = chan === "email" && d.can_send_email;
+  const gmailLive = d.live_channel === "gmail";
+  const draftLabel = chan === "email" ? "Draft with AI" : chan === "linkedin" ? "Draft LinkedIn" : chan === "whatsapp" ? "Draft WhatsApp" : "Talking points";
 
   return (
-    <div className="border-t border-border bg-popover/95 p-4 space-y-3">
-      {/* channel tabs */}
-      <div className="flex items-center gap-1">
-        {(["email", "linkedin", "whatsapp", "call"] as Chan[]).map((c) => (
-          <button key={c} onClick={() => { setChan(c); setSent(null); }}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-colors ${
-              chan === c ? "bg-[#FFD60A]/12 text-[#FFD60A]" : "text-muted-foreground hover:bg-secondary"}`}>
-            {CHANNEL_META[c].label}
-          </button>
-        ))}
+    <div className="border-b border-border bg-popover/95 p-4 space-y-2.5">
+      {/* channel tabs + how it sends */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1">
+          {(["email", "linkedin", "whatsapp", "call"] as Chan[]).map((c) => (
+            <button key={c} onClick={() => { setChan(c); setSent(null); }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                chan === c ? "bg-[#FFD60A]/12 text-[#FFD60A]" : "text-muted-foreground hover:bg-secondary"}`}>
+              {CHANNEL_META[c].label}
+            </button>
+          ))}
+        </div>
+        <span className="text-[11px] text-muted-foreground">
+          {chan === "email"
+            ? (canSendEmail ? "Sends on-thread via Instantly" : gmailLive ? "Reply from Gmail" : "No thread — copy & send")
+            : "Copy & send by hand"}
+        </span>
       </div>
 
-      {!meMeta && !text ? (
-        <div className="flex gap-2">
+      {/* always-visible reply box */}
+      <textarea
+        value={text} onChange={(e) => setDraft(chan, e.target.value)}
+        placeholder={`Write your ${CHANNEL_META[chan].label} message, or click ${draftLabel}…`}
+        rows={Math.min(12, Math.max(4, text.split("\n").length + 1))}
+        className="w-full bg-background border border-border rounded-lg p-3 text-sm text-foreground leading-relaxed focus:outline-none focus:ring-1 focus:ring-[#FFD60A]/50 resize-y"
+      />
+
+      {/* copilot chat-to-edit */}
+      {coLog.length > 0 && (
+        <div className="space-y-1.5 max-h-24 overflow-y-auto text-xs">
+          {coLog.map((l, i) => (
+            <div key={i} className={l.role === "you" ? "text-muted-foreground" : "text-[#FFD60A]"}>
+              <span className="font-semibold">{l.role === "you" ? "You: " : "Copilot: "}</span>{l.content}
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <Bot className="w-4 h-4 text-[#FFD60A] absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            value={co} onChange={(e) => setCo(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); askCopilot(); } }}
+            placeholder="Ask copilot: shorter, warmer, add the Build link…"
+            className="w-full bg-background border border-border rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#FFD60A]/50"
+          />
+        </div>
+        <button onClick={askCopilot} disabled={coBusy || !co.trim()}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-[#FFD60A]/40 px-3 py-2 text-sm text-[#FFD60A] hover:bg-[#FFD60A]/10 disabled:opacity-40 transition-colors">
+          {coBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+        </button>
+      </div>
+
+      {/* actions */}
+      {sent === "ok" ? (
+        <div className="flex items-center gap-2 text-sm text-[#5fe08a]"><Check className="w-4 h-4" /> Sent on-thread via Instantly. Cadence advanced.</div>
+      ) : (
+        <div className="flex items-center gap-2 flex-wrap">
+          {canSendEmail ? (
+            <button onClick={send} disabled={sending || !text.trim()}
+              className="inline-flex items-center gap-2 rounded-lg bg-[#FFD60A] px-4 py-2 text-sm font-semibold text-[#0A0E1A] hover:bg-[#ffdf3a] disabled:opacity-40 transition-colors">
+              {sending ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending…</> : <><Send className="w-4 h-4" /> Send via Instantly</>}
+            </button>
+          ) : chan !== "email" && text.trim() ? (
+            <a href={chan === "whatsapp" && d.phone ? (d.wa_link || `https://wa.me/${d.phone.replace(/[^\d]/g, "")}`) : chan === "linkedin" ? (d.linkedin_url || linkedinSearchUrl(d.name, d.company)) : "#"}
+              target="_blank" rel="noreferrer"
+              onClick={() => navigator.clipboard.writeText(text)}
+              className="inline-flex items-center gap-2 rounded-lg bg-[#FFD60A] px-4 py-2 text-sm font-semibold text-[#0A0E1A] hover:bg-[#ffdf3a] transition-colors">
+              <Copy className="w-4 h-4" /> Copy & open {CHANNEL_META[chan].label}
+            </a>
+          ) : null}
           <button onClick={() => gen()} disabled={drafting}
-            className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg border border-[#FFD60A]/40 bg-[#FFD60A]/10 px-3 py-2.5 text-sm font-medium text-[#FFD60A] hover:bg-[#FFD60A]/15 disabled:opacity-40 transition-colors">
-            {drafting ? <><Loader2 className="w-4 h-4 animate-spin" /> Writing…</> : <><PenLine className="w-4 h-4" /> {draftLabel}</>}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[#FFD60A]/40 px-3 py-2 text-sm text-[#FFD60A] hover:bg-[#FFD60A]/10 disabled:opacity-40 transition-colors">
+            {drafting ? <Loader2 className="w-4 h-4 animate-spin" /> : <PenLine className="w-4 h-4" />} {draftLabel}
           </button>
           {chan === "email" && (
             <button onClick={() => gen("book")} disabled={drafting}
-              className="inline-flex items-center gap-2 rounded-lg border border-[#5fe08a]/40 bg-[#22c55e]/10 px-3 py-2.5 text-sm font-medium text-[#5fe08a] hover:bg-[#22c55e]/15 disabled:opacity-40 transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[#5fe08a]/40 px-3 py-2 text-sm text-[#5fe08a] hover:bg-[#22c55e]/10 disabled:opacity-40 transition-colors"
               title="Draft a booking message with the calendar link">
               <CalendarClock className="w-4 h-4" /> Book
             </button>
           )}
+          <button onClick={() => { navigator.clipboard.writeText(text); }} disabled={!text.trim()}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary disabled:opacity-40 transition-colors">
+            <Copy className="w-3.5 h-3.5" /> Copy
+          </button>
+          {chan === "email" && !canSendEmail && (
+            <span className="text-[11px] text-muted-foreground flex-1 min-w-[8rem]">
+              {gmailLive ? "This lead's live thread is Gmail — reply from jose@luxvance.com." : "No Instantly thread on file — copy and send from your inbox."}
+            </span>
+          )}
         </div>
-      ) : (
-        <>
-          <textarea
-            value={text} onChange={(e) => setDraft(chan, e.target.value)}
-            placeholder="Your message…"
-            rows={Math.min(12, Math.max(4, text.split("\n").length + 1))}
-            className="w-full bg-background border border-border rounded-lg p-3 text-sm text-foreground leading-relaxed focus:outline-none focus:ring-1 focus:ring-[#FFD60A]/50 resize-y"
-          />
-          {/* copilot chat-to-edit bar */}
-          {coLog.length > 0 && (
-            <div className="space-y-1.5 max-h-28 overflow-y-auto text-xs">
-              {coLog.map((l, i) => (
-                <div key={i} className={l.role === "you" ? "text-muted-foreground" : "text-[#FFD60A]"}>
-                  <span className="font-semibold">{l.role === "you" ? "You: " : "Copilot: "}</span>{l.content}
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1">
-              <Bot className="w-4 h-4 text-[#FFD60A] absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                value={co} onChange={(e) => setCo(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); askCopilot(); } }}
-                placeholder="Ask the copilot to edit: shorter, warmer, add the Build link…"
-                className="w-full bg-background border border-border rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#FFD60A]/50"
-              />
-            </div>
-            <button onClick={askCopilot} disabled={coBusy || !co.trim()}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[#FFD60A]/40 px-3 py-2 text-sm text-[#FFD60A] hover:bg-[#FFD60A]/10 disabled:opacity-40 transition-colors">
-              {coBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-            </button>
-          </div>
-          {/* actions */}
-          {sent === "ok" ? (
-            <div className="flex items-center gap-2 text-sm text-[#5fe08a]"><Check className="w-4 h-4" /> Sent on-thread via Instantly. Cadence advanced.</div>
-          ) : (
-            <div className="flex items-center gap-2 flex-wrap">
-              {canSend ? (
-                <button onClick={send} disabled={sending || !text.trim()}
-                  className="inline-flex items-center gap-2 rounded-lg bg-[#FFD60A] px-4 py-2 text-sm font-semibold text-[#0A0E1A] hover:bg-[#ffdf3a] disabled:opacity-40 transition-colors">
-                  {sending ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending…</> : <><Send className="w-4 h-4" /> Send via Instantly</>}
-                </button>
-              ) : (
-                <span className="text-xs text-muted-foreground flex-1 min-w-[8rem]">
-                  {chan === "email"
-                    ? (meMeta?.gmail_live ? "Live thread is Gmail. Send from jose@luxvance.com." : "No Instantly thread. Copy and send by hand.")
-                    : "Copy and send by hand."}
-                </span>
-              )}
-              <button onClick={() => { navigator.clipboard.writeText(text); }}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
-                <Copy className="w-3.5 h-3.5" /> Copy
-              </button>
-              <button onClick={() => gen()} disabled={drafting} title="Redraft"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
-                <RefreshCw className={`w-3.5 h-3.5 ${drafting ? "animate-spin" : ""}`} />
-              </button>
-            </div>
-          )}
-          {sent?.startsWith("err:") && <div className="text-xs text-[#ef4444]">Send failed: {sent.slice(4)}</div>}
-        </>
       )}
+      {sent?.startsWith("err:") && <div className="text-xs text-[#ef4444]">Send failed: {sent.slice(4)}</div>}
     </div>
   );
 }
@@ -556,16 +576,14 @@ function ContactActions({ d, onChanged }: { d: Detail; onChanged: () => void }) 
   const [finding, setFinding] = useState(false);
   const [findNote, setFindNote] = useState<string | null>(null);
 
-  const findPhone = (source: "thread" | "clay") => {
+  // The email-thread scan runs automatically server-side when the record opens, so
+  // there is no "find in thread" button. The only button is Clay (paid, optional).
+  const shopClay = () => {
     setFinding(true); setFindNote(null);
-    fetch(`${API}/api/crm/prospect/${d.id}/find-phone?source=${source}`, { method: "POST" })
+    fetch(`${API}/api/crm/prospect/${d.id}/find-phone?source=clay`, { method: "POST" })
       .then((r) => r.json())
-      .then((j) => {
-        if (j.found) { onChanged(); }
-        else if (source === "clay") setFindNote(j.note || "Clay lookup not available.");
-        else setFindNote("No number in the conversation. Try Clay.");
-      })
-      .catch(() => setFindNote("Lookup failed."))
+      .then((j) => { if (j.found) onChanged(); else setFindNote(j.note || "Clay lookup not available yet."); })
+      .catch(() => setFindNote("Clay lookup failed."))
       .finally(() => setFinding(false));
   };
 
@@ -616,17 +634,11 @@ function ContactActions({ d, onChanged }: { d: Detail; onChanged: () => void }) 
           </div>
         ) : (
           <div className="space-y-2">
-            <div className="text-xs text-muted-foreground">No phone on file yet.</div>
-            <div className="flex items-center gap-2">
-              <button onClick={() => findPhone("thread")} disabled={finding}
-                className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg border border-[#f0b45f]/40 bg-[#f0b45f]/10 px-3 py-2 text-sm text-[#f0b45f] hover:bg-[#f0b45f]/15 disabled:opacity-40 transition-colors">
-                {finding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />} Find in conversation
-              </button>
-              <button onClick={() => findPhone("clay")} disabled={finding}
-                className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary disabled:opacity-40 transition-colors">
-                Shop via Clay
-              </button>
-            </div>
+            <div className="text-xs text-muted-foreground">No number in the email thread. Shop for it with Clay (paid).</div>
+            <button onClick={shopClay} disabled={finding}
+              className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-[#f0b45f]/40 bg-[#f0b45f]/10 px-3 py-2 text-sm text-[#f0b45f] hover:bg-[#f0b45f]/15 disabled:opacity-40 transition-colors">
+              {finding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />} Shop via Clay
+            </button>
             {findNote && <div className="text-xs text-muted-foreground">{findNote}</div>}
           </div>
         )}
@@ -707,21 +719,21 @@ function Record({ id, onClose, onChanged }: { id: number; onClose: () => void; o
           <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)]">
             {/* LEFT: context + actions */}
             <div className="overflow-y-auto p-6 space-y-5 lg:border-r border-border">
-              {/* next touch */}
-              <div className="bg-card border border-border rounded-xl p-4">
-                <div className="flex items-center gap-2 text-sm font-medium text-foreground mb-1.5">
-                  <CalendarClock className="w-4 h-4 text-[#FFD60A]" /> Next touch
-                </div>
-                {d.next.next_channel ? (
-                  <div className="text-sm text-muted-foreground">
-                    <span className="capitalize text-foreground">{d.next.next_channel}</span>{" · "}
-                    <span className={isDue(d.next.next_touch_at) ? "text-[#FFD60A]" : ""}>
-                      {isDue(d.next.next_touch_at) ? "due now" : fmtDate(d.next.next_touch_at)}
-                    </span>
-                    {d.next.next_goal && <p className="mt-1 italic">{d.next.next_goal}</p>}
+              {/* act now */}
+              {(() => {
+                const a = actNow(d);
+                const tone = a.tone === "green" ? "border-[#5fe08a]/40 bg-[#22c55e]/8"
+                  : a.tone === "gold" ? "border-[#FFD60A]/40 bg-[#FFD60A]/8" : "border-border bg-card";
+                const txt = a.tone === "green" ? "text-[#5fe08a]" : a.tone === "gold" ? "text-[#FFD60A]" : "text-foreground";
+                return (
+                  <div className={`rounded-xl border p-4 ${tone}`}>
+                    <div className={`flex items-center gap-2 text-sm font-semibold ${txt}`}>
+                      <Zap className="w-4 h-4" /> {a.title}
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">{a.detail}</p>
                   </div>
-                ) : <div className="text-sm text-muted-foreground">Sequence complete.</div>}
-              </div>
+                );
+              })()}
 
               <BuildCard d={d} onChanged={both} />
               <ContactActions d={d} onChanged={reload} />
@@ -733,13 +745,13 @@ function Record({ id, onClose, onChanged }: { id: number; onClose: () => void; o
               </div>
             </div>
 
-            {/* RIGHT: conversation + composer */}
+            {/* RIGHT: composer on top, newest-first conversation below */}
             <div className="flex flex-col min-h-0">
+              <ReplyComposer d={d} onSent={both} />
               <div className="flex-1 min-h-0 overflow-y-auto p-6">
-                <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Conversation</div>
+                <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Conversation · newest first</div>
                 <Conversation id={id} themName={themName} fallback={d.reply_text} />
               </div>
-              <ReplyComposer d={d} onSent={both} />
             </div>
           </div>
         )}
