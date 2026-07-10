@@ -908,6 +908,14 @@ export default function CrmPage() {
     const p = new URLSearchParams(window.location.search).get("lead");
     if (p && !isNaN(Number(p))) setOpenId(Number(p));
   }, []);
+  // Live-sync: on open, ask the server to refresh the queue from the real Instantly
+  // threads (catches replies/sends made anywhere), then pull the fresh data.
+  useEffect(() => {
+    fetch(`${API}/api/crm/refresh`, { method: "POST" })
+      .then((r) => r.json())
+      .then((j) => { if (j.started) setTimeout(load, 12000); })
+      .catch(() => {});
+  }, [load]);
 
   const book = (id: number) => {
     fetch(`${API}/api/crm/prospect/${id}/book`, { method: "POST" }).then((r) => { if (r.ok) load(); });
