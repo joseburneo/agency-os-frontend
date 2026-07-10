@@ -896,6 +896,19 @@ export default function CrmPage() {
   }, []);
   useEffect(() => { load(); }, [load]);
 
+  // Deep link: /crm?lead=<id> opens that prospect straight away (from a Slack alert).
+  // Keep the URL in sync so back/close and sharing behave.
+  const openRecord = useCallback((id: number | null) => {
+    setOpenId(id);
+    if (typeof window !== "undefined") {
+      window.history.replaceState(null, "", id ? `/crm?lead=${id}` : "/crm");
+    }
+  }, []);
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search).get("lead");
+    if (p && !isNaN(Number(p))) setOpenId(Number(p));
+  }, []);
+
   const book = (id: number) => {
     fetch(`${API}/api/crm/prospect/${id}/book`, { method: "POST" }).then((r) => { if (r.ok) load(); });
   };
@@ -938,7 +951,7 @@ export default function CrmPage() {
         </div>
       </div>
 
-      <Briefing onOpen={setOpenId} />
+      <Briefing onOpen={openRecord} />
 
       {funnel && (
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
@@ -968,23 +981,23 @@ export default function CrmPage() {
         <div className="text-center text-muted-foreground py-16">Loading…</div>
       ) : view === "queue" ? (
         <>
-          <PipelineSection title="⚡ Your turn" hint="they replied, the ball is with us · hottest first" rows={groups.us} onOpen={setOpenId} accent />
-          {!onlyMine && <PipelineSection title="Waiting on them" hint="we replied last" rows={groups.them} onOpen={setOpenId} />}
-          {!onlyMine && <PipelineSection title="Booked & closed" rows={groups.closed} onOpen={setOpenId} />}
+          <PipelineSection title="⚡ Your turn" hint="they replied, the ball is with us · hottest first" rows={groups.us} onOpen={openRecord} accent />
+          {!onlyMine && <PipelineSection title="Waiting on them" hint="we replied last" rows={groups.them} onOpen={openRecord} />}
+          {!onlyMine && <PipelineSection title="Booked & closed" rows={groups.closed} onOpen={openRecord} />}
           {groups.us.length === 0 && groups.them.length === 0 && groups.closed.length === 0 && (
             <div className="text-center text-muted-foreground py-16">No prospects.</div>
           )}
         </>
       ) : (
         <div className="flex gap-3 overflow-x-auto pb-4">
-          <BoardColumn title="⚡ Your turn" accent rows={groups.us} onOpen={setOpenId} />
-          <BoardColumn title="Waiting on them" rows={groups.them} onOpen={setOpenId} />
-          <BoardColumn title="Booked" rows={groups.closed.filter((r) => r.status === "meeting_booked")} onOpen={setOpenId} onDropBook={book} />
-          <BoardColumn title="Stopped / done" rows={groups.closed.filter((r) => r.status !== "meeting_booked")} onOpen={setOpenId} />
+          <BoardColumn title="⚡ Your turn" accent rows={groups.us} onOpen={openRecord} />
+          <BoardColumn title="Waiting on them" rows={groups.them} onOpen={openRecord} />
+          <BoardColumn title="Booked" rows={groups.closed.filter((r) => r.status === "meeting_booked")} onOpen={openRecord} onDropBook={book} />
+          <BoardColumn title="Stopped / done" rows={groups.closed.filter((r) => r.status !== "meeting_booked")} onOpen={openRecord} />
         </div>
       )}
 
-      {openId !== null && <Record id={openId} onClose={() => setOpenId(null)} onChanged={load} />}
+      {openId !== null && <Record id={openId} onClose={() => openRecord(null)} onChanged={load} />}
     </div>
   );
 }
