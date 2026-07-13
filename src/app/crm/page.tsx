@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  X, Mail, Link2, MessageCircle, Phone, ExternalLink, Copy, Check,
+  X, Link2, MessageCircle, Phone, ExternalLink, Copy, Check,
   Search, RefreshCw, CalendarClock, Sparkles, Send, PenLine, Loader2,
   Flame, LayoutGrid, List, Bot, ChevronRight, Zap,
 } from "lucide-react";
@@ -59,9 +59,14 @@ type Detail = Card & {
   linkedin_url: string;
   wa_link: string;
   build_slug: string | null;
+  build_name: string;
+  build_audience: string;
+  build_leads: number;
   build_published: boolean;
   live_channel: string;
   can_send_email: boolean;
+  intent_label: string;
+  intent_summary: string;
   reply_campaign: string;
   notes: string;
   next: {
@@ -122,6 +127,19 @@ function heatChip(heat: number): { label: string; cls: string; hot: boolean } {
   return { label: "Cool", cls: "bg-secondary text-muted-foreground border border-border", hot: false };
 }
 
+// Category → a color-coded pill. Signal Green for Positive/SQL (a live buyer), gold for
+// MQL, muted for the rest. Green = "go" per the brand's on-screen accent rule.
+function catPill(category: string): { label: string; cls: string } {
+  const c = (category || "").toLowerCase();
+  if (c.includes("positive") || c.includes("sql"))
+    return { label: category, cls: "bg-[#26D07C]/15 text-[#5fe08a] border border-[#26D07C]/30" };
+  if (c.includes("mql"))
+    return { label: category, cls: "bg-[#FFD60A]/12 text-[#FFD60A] border border-[#FFD60A]/25" };
+  if (c.includes("neg") || c.includes("not") || c.includes("unsub"))
+    return { label: category, cls: "bg-[#ef4444]/10 text-[#ff9b9b] border border-[#ef4444]/25" };
+  return { label: category || "Reply", cls: "bg-secondary text-muted-foreground border border-border" };
+}
+
 // Deal-rot: the longer a reply we owe goes unanswered, the louder the left edge.
 function rotEdge(card: Card): string {
   if (card.waiting_on !== "us") return "";
@@ -138,8 +156,19 @@ function actNow(d: Detail): { title: string; detail: string; tone: "green" | "go
   if (d.status === "meeting_booked") return { title: "Meeting booked", detail: "Out of the queue. Prep for the call.", tone: "green" };
   if (d.status === "stopped" || d.status === "exhausted") return { title: "Closed", detail: "No action needed.", tone: "muted" };
   if (d.waiting_on === "us") {
-    if (d.wants_meeting) return { title: "They want to meet", detail: "Reply with two time slots, or use Book to send the calendar link.", tone: "green" };
-    return { title: "They are waiting on your reply", detail: d.heat_reason ? `Answer their last message. ${d.heat_reason}.` : "Answer their last message below.", tone: "gold" };
+    // Real intent (gpt-5-mini read of their actual last message) beats the keyword.
+    const s = d.intent_summary || "";
+    switch (d.intent_label) {
+      case "wants_meeting": return { title: "They want to meet", detail: s || "Reply with two time slots, or use Book to send the calendar link.", tone: "green" };
+      case "meeting_already_set": return { title: "Meeting already set", detail: s || "A meeting looks arranged. Confirm and prep, or mark it booked.", tone: "green" };
+      case "positive": return { title: "Positive reply", detail: s || "They are interested. Move toward a short call.", tone: "gold" };
+      case "question": return { title: "They asked a question", detail: s || "Answer their question directly.", tone: "gold" };
+      case "referral": return { title: "They pointed you elsewhere", detail: s || "They referred you to someone else. Ask for the intro.", tone: "gold" };
+      case "not_interested":
+      case "using_competitor": return { title: "Soft no", detail: s || "They are not looking right now. Keep it warm, do not push.", tone: "muted" };
+      default:
+        return { title: "They are waiting on your reply", detail: s || (d.heat_reason ? `Answer their last message. ${d.heat_reason}.` : "Answer their last message below."), tone: "gold" };
+    }
   }
   if (d.next.next_channel && d.next.next_touch_at) {
     return { title: "Waiting on them", detail: `You replied last. Next nudge: ${d.next.next_channel}, ${isDue(d.next.next_touch_at) ? "due now" : fmtDate(d.next.next_touch_at)}.`, tone: "muted" };
@@ -217,8 +246,9 @@ function Briefing({ onOpen }: { onOpen: (id: number) => void }) {
   }, []);
   return (
     <div className="bg-gradient-to-br from-card to-card/40 border border-[#FFD60A]/20 rounded-2xl p-5 mb-5">
-      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#FFD60A] mb-2">
-        <Sparkles className="w-4 h-4" /> Where you stand
+      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider mb-2">
+        <Sparkles className="w-4 h-4 text-[#FFD60A]" />
+        <span className="neon-hl">// WHERE_YOU_STAND</span>
       </div>
       {loading ? (
         <div className="text-sm text-muted-foreground">Reading the pipeline…</div>
@@ -250,15 +280,31 @@ function Briefing({ onOpen }: { onOpen: (id: number) => void }) {
 }
 
 // ── conversation thread (live from Instantly) ────────────────────────
-type ThreadMsg = { from_me: boolean; at: string | null; subject: string; text: string };
+type ThreadMsg = { from_me: boolean; at: string | null; subject: string; text: string; from_addr: string; to_addr: string; eaccount: string };
+
+// Distill the email chrome: strip Re:/Fwd: chains, collapse whitespace.
+function cleanSubject(s: string): string {
+  const t = (s || "").replace(/^((re|fwd|fw)\s*:\s*)+/i, "").replace(/\s+/g, " ").trim();
+  return t || "(no subject)";
+}
+function addrDomain(a: string): string { return (a || "").split("@")[1] || ""; }
+function shortAddr(a: string): string {
+  a = a || "";
+  return a.length <= 28 ? a : `${a.slice(0, 14)}…${a.slice(-11)}`;
+}
+// Direction-agnostic identity of a message: same two addresses = same route.
+function routeKey(m: ThreadMsg): string { return [m.from_addr, m.to_addr].filter(Boolean).sort().join("|"); }
 
 function Conversation({ id, themName, fallback }: { id: number; themName: string; fallback?: string }) {
   const [msgs, setMsgs] = useState<ThreadMsg[] | null>(null);
+  const [burner, setBurner] = useState("");
+  const [hidden, setHidden] = useState(0);
+  const [subject, setSubject] = useState("");
   useEffect(() => {
     setMsgs(null);
     fetch(`${API}/api/crm/prospect/${id}/thread`)
       .then((r) => r.json())
-      .then((j) => setMsgs(j.messages || []))
+      .then((j) => { setMsgs(j.messages || []); setBurner(j.burner || ""); setHidden(j.hidden || 0); setSubject(j.subject || ""); })
       .catch(() => setMsgs([]));
   }, [id]);
 
@@ -268,28 +314,66 @@ function Conversation({ id, themName, fallback }: { id: number; themName: string
       ? <div className="bg-card border border-border rounded-xl p-4 text-sm text-foreground whitespace-pre-wrap">{fallback}</div>
       : <div className="text-sm text-muted-foreground p-2">No email thread found in Instantly.</div>;
   }
+  // Compute in chronological order (msgs oldest first):
+  // route line shows only when the {from,to} pair changes (opener + any switch).
+  const routeShow = msgs.map((m, i) => i === 0 || routeKey(m) !== routeKey(msgs[i - 1]));
+  // graduation = our outbound from-domain moving off the burner onto luxvance.com.
+  let gradIndex = -1, sawBurnerOut = false;
+  for (let i = 0; i < msgs.length; i++) {
+    const m = msgs[i];
+    if (!m.from_me || !m.from_addr) continue;
+    if (addrDomain(m.from_addr) === "luxvance.com") { if (sawBurnerOut) { gradIndex = i; break; } }
+    else sawBurnerOut = true;
+  }
+  const graduated = burner.endsWith("luxvance.com");
   // Newest on top: Jose sees the latest reply first, no scrolling.
   const ordered = [...msgs].reverse();
   return (
     <div className="space-y-3">
+      {/* thread header: subject once + the current sending identity */}
+      <div className="pb-2.5 mb-1 border-b border-border">
+        <div className="text-[10px] uppercase tracking-[0.12em] text-[#FFD60A]/65 mb-0.5">// THREAD</div>
+        <div className="text-[13px] font-semibold text-foreground truncate">{cleanSubject(subject)}</div>
+        {burner && (
+          <div className={`text-[11px] mt-0.5 ${graduated ? "text-[#FFD60A]/85" : "text-muted-foreground"}`}>
+            via {burner}{hidden > 0 && <span className="text-muted-foreground/70"> · {hidden} hidden from other campaigns</span>}
+          </div>
+        )}
+      </div>
       {ordered.map((m, i) => {
+        const orig = msgs.length - 1 - i;
         const who = m.from_me ? "You" : themName;
         const latest = i === 0;
+        const divider = gradIndex > 0 && orig === gradIndex - 1; // boundary, rendered above older half
         return (
-          <div key={i} className={`flex gap-2.5 ${m.from_me ? "flex-row-reverse" : ""}`}>
-            <div className={`shrink-0 w-8 h-8 rounded-full grid place-items-center text-[11px] font-semibold ${
-              m.from_me ? "bg-[#FFD60A]/15 text-[#FFD60A]" : "bg-secondary text-muted-foreground"}`}>
-              {m.from_me ? "JB" : initials(themName)}
-            </div>
-            <div className={`max-w-[82%] rounded-2xl px-3.5 py-2.5 text-sm border ${
-              m.from_me ? "bg-[#FFD60A]/8 border-[#FFD60A]/25"
-              : latest ? "bg-card border-[#FFD60A]/40 ring-1 ring-[#FFD60A]/20" : "bg-card border-border"}`}>
-              <div className="flex items-center gap-2 mb-1">
-                <span className={`text-[11px] font-semibold ${m.from_me ? "text-[#FFD60A]" : "text-foreground"}`}>{who}</span>
-                <span className="text-[11px] text-muted-foreground tabular-nums">{timeAgo(m.at)}</span>
-                {latest && !m.from_me && <span className="text-[10px] text-[#FFD60A] font-medium">latest</span>}
+          <div key={i}>
+            {divider && (
+              <div className="flex items-center gap-3 my-3 text-[10px] uppercase tracking-[0.12em] text-[#FFD60A]">
+                <span className="flex-1 h-px bg-[#FFD60A]/35" />
+                // MOVED TO DIRECT · jose@luxvance.com
+                <span className="flex-1 h-px bg-[#FFD60A]/35" />
               </div>
-              <div className="text-foreground whitespace-pre-wrap leading-relaxed">{m.text}</div>
+            )}
+            <div className={`flex gap-2.5 ${m.from_me ? "flex-row-reverse" : ""}`}>
+              <div className={`shrink-0 w-8 h-8 rounded-full grid place-items-center text-[11px] font-semibold ${
+                m.from_me ? "bg-[#FFD60A]/15 text-[#FFD60A]" : "bg-secondary text-muted-foreground"}`}>
+                {m.from_me ? "JB" : initials(themName)}
+              </div>
+              <div className={`max-w-[82%] rounded-2xl px-3.5 py-2.5 text-sm border ${
+                m.from_me ? "bg-[#FFD60A]/8 border-[#FFD60A]/25"
+                : latest ? "bg-card border-[#FFD60A]/40 ring-1 ring-[#FFD60A]/20" : "bg-card border-border"}`}>
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className={`text-[11px] font-semibold ${m.from_me ? "text-[#FFD60A]" : "text-foreground"}`}>{who}</span>
+                  <span className="text-[11px] text-muted-foreground tabular-nums">{timeAgo(m.at)}</span>
+                  {latest && !m.from_me && <span className="text-[10px] text-[#FFD60A] font-medium">latest</span>}
+                </div>
+                {routeShow[orig] && (m.from_addr || m.to_addr) && (
+                  <div className="text-[10.5px] text-muted-foreground/80 mb-1.5 truncate">
+                    {shortAddr(m.from_addr)} <span className="text-[#FFD60A]">&gt;</span> {shortAddr(m.to_addr)}
+                  </div>
+                )}
+                <div className="text-foreground whitespace-pre-wrap leading-relaxed">{m.text}</div>
+              </div>
             </div>
           </div>
         );
@@ -387,6 +471,18 @@ function ReplyComposer({ d, onSent }: { d: Detail; onSent: () => void }) {
         className="w-full bg-background border border-border rounded-lg p-3 text-sm text-foreground leading-relaxed focus:outline-none focus:ring-1 focus:ring-[#FFD60A]/50 resize-y"
       />
 
+      {/* one-click: drop the Build (lead magnet) link into the message */}
+      {d.build_url && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setDraft(chan, (text.trim() ? text.trimEnd() + "\n\n" : "") + `Here is your Build: ${d.build_url}`)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[#FFD60A]/30 bg-[#FFD60A]/8 px-2.5 py-1.5 text-xs text-[#FFD60A] hover:bg-[#FFD60A]/12 transition-colors">
+            🧲 Insert Build link
+          </button>
+          <span className="text-[11px] text-muted-foreground truncate">{d.build_name || "Their Build"}</span>
+        </div>
+      )}
+
       {/* copilot chat-to-edit */}
       {coLog.length > 0 && (
         <div className="space-y-1.5 max-h-24 overflow-y-auto text-xs">
@@ -420,7 +516,7 @@ function ReplyComposer({ d, onSent }: { d: Detail; onSent: () => void }) {
         <div className="flex items-center gap-2 flex-wrap">
           {canSendEmail ? (
             <button onClick={send} disabled={sending || !text.trim()}
-              className="inline-flex items-center gap-2 rounded-lg bg-[#FFD60A] px-4 py-2 text-sm font-semibold text-[#0A0E1A] hover:bg-[#ffdf3a] disabled:opacity-40 transition-colors">
+              className="neon-btn inline-flex items-center gap-2 rounded-lg bg-[#FFD60A] px-4 py-2 text-sm font-semibold text-[#0A0E1A] hover:bg-[#ffdf3a] disabled:opacity-40 transition-colors">
               {sending ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending…</> : <><Send className="w-4 h-4" /> Send via Instantly</>}
             </button>
           ) : chan !== "email" && text.trim() ? (
@@ -458,48 +554,37 @@ function ReplyComposer({ d, onSent }: { d: Detail; onSent: () => void }) {
   );
 }
 
-// ── build card ───────────────────────────────────────────────────────
+// ── build card: the Build IS the lead magnet ─────────────────────────
 function BuildCard({ d, onChanged }: { d: Detail; onChanged: () => void }) {
   const id = d.id;
-  const [brief, setBrief] = useState<string | null>(null);
-  const [briefLoading, setBriefLoading] = useState(false);
   const [building, setBuilding] = useState(d.build_status === "building");
   const [err, setErr] = useState<string | null>(null);
-  const [co, setCo] = useState("");
-  const [coBusy, setCoBusy] = useState(false);
+  const [instr, setInstr] = useState("");        // optional extra context for the Build
+  const [showInstr, setShowInstr] = useState(false);
+  const [optimize, setOptimize] = useState(false);
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
 
-  const getBrief = () => {
-    setBriefLoading(true); setErr(null);
-    fetch(`${API}/api/crm/prospect/${id}/build-brief`).then((r) => r.json())
-      .then((j) => setBrief(j.instructions || "")).catch(() => setBrief("")).finally(() => setBriefLoading(false));
-  };
+  // Poll the detail endpoint until the Build link appears (or changes, after a
+  // rebuild). d.build_url captured here is the "before" value for this render.
   const poll = () => {
     if (!alive.current) return;
     fetch(`${API}/api/crm/prospect/${id}`).then((r) => r.json()).then((j) => {
       if (!alive.current) return;
-      if (j.build_url) { setBuilding(false); onChanged(); }
+      if (j.build_url && j.build_url !== d.build_url) { setBuilding(false); onChanged(); }
       else if (j.build_status === "error") { setBuilding(false); setErr("Build failed. Check credits or niche coverage, then retry."); }
       else setTimeout(poll, 6000);
     }).catch(() => { if (alive.current) setTimeout(poll, 8000); });
   };
-  const start = () => {
-    setBuilding(true); setErr(null); setBrief(null);
+  // Generate straight from the conversation. instr is optional extra guidance for
+  // anything not in the emails. force=true rebuilds an existing Build.
+  const start = (force: boolean) => {
+    setBuilding(true); setErr(null); setOptimize(false);
     fetch(`${API}/api/crm/prospect/${id}/build`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ instructions: brief || "" }),
+      body: JSON.stringify({ instructions: instr.trim(), force }),
     }).then((r) => { if (!r.ok) throw new Error(); setTimeout(poll, 6000); })
       .catch(() => { setBuilding(false); setErr("Could not start the Build."); });
-  };
-  const tweakBrief = () => {
-    if (!co.trim() || brief === null) return;
-    setCoBusy(true);
-    fetch(`${API}/api/crm/prospect/${id}/copilot`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: co.trim(), draft: brief, target: "build" }),
-    }).then((r) => r.json()).then((j) => { if (j.draft) setBrief(j.draft); setCo(""); })
-      .catch(() => {}).finally(() => setCoBusy(false));
   };
 
   const statusLine = d.build_delivered
@@ -509,60 +594,73 @@ function BuildCard({ d, onChanged }: { d: Detail; onChanged: () => void }) {
 
   return (
     <div>
-      <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Their Build</div>
-      {d.build_url ? (
-        <div className="bg-card border border-border rounded-xl p-4 space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm">
-              <Sparkles className="w-4 h-4 text-[#FFD60A]" />
-              <span className={statusLine.cls}>{statusLine.txt}</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <CopyBtn value={d.build_url} label="Link" />
-              <a href={d.build_url} target="_blank" rel="noreferrer"
-                className="inline-flex items-center gap-1.5 text-sm text-[#FFD60A] hover:underline px-2">
-                Open <ExternalLink className="w-3.5 h-3.5" />
-              </a>
-            </div>
-          </div>
-          <div className="text-[11px] text-muted-foreground break-all">{d.build_url}</div>
-        </div>
-      ) : building ? (
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-base leading-none">🧲</span>
+        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">// THEIR_BUILD</span>
+        <span className="text-[11px] text-muted-foreground">· the lead magnet</span>
+      </div>
+
+      {building ? (
         <div className="flex items-center gap-2 rounded-xl border border-[#FFD60A]/30 bg-[#FFD60A]/8 px-4 py-3 text-sm text-[#FFD60A]">
           <Loader2 className="w-4 h-4 animate-spin" /> Building… sourcing ~50 real leads + copy (about a minute).
         </div>
-      ) : brief !== null ? (
-        <div className="bg-card border border-border rounded-xl p-4 space-y-2">
-          <div className="text-xs text-muted-foreground">Build brief from the conversation. Edit or ask the copilot, then build.</div>
-          <textarea value={brief} onChange={(e) => setBrief(e.target.value)}
-            rows={Math.min(14, Math.max(5, brief.split("\n").length + 1))}
-            className="w-full bg-background border border-border rounded-lg p-3 text-sm text-foreground leading-relaxed focus:outline-none focus:ring-1 focus:ring-[#FFD60A]/50 resize-y" />
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1">
-              <Bot className="w-4 h-4 text-[#FFD60A] absolute left-3 top-1/2 -translate-y-1/2" />
-              <input value={co} onChange={(e) => setCo(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); tweakBrief(); } }}
-                placeholder="Ask copilot to adjust the brief…"
-                className="w-full bg-background border border-border rounded-lg pl-9 pr-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-[#FFD60A]/50" />
+      ) : d.build_url ? (
+        <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-base leading-none">🧲</span>
+                <span className="font-semibold text-foreground truncate">{d.build_name || "Their Build"}</span>
+              </div>
+              <div className="text-xs text-muted-foreground mt-0.5 truncate">
+                {d.build_audience || "Personalized sample"}{d.build_leads ? ` · ${d.build_leads} sample leads` : ""}
+              </div>
             </div>
-            <button onClick={tweakBrief} disabled={coBusy || !co.trim()}
-              className="inline-flex items-center rounded-lg border border-[#FFD60A]/40 px-2.5 py-2 text-[#FFD60A] hover:bg-[#FFD60A]/10 disabled:opacity-40">
-              {coBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-            </button>
+            <span className={`shrink-0 text-xs ${statusLine.cls}`}>{statusLine.txt}</span>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={start} disabled={!brief.trim()}
-              className="inline-flex items-center gap-2 rounded-lg bg-[#FFD60A] px-4 py-2 text-sm font-semibold text-[#0A0E1A] hover:bg-[#ffdf3a] disabled:opacity-40 transition-colors">
-              <Sparkles className="w-4 h-4" /> Generate Build
+            <a href={d.build_url} target="_blank" rel="noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[#FFD60A]/10 border border-[#FFD60A]/40 px-3 py-2 text-sm text-[#FFD60A] hover:bg-[#FFD60A]/15 transition-colors">
+              Open the Build <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+            <CopyBtn value={d.build_url} label="Copy link" />
+            <button onClick={() => setOptimize((v) => !v)}
+              className="ml-auto inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-2 py-1.5">
+              <Sparkles className="w-3.5 h-3.5" /> Optimize
             </button>
-            <button onClick={() => setBrief(null)} className="text-sm text-muted-foreground hover:text-foreground px-2 py-2">Cancel</button>
           </div>
+          <div className="text-[11px] text-muted-foreground break-all">{d.build_url}</div>
+          {optimize && (
+            <div className="space-y-2 border-t border-border pt-3">
+              <div className="text-xs text-muted-foreground">Rebuild keeps the conversation context. Add anything you want changed.</div>
+              <textarea value={instr} onChange={(e) => setInstr(e.target.value)} rows={3}
+                placeholder="e.g. focus on Series A fintech in the UK, drop agencies…"
+                className="w-full bg-background border border-border rounded-lg p-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-[#FFD60A]/50 resize-y" />
+              <button onClick={() => start(true)}
+                className="inline-flex items-center gap-2 rounded-lg bg-[#FFD60A] px-4 py-2 text-sm font-semibold text-[#0A0E1A] hover:bg-[#ffdf3a] transition-colors">
+                <Sparkles className="w-4 h-4" /> Rebuild the Build
+              </button>
+            </div>
+          )}
+          {err && <div className="text-xs text-[#ef4444]">{err}</div>}
         </div>
       ) : (
-        <div className="space-y-2">
-          <button onClick={getBrief} disabled={briefLoading}
-            className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-[#FFD60A]/40 bg-[#FFD60A]/10 px-4 py-3 text-sm font-medium text-[#FFD60A] hover:bg-[#FFD60A]/15 disabled:opacity-40 transition-colors">
-            {briefLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Reading the conversation…</> : <><Sparkles className="w-4 h-4" /> Build with context</>}
+        <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+          <div className="text-sm text-foreground">
+            Generate a personalized Build: about 50 of their ideal leads plus tailored copy. It reads the conversation automatically.
+          </div>
+          <button onClick={() => setShowInstr((v) => !v)}
+            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
+            <PenLine className="w-3.5 h-3.5" /> {showInstr ? "Hide" : "Add"} instructions (optional)
+          </button>
+          {showInstr && (
+            <textarea value={instr} onChange={(e) => setInstr(e.target.value)} rows={3}
+              placeholder="Anything to consider that is not in the emails? e.g. target only US mid-market, avoid competitors…"
+              className="w-full bg-background border border-border rounded-lg p-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-[#FFD60A]/50 resize-y" />
+          )}
+          <button onClick={() => start(false)}
+            className="neon-btn w-full inline-flex items-center justify-center gap-2 rounded-lg bg-[#FFD60A] px-4 py-3 text-sm font-semibold text-[#0A0E1A] hover:bg-[#ffdf3a] transition-colors">
+            🧲 Generate the Build
           </button>
           {err && <div className="text-xs text-[#ef4444]">{err}</div>}
         </div>
@@ -749,7 +847,7 @@ function Record({ id, onClose, onChanged }: { id: number; onClose: () => void; o
             <div className="flex flex-col min-h-0">
               <ReplyComposer d={d} onSent={both} />
               <div className="flex-1 min-h-0 overflow-y-auto p-6">
-                <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Conversation · newest first</div>
+                <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">// CONVERSATION · NEWEST_FIRST</div>
                 <Conversation id={id} themName={themName} fallback={d.reply_text} />
               </div>
             </div>
@@ -830,16 +928,30 @@ function PipelineSection({ title, hint, rows, onOpen, accent }: {
 // ── board (kanban) ───────────────────────────────────────────────────
 function BoardCard({ r, onOpen }: { r: Card; onOpen: (id: number) => void }) {
   const h = heatChip(r.heat);
+  const cat = catPill(r.category);
+  const owed = r.waiting_on === "us" ? daysSince(r.last_reply_at) : 0;
+  // The footer clock reads differently per column: when the ball is with us it's a
+  // "silent for N days" debt (loud past 3d); when it's on them it's the next scheduled
+  // nudge; when closed it's the stage. This is the single most action-driving line.
+  const clock =
+    r.waiting_on === "us"
+      ? { text: owed <= 0 ? "replied today" : `${owed}d silent`, cls: owed >= 7 ? "text-[#ff9b9b]" : owed >= 3 ? "text-[#f0b45f]" : "text-muted-foreground" }
+      : r.waiting_on === "them"
+      ? { text: r.next_touch_at ? (isDue(r.next_touch_at) ? "nudge due" : `next ${fmtDate(r.next_touch_at)}`) : timeAgo(r.last_touch_at), cls: r.next_touch_at && isDue(r.next_touch_at) ? "text-[#FFD60A]" : "text-muted-foreground" }
+      : { text: r.stage_label || r.status_label, cls: "text-muted-foreground" };
   return (
     <button onClick={() => onOpen(r.id)} draggable
       onDragStart={(e) => e.dataTransfer.setData("text/plain", String(r.id))}
       className={`w-full text-left bg-card border border-border rounded-xl p-3 hover:border-[#FFD60A]/50 transition-colors ${rotEdge(r)}`}>
+      {/* name + heat */}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="font-medium text-foreground text-sm truncate flex items-center gap-1.5">
             {r.wants_meeting && r.waiting_on !== "closed" && <span className="text-[11px]">📅</span>}{r.name}
           </div>
-          <div className="text-xs text-muted-foreground truncate">{r.company || r.email}</div>
+          <div className="text-xs text-muted-foreground truncate">
+            {[r.job_title, r.company].filter(Boolean).join(" · ") || r.email}
+          </div>
         </div>
         {r.waiting_on !== "closed" && (
           <span className={`shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${h.cls}`}>
@@ -847,9 +959,25 @@ function BoardCard({ r, onOpen }: { r: Card; onOpen: (id: number) => void }) {
           </span>
         )}
       </div>
-      <div className="flex items-center justify-between mt-2 text-[11px] text-muted-foreground">
-        <span>{timeAgo(r.last_reply_at)}</span>
-        <span className={`inline-block w-1.5 h-1.5 rounded-full ${r.build_delivered ? "bg-[#5fe08a]" : r.has_build ? "bg-[#FFD60A]" : "bg-muted-foreground/40"}`} />
+
+      {/* their actual words — the context that makes this a cockpit, not a list */}
+      {r.reply_snippet && (
+        <p className="mt-2 text-[11px] leading-snug text-muted-foreground/90 line-clamp-2 border-l border-border pl-2">
+          “{r.reply_snippet}”
+        </p>
+      )}
+
+      {/* footer: category · country · clock · build · assets */}
+      <div className="flex items-center gap-1.5 mt-2.5 text-[10px]">
+        <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full font-medium ${cat.cls}`}>{cat.label}</span>
+        {r.country && <span className="text-muted-foreground/70 truncate max-w-[5rem]">{r.country}</span>}
+        <span className={`ml-auto tabular-nums ${clock.cls}`}>{clock.text}</span>
+        {(r.build_delivered || r.has_build) && (
+          <span title={r.build_delivered ? "Build sent" : "Build ready"}
+            className={`inline-block w-1.5 h-1.5 rounded-full ${r.build_delivered ? "bg-[#26D07C]" : "bg-[#FFD60A]"}`} />
+        )}
+        {r.has_phone && <span title="Phone on file" className="text-muted-foreground/60">☎</span>}
+        {r.has_linkedin && <span title="LinkedIn on file" className="text-[#5fd0e0]/70 font-semibold">in</span>}
       </div>
     </button>
   );
@@ -884,7 +1012,7 @@ export default function CrmPage() {
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [onlyMine, setOnlyMine] = useState(false);
-  const [view, setView] = useState<"queue" | "board">("queue");
+  const [view, setView] = useState<"queue" | "board">("board");
   const [openId, setOpenId] = useState<number | null>(null);
 
   const load = useCallback(() => {
@@ -939,8 +1067,8 @@ export default function CrmPage() {
     <div className="p-6 md:p-8 max-w-[1600px] mx-auto">
       <div className="flex items-end justify-between mb-5 gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">CRM</h1>
-          <p className="text-sm text-muted-foreground mt-1">Prospects who replied · work the queue, book the call</p>
+          <h1 className="text-2xl font-bold neon tracking-tight">// LUXVANCE_CRM</h1>
+          <p className="text-sm text-muted-foreground mt-1 term-prompt">reply pipeline · work the queue, book the call</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center bg-card border border-border rounded-lg p-0.5">
@@ -989,9 +1117,9 @@ export default function CrmPage() {
         <div className="text-center text-muted-foreground py-16">Loading…</div>
       ) : view === "queue" ? (
         <>
-          <PipelineSection title="⚡ Your turn" hint="they replied, the ball is with us · hottest first" rows={groups.us} onOpen={openRecord} accent />
-          {!onlyMine && <PipelineSection title="Waiting on them" hint="we replied last" rows={groups.them} onOpen={openRecord} />}
-          {!onlyMine && <PipelineSection title="Booked & closed" rows={groups.closed} onOpen={openRecord} />}
+          <PipelineSection title="// YOUR_TURN" hint="they replied, the ball is with us · hottest first" rows={groups.us} onOpen={openRecord} accent />
+          {!onlyMine && <PipelineSection title="// WAITING_ON_THEM" hint="we replied last" rows={groups.them} onOpen={openRecord} />}
+          {!onlyMine && <PipelineSection title="// BOOKED_&_CLOSED" rows={groups.closed} onOpen={openRecord} />}
           {groups.us.length === 0 && groups.them.length === 0 && groups.closed.length === 0 && (
             <div className="text-center text-muted-foreground py-16">No prospects.</div>
           )}
