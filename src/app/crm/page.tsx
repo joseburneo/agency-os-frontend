@@ -22,6 +22,8 @@ type Card = {
   status_label: string;
   seq_step: number;
   stage_label: string;
+  stage: string;
+  stage_name: string;
   next_channel: string | null;
   next_touch_at: string | null;
   last_channel: string | null;
@@ -983,27 +985,44 @@ function BoardCard({ r, onOpen }: { r: Card; onOpen: (id: number) => void }) {
   );
 }
 
-function BoardColumn({ title, accent, rows, onOpen, onDropBook }: {
-  title: string; accent?: boolean; rows: Card[]; onOpen: (id: number) => void; onDropBook?: (id: number) => void;
+function BoardColumn({ title, hint, accent, tone, rows, onOpen, onDrop }: {
+  title: string; hint?: string; accent?: boolean; tone?: "green" | "muted";
+  rows: Card[]; onOpen: (id: number) => void; onDrop?: (id: number) => void;
 }) {
   const [over, setOver] = useState(false);
+  const ring = tone === "green" ? "bg-[#26D07C]/8 ring-1 ring-[#26D07C]/40"
+    : tone === "muted" ? "bg-muted/20 ring-1 ring-border" : "bg-[#FFD60A]/6 ring-1 ring-[#FFD60A]/40";
   return (
     <div
-      onDragOver={onDropBook ? (e) => { e.preventDefault(); setOver(true); } : undefined}
+      onDragOver={onDrop ? (e) => { e.preventDefault(); setOver(true); } : undefined}
       onDragLeave={() => setOver(false)}
-      onDrop={onDropBook ? (e) => { e.preventDefault(); setOver(false); const id = Number(e.dataTransfer.getData("text/plain")); if (id) onDropBook(id); } : undefined}
-      className={`shrink-0 w-72 rounded-xl p-2 ${over ? "bg-[#5fe08a]/8 ring-1 ring-[#5fe08a]/40" : ""}`}>
-      <div className="flex items-center gap-2 px-2 py-1.5 mb-1">
-        <h3 className={`text-xs font-semibold ${accent ? "text-[#FFD60A]" : "text-foreground"}`}>{title}</h3>
-        <span className="text-xs text-muted-foreground tabular-nums">{rows.length}</span>
+      onDrop={onDrop ? (e) => { e.preventDefault(); setOver(false); const id = Number(e.dataTransfer.getData("text/plain")); if (id) onDrop(id); } : undefined}
+      className={`shrink-0 w-[17rem] rounded-xl p-2 transition-colors ${over ? ring : "bg-card/30"}`}>
+      <div className="px-2 py-1.5 mb-1 border-b border-border/60">
+        <div className="flex items-center gap-2">
+          <h3 className={`text-xs font-semibold uppercase tracking-wide ${accent ? "text-[#FFD60A]" : tone === "green" ? "text-[#5fe08a]" : "text-foreground"}`}>{title}</h3>
+          <span className="text-xs text-muted-foreground tabular-nums ml-auto">{rows.length}</span>
+        </div>
+        {hint && <p className="text-[10px] text-muted-foreground/70 mt-0.5">{hint}</p>}
       </div>
-      <div className="space-y-2 max-h-[calc(100vh-22rem)] overflow-y-auto pr-1">
+      <div className="space-y-2 max-h-[calc(100vh-20rem)] overflow-y-auto pr-1 pt-1">
         {rows.map((r) => <BoardCard key={r.id} r={r} onOpen={onOpen} />)}
-        {rows.length === 0 && <div className="text-xs text-muted-foreground px-2 py-4">Empty</div>}
+        {rows.length === 0 && <div className="text-[11px] text-muted-foreground/50 px-2 py-6 text-center border border-dashed border-border/50 rounded-lg">drop here</div>}
       </div>
     </div>
   );
 }
+
+// The funnel = our lead journey, in order. Each column is a stage; drag a card right as
+// the deal advances. Kept in sync with the backend FUNNEL_STAGES.
+const FUNNEL: { key: string; title: string; hint: string; tone?: "green" | "muted" }[] = [
+  { key: "new_reply",        title: "New reply",       hint: "replied · Build being prepped" },
+  { key: "in_conversation",  title: "In conversation", hint: "nurturing · Build sent" },
+  { key: "discovery_booked", title: "Discovery",       hint: "call booked / held" },
+  { key: "proposal_sent",    title: "Proposal sent",   hint: "after they saw the Build" },
+  { key: "won",              title: "Won",             hint: "closed · client", tone: "green" },
+  { key: "lost",             title: "Lost / Parked",   hint: "dead or not now", tone: "muted" },
+];
 
 // ── page ─────────────────────────────────────────────────────────────
 export default function CrmPage() {
@@ -1045,8 +1064,14 @@ export default function CrmPage() {
       .catch(() => {});
   }, [load]);
 
-  const book = (id: number) => {
-    fetch(`${API}/api/crm/prospect/${id}/book`, { method: "POST" }).then((r) => { if (r.ok) load(); });
+  // Drag a card to a funnel column → persist the stage, then refresh so the queue/cadence
+  // (which the backend keeps in sync with the stage) and the board agree.
+  const moveStage = (id: number, stage: string) => {
+    setRows((rs) => rs.map((r) => (r.id === id ? { ...r, stage } : r)));  // optimistic
+    fetch(`${API}/api/crm/prospect/${id}/stage`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ stage }),
+    }).then((r) => { if (r.ok) load(); else load(); });
   };
 
   const groups = useMemo(() => {
@@ -1126,10 +1151,20 @@ export default function CrmPage() {
         </>
       ) : (
         <div className="flex gap-3 overflow-x-auto pb-4">
-          <BoardColumn title="⚡ Your turn" accent rows={groups.us} onOpen={openRecord} />
-          <BoardColumn title="Waiting on them" rows={groups.them} onOpen={openRecord} />
-          <BoardColumn title="Booked" rows={groups.closed.filter((r) => r.status === "meeting_booked")} onOpen={openRecord} onDropBook={book} />
-          <BoardColumn title="Stopped / done" rows={groups.closed.filter((r) => r.status !== "meeting_booked")} onOpen={openRecord} />
+          {FUNNEL.map((s) => {
+            const ms = (v: string | null) => (v ? new Date(v).getTime() : 0);
+            const col = (q.trim()
+              ? rows.filter((x) => x.name.toLowerCase().includes(q.toLowerCase()) || x.company.toLowerCase().includes(q.toLowerCase()) || x.email.toLowerCase().includes(q.toLowerCase()))
+              : rows
+            ).filter((x) => (x.stage || "new_reply") === s.key)
+              // hottest first, then most-overdue
+              .sort((a, b) => b.heat - a.heat || ms(a.last_reply_at) - ms(b.last_reply_at));
+            return (
+              <BoardColumn key={s.key} title={s.title} hint={s.hint} tone={s.tone}
+                accent={s.key === "new_reply"} rows={col} onOpen={openRecord}
+                onDrop={(id) => moveStage(id, s.key)} />
+            );
+          })}
         </div>
       )}
 
