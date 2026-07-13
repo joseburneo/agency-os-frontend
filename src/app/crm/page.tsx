@@ -71,6 +71,18 @@ type Detail = Card & {
   intent_summary: string;
   reply_campaign: string;
   notes: string;
+  call_notes: string;
+  call_notes_at: string | null;
+  dossier_facts: Record<string, unknown>;
+  dossier_status: string;
+  research: {
+    website: string;
+    google_company: string;
+    google_person: string;
+    linkedin_person: string;
+    linkedin_company: string;
+    fireflies: string;
+  };
   next: {
     next_step: number | null;
     next_channel: string | null;
@@ -189,6 +201,43 @@ function initials(name: string): string {
   const p = (name || "?").trim().split(/\s+/);
   return ((p[0]?.[0] || "") + (p[1]?.[0] || "")).toUpperCase() || "?";
 }
+
+const FREE_MAIL = new Set(["gmail.com","googlemail.com","outlook.com","hotmail.com","live.com",
+  "yahoo.com","icloud.com","me.com","aol.com","proton.me","protonmail.com","msn.com"]);
+
+// The prospect's company domain, for their favicon. Prefer the email domain (a B2B
+// prospect emails from their company), skipping free mailboxes.
+function domainOf(email?: string): string {
+  const d = (email || "").split("@")[1]?.trim().toLowerCase() || "";
+  return d && !FREE_MAIL.has(d) ? d : "";
+}
+
+// A small logo from a domain's favicon (Google's service). Falls back to a monogram tile
+// if the icon fails, so a missing favicon never leaves a broken image.
+function Favicon({ domain, label, size = 20, className = "" }: {
+  domain: string; label?: string; size?: number; className?: string;
+}) {
+  const [ok, setOk] = useState(true);
+  if (domain && ok) {
+    return (
+      <img src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`}
+        width={size} height={size} alt={label || domain} onError={() => setOk(false)}
+        className={`rounded-[4px] shrink-0 ${className}`} style={{ width: size, height: size }} />
+    );
+  }
+  return (
+    <span className={`inline-grid place-items-center rounded-[4px] bg-secondary text-muted-foreground shrink-0 ${className}`}
+      style={{ width: size, height: size, fontSize: size * 0.5 }}>
+      {(label || domain || "?").slice(0, 1).toUpperCase()}
+    </span>
+  );
+}
+
+// Brand favicon for a channel tab (real logos: Gmail / LinkedIn / WhatsApp), phone glyph
+// for a call. Keeps the CRM feeling like the tools Jose actually sends from.
+const CHANNEL_BRAND: Record<string, string> = {
+  email: "gmail.com", linkedin: "linkedin.com", whatsapp: "whatsapp.com", call: "",
+};
 
 function linkedinSearchUrl(name: string, company: string): string {
   const q = [name, company].filter(Boolean).join(" ");
@@ -452,8 +501,11 @@ function ReplyComposer({ d, onSent }: { d: Detail; onSent: () => void }) {
         <div className="flex items-center gap-1">
           {(["email", "linkedin", "whatsapp", "call"] as Chan[]).map((c) => (
             <button key={c} onClick={() => { setChan(c); setSent(null); }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 chan === c ? "bg-[#FFD60A]/12 text-[#FFD60A]" : "text-muted-foreground hover:bg-secondary"}`}>
+              {CHANNEL_BRAND[c]
+                ? <Favicon domain={CHANNEL_BRAND[c]} label={CHANNEL_META[c].label} size={14} />
+                : <Phone className="w-3.5 h-3.5 text-[#5fe08a]" />}
               {CHANNEL_META[c].label}
             </button>
           ))}
@@ -748,6 +800,77 @@ function ContactActions({ d, onChanged }: { d: Detail; onChanged: () => void }) 
 }
 
 // ── record (wide full-screen) ────────────────────────────────────────
+// The intelligence panel: the discovery-call notes (Fireflies) + the distilled why-they-fit
+// dossier + the 6 raw research sources, each expandable. This is the "deep research" surfaced
+// in the CRM so Jose can see, on the card, exactly why a prospect fits and what was said.
+const FACT_ROWS: [string, string][] = [
+  ["best_angle", "Best angle"], ["what_they_sell", "What they sell"],
+  ["their_icp", "Who they sell to"], ["pain_points", "Likely pain"],
+  ["buying_signals", "Buying signals"], ["person_notes", "About them"],
+  ["objections", "Objections"],
+];
+const RESEARCH_ROWS: [string, string][] = [
+  ["fireflies", "📞 Discovery call"], ["linkedin_person", "in Person LinkedIn"],
+  ["linkedin_company", "in Company LinkedIn"], ["google_person", "🔎 Person on the web"],
+  ["google_company", "🔎 Company on the web"], ["website", "🌐 Website"],
+];
+function factStr(v: unknown): string {
+  if (Array.isArray(v)) return v.filter(Boolean).map(String).join(" · ");
+  return v == null ? "" : String(v);
+}
+function Expandable({ label, text }: { label: string; text: string }) {
+  const [open, setOpen] = useState(false);
+  if (!text) return null;
+  return (
+    <div className="border border-border rounded-lg overflow-hidden">
+      <button onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between px-3 py-2 text-xs text-foreground hover:bg-secondary/50">
+        <span className="font-medium">{label}</span>
+        <ChevronRight className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${open ? "rotate-90" : ""}`} />
+      </button>
+      {open && <p className="px-3 pb-3 text-[11px] leading-relaxed text-muted-foreground whitespace-pre-wrap max-h-64 overflow-y-auto">{text}</p>}
+    </div>
+  );
+}
+function IntelPanel({ d }: { d: Detail }) {
+  const f = (d.dossier_facts || {}) as Record<string, unknown>;
+  const facts = FACT_ROWS.map(([k, l]) => [l, factStr(f[k])] as [string, string]).filter(([, v]) => v);
+  const research = RESEARCH_ROWS.map(([k, l]) => [l, (d.research?.[k as keyof typeof d.research] || "")] as [string, string]).filter(([, v]) => v);
+  const ffCount = research.length;
+  if (!facts.length && !ffCount && !d.call_notes) return null;
+  return (
+    <div className="rounded-xl border border-[#FFD60A]/20 bg-card p-4 space-y-3">
+      <div className="flex items-center gap-2 text-sm font-semibold text-[#FFD60A]">
+        <Bot className="w-4 h-4" /> Intelligence · why they fit
+        {d.dossier_status && <span className="ml-auto text-[10px] font-normal text-muted-foreground uppercase">{ffCount}/6 sources</span>}
+      </div>
+      {/* call notes get top billing when we have them */}
+      {d.call_notes && (
+        <div className="rounded-lg border border-[#26D07C]/25 bg-[#26D07C]/5 p-3">
+          <div className="text-[11px] font-semibold text-[#5fe08a] mb-1">📞 Call notes (Fireflies){d.call_notes_at ? ` · ${fmtDate(d.call_notes_at)}` : ""}</div>
+          <p className="text-[11px] leading-relaxed text-muted-foreground whitespace-pre-wrap max-h-48 overflow-y-auto">{d.call_notes}</p>
+        </div>
+      )}
+      {facts.length > 0 && (
+        <dl className="space-y-1.5">
+          {facts.map(([label, val]) => (
+            <div key={label} className="text-xs">
+              <dt className="text-muted-foreground/70 text-[10px] uppercase tracking-wide">{label}</dt>
+              <dd className="text-foreground/90 leading-snug">{val}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {research.length > 0 && (
+        <div className="space-y-1.5 pt-1">
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground/60">Raw research</div>
+          {research.map(([label, text]) => <Expandable key={label} label={label} text={text} />)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Record({ id, onClose, onChanged }: { id: number; onClose: () => void; onChanged: () => void }) {
   const [d, setD] = useState<Detail | null>(null);
   const [themName, setThemName] = useState("Them");
@@ -792,8 +915,9 @@ function Record({ id, onClose, onChanged }: { id: number; onClose: () => void; o
               {d?.wants_meeting && !booked && <Badge text="📅 wants to meet" className="bg-[#22c55e]/15 text-[#5fe08a]" />}
               {d?.category && <Badge text={d.category} className="bg-[#FFD60A]/12 text-[#FFD60A]" />}
             </div>
-            <p className="text-sm text-muted-foreground mt-0.5 truncate">
-              {d?.job_title ? `${d.job_title} · ` : ""}{d?.company}{d?.country ? ` · ${d.country}` : ""}
+            <p className="text-sm text-muted-foreground mt-0.5 truncate flex items-center gap-1.5">
+              {d && domainOf(d.email) && <Favicon domain={domainOf(d.email)} label={d.company} size={16} />}
+              <span className="truncate">{d?.job_title ? `${d.job_title} · ` : ""}{d?.company}{d?.country ? ` · ${d.country}` : ""}</span>
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -835,6 +959,7 @@ function Record({ id, onClose, onChanged }: { id: number; onClose: () => void; o
                 );
               })()}
 
+              <IntelPanel d={d} />
               <BuildCard d={d} onChanged={both} />
               <ContactActions d={d} onChanged={reload} />
 
@@ -951,8 +1076,9 @@ function BoardCard({ r, onOpen }: { r: Card; onOpen: (id: number) => void }) {
           <div className="font-medium text-foreground text-sm truncate flex items-center gap-1.5">
             {r.wants_meeting && r.waiting_on !== "closed" && <span className="text-[11px]">📅</span>}{r.name}
           </div>
-          <div className="text-xs text-muted-foreground truncate">
-            {[r.job_title, r.company].filter(Boolean).join(" · ") || r.email}
+          <div className="text-xs text-muted-foreground truncate flex items-center gap-1">
+            {domainOf(r.email) && <Favicon domain={domainOf(r.email)} label={r.company} size={13} />}
+            <span className="truncate">{[r.job_title, r.company].filter(Boolean).join(" · ") || r.email}</span>
           </div>
         </div>
         {r.waiting_on !== "closed" && (
@@ -1015,6 +1141,39 @@ function BoardColumn({ title, hint, accent, tone, rows, onOpen, onDrop }: {
 
 // The funnel = our lead journey, in order. Each column is a stage; drag a card right as
 // the deal advances. Kept in sync with the backend FUNNEL_STAGES.
+// Per-column sort — the controls a VP actually works a pipeline by.
+type SortKey = "heat" | "stalled" | "value" | "recent" | "name";
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: "heat", label: "🔥 Priority (hottest)" },
+  { key: "stalled", label: "🕒 Most stalled" },
+  { key: "value", label: "⭐ Best fit (Positive/SQL)" },
+  { key: "recent", label: "⚡ Recently active" },
+  { key: "name", label: "A–Z name" },
+];
+function catRank(cat: string): number {
+  const c = (cat || "").toLowerCase();
+  if (c.includes("positive") || c.includes("sql")) return 3;
+  if (c.includes("mql")) return 2;
+  if (c.includes("neg") || c.includes("not")) return 0;
+  return 1;
+}
+function sortCards(list: Card[], by: SortKey): Card[] {
+  const ms = (s: string | null) => (s ? new Date(s).getTime() : 0);
+  const r = [...list];
+  switch (by) {
+    case "stalled": // oldest last activity first (deals rotting at the top)
+      return r.sort((a, b) => (ms(a.last_touch_at) || ms(a.last_reply_at)) - (ms(b.last_touch_at) || ms(b.last_reply_at)));
+    case "value":
+      return r.sort((a, b) => catRank(b.category) - catRank(a.category) || b.heat - a.heat);
+    case "recent":
+      return r.sort((a, b) => Math.max(ms(b.last_reply_at), ms(b.last_touch_at)) - Math.max(ms(a.last_reply_at), ms(a.last_touch_at)));
+    case "name":
+      return r.sort((a, b) => a.name.localeCompare(b.name));
+    default: // heat
+      return r.sort((a, b) => b.heat - a.heat || ms(a.last_reply_at) - ms(b.last_reply_at));
+  }
+}
+
 const FUNNEL: { key: string; title: string; hint: string; tone?: "green" | "muted" }[] = [
   { key: "new_reply",        title: "New reply",       hint: "replied · Build being prepped" },
   { key: "in_conversation",  title: "In conversation", hint: "nurturing · Build sent" },
@@ -1032,6 +1191,7 @@ export default function CrmPage() {
   const [q, setQ] = useState("");
   const [onlyMine, setOnlyMine] = useState(false);
   const [view, setView] = useState<"queue" | "board">("board");
+  const [sortBy, setSortBy] = useState<SortKey>("heat");
   const [openId, setOpenId] = useState<number | null>(null);
 
   const load = useCallback(() => {
@@ -1106,6 +1266,11 @@ export default function CrmPage() {
               <LayoutGrid className="w-4 h-4" /> Board
             </button>
           </div>
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortKey)}
+            title="Sort each column"
+            className="bg-card border border-border rounded-lg px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground focus:outline-none focus:ring-1 focus:ring-[#FFD60A]/40 cursor-pointer">
+            {SORT_OPTIONS.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
+          </select>
           <button onClick={load} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground px-2 py-1.5">
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> Refresh
           </button>
@@ -1152,13 +1317,10 @@ export default function CrmPage() {
       ) : (
         <div className="flex gap-3 overflow-x-auto pb-4">
           {FUNNEL.map((s) => {
-            const ms = (v: string | null) => (v ? new Date(v).getTime() : 0);
-            const col = (q.trim()
+            const col = sortCards((q.trim()
               ? rows.filter((x) => x.name.toLowerCase().includes(q.toLowerCase()) || x.company.toLowerCase().includes(q.toLowerCase()) || x.email.toLowerCase().includes(q.toLowerCase()))
               : rows
-            ).filter((x) => (x.stage || "new_reply") === s.key)
-              // hottest first, then most-overdue
-              .sort((a, b) => b.heat - a.heat || ms(a.last_reply_at) - ms(b.last_reply_at));
+            ).filter((x) => (x.stage || "new_reply") === s.key), sortBy);
             return (
               <BoardColumn key={s.key} title={s.title} hint={s.hint} tone={s.tone}
                 accent={s.key === "new_reply"} rows={col} onOpen={openRecord}
