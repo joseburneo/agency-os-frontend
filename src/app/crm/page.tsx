@@ -1458,22 +1458,41 @@ function catRank(cat: string): number {
   if (c.includes("neg") || c.includes("not")) return 0;
   return 1;
 }
-// The tiles double as board filters — click "Hot now" and the whole pipeline narrows to hot
-// cards, click again to clear. null = no filter (show everything).
-type BoardFilter = null | "us" | "hot" | "wants" | "them" | "meetings";
-const FILTER_LABEL: Record<Exclude<BoardFilter, null>, string> = {
-  us: "⚡ Your turn", hot: "🔥 Hot now", wants: "📅 Want to meet",
-  them: "Waiting on them", meetings: "Meetings booked",
-};
-function passesFilter(c: Card, f: BoardFilter): boolean {
-  switch (f) {
-    case "us": return c.waiting_on === "us";
-    case "hot": return c.heat >= 70;
-    case "wants": return c.wants_meeting;
-    case "them": return c.waiting_on === "them";
-    case "meetings": return c.status === "meeting_booked";
-    default: return true;
-  }
+// Filters are combinable (AND): a card must pass EVERY active filter. The tiles cover the
+// status filters (with counts); the chip bar adds Build / reach / cadence / last-touch
+// dimensions so Jose can isolate exactly the cohort he wants to work, Master-Inbox style.
+// Note: "WhatsApp/LinkedIn" here mean reachable-on / last-touched-on (we track a single
+// last_channel + seq_step, not a full per-channel send log), so they are the best proxy
+// available client-side, not a literal "we sent a LinkedIn DM" flag.
+type FilterKey =
+  | "us" | "them" | "nudge" | "hot" | "wants" | "meetings"
+  | "build_sent" | "no_build"
+  | "has_phone" | "has_linkedin"
+  | "fu2" | "fu3"
+  | "ch_email" | "ch_linkedin" | "ch_whatsapp" | "ch_call";
+
+const FILTERS: { key: FilterKey; label: string; group: string; test: (c: Card) => boolean }[] = [
+  { key: "us",       label: "⚡ Your turn",      group: "Status", test: (c) => c.waiting_on === "us" },
+  { key: "them",     label: "Waiting on them",   group: "Status", test: (c) => c.waiting_on === "them" },
+  { key: "nudge",    label: "⏰ Nudge due",       group: "Status", test: (c) => c.waiting_on === "them" && !!c.next_touch_at && new Date(c.next_touch_at).getTime() <= Date.now() },
+  { key: "hot",      label: "🔥 Hot",            group: "Status", test: (c) => c.heat >= 70 },
+  { key: "wants",    label: "📅 Wants meeting",   group: "Status", test: (c) => c.wants_meeting },
+  { key: "meetings", label: "✅ Booked",          group: "Status", test: (c) => c.status === "meeting_booked" },
+  { key: "build_sent", label: "🧲 Build sent",    group: "Build",  test: (c) => c.build_delivered },
+  { key: "no_build",   label: "No Build",         group: "Build",  test: (c) => !c.has_build },
+  { key: "has_phone",    label: "☎ Phone / WhatsApp", group: "Reach", test: (c) => c.has_phone },
+  { key: "has_linkedin", label: "🔗 LinkedIn",        group: "Reach", test: (c) => c.has_linkedin },
+  { key: "fu2", label: "2+ emails sent", group: "Cadence", test: (c) => (c.seq_step || 0) >= 2 },
+  { key: "fu3", label: "3+ emails sent", group: "Cadence", test: (c) => (c.seq_step || 0) >= 3 },
+  { key: "ch_email",    label: "Last: Email",    group: "Last touch", test: (c) => (c.last_channel || "") === "email" },
+  { key: "ch_linkedin", label: "Last: LinkedIn", group: "Last touch", test: (c) => (c.last_channel || "") === "linkedin" },
+  { key: "ch_whatsapp", label: "Last: WhatsApp", group: "Last touch", test: (c) => (c.last_channel || "") === "whatsapp" },
+  { key: "ch_call",     label: "Last: Call",     group: "Last touch", test: (c) => (c.last_channel || "") === "call" },
+];
+const FILTER_BY_KEY = Object.fromEntries(FILTERS.map((f) => [f.key, f.test])) as Record<FilterKey, (c: Card) => boolean>;
+function passesAll(c: Card, active: Set<FilterKey>): boolean {
+  for (const k of active) { if (!FILTER_BY_KEY[k]?.(c)) return false; }
+  return true;
 }
 function matchQuery(c: Card, q: string): boolean {
   if (!q.trim()) return true;
@@ -1512,7 +1531,12 @@ export default function CrmPage() {
   const [rows, setRows] = useState<Card[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
-  const [filter, setFilter] = useState<BoardFilter>(null);
+  const [filters, setFilters] = useState<Set<FilterKey>>(new Set());
+  const toggleFilter = (k: FilterKey) => setFilters((prev) => {
+    const n = new Set(prev);
+    if (n.has(k)) n.delete(k); else n.add(k);
+    return n;
+  });
   const [view, setView] = useState<"queue" | "board">("board");
   const [sortBy, setSortBy] = useState<SortKey>("heat");
   const [openId, setOpenId] = useState<number | null>(null);
@@ -1558,14 +1582,14 @@ export default function CrmPage() {
   };
 
   const groups = useMemo(() => {
-    const r = rows.filter((x) => matchQuery(x, q) && passesFilter(x, filter));
+    const r = rows.filter((x) => matchQuery(x, q) && passesAll(x, filters));
     const ms = (s: string | null) => (s ? new Date(s).getTime() : 0);
     // Hottest first: heat desc, then most-overdue.
     const us = r.filter((x) => x.waiting_on === "us").sort((a, b) => b.heat - a.heat || ms(a.last_reply_at) - ms(b.last_reply_at));
     const them = r.filter((x) => x.waiting_on === "them").sort((a, b) => ms(a.next_touch_at) - ms(b.next_touch_at));
     const closed = r.filter((x) => x.waiting_on === "closed");
     return { us, them, closed };
-  }, [rows, q, filter]);
+  }, [rows, q, filters]);
 
   return (
     <div className="max-w-[1760px] mx-auto">
@@ -1602,24 +1626,32 @@ export default function CrmPage() {
       {/* the tiles ARE the filters: click to narrow the pipeline, click again to clear */}
       {funnel && (
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
-          <Tile label="⚡ Your turn" value={funnel.waiting_us} accent active={filter === "us"} onClick={() => setFilter((f) => (f === "us" ? null : "us"))} />
-          <Tile label="Hot now" value={funnel.hot_now} icon={<Flame className="w-4 h-4 text-[#ff9b9b]" />} active={filter === "hot"} onClick={() => setFilter((f) => (f === "hot" ? null : "hot"))} />
-          <Tile label="Want to meet" value={funnel.wants_meeting} active={filter === "wants"} onClick={() => setFilter((f) => (f === "wants" ? null : "wants"))} />
-          <Tile label="Waiting on them" value={funnel.waiting_them} active={filter === "them"} onClick={() => setFilter((f) => (f === "them" ? null : "them"))} />
-          <Tile label="Meetings" value={funnel.by_status?.meeting_booked?.count || 0} active={filter === "meetings"} onClick={() => setFilter((f) => (f === "meetings" ? null : "meetings"))} />
+          <Tile label="⚡ Your turn" value={funnel.waiting_us} accent active={filters.has("us")} onClick={() => toggleFilter("us")} />
+          <Tile label="Hot now" value={funnel.hot_now} icon={<Flame className="w-4 h-4 text-[#ff9b9b]" />} active={filters.has("hot")} onClick={() => toggleFilter("hot")} />
+          <Tile label="Want to meet" value={funnel.wants_meeting} active={filters.has("wants")} onClick={() => toggleFilter("wants")} />
+          <Tile label="Waiting on them" value={funnel.waiting_them} active={filters.has("them")} onClick={() => toggleFilter("them")} />
+          <Tile label="Meetings" value={funnel.by_status?.meeting_booked?.count || 0} active={filters.has("meetings")} onClick={() => toggleFilter("meetings")} />
         </div>
       )}
 
-      {/* active-filter chip, so it's obvious the pipeline is narrowed + how to clear it */}
-      {filter && (
-        <div className="flex items-center gap-2 mb-3 text-xs">
-          <span className="text-muted-foreground">Filtered:</span>
-          <button onClick={() => setFilter(null)}
-            className="inline-flex items-center gap-1.5 rounded-full bg-[#FFD60A]/10 border border-[#FFD60A]/40 text-[#FFD60A] px-2.5 py-1 font-medium hover:bg-[#FFD60A]/15 transition-colors">
-            {FILTER_LABEL[filter]} <X className="w-3 h-3" />
+      {/* filter chip bar — combinable (AND), Master-Inbox style: isolate the exact cohort to work */}
+      <div className="flex items-center gap-1.5 flex-wrap mb-3">
+        {FILTERS.filter((f) => f.group !== "Status").map((f) => {
+          const on = filters.has(f.key);
+          return (
+            <button key={f.key} onClick={() => toggleFilter(f.key)} title={f.group}
+              className={`text-[11px] rounded-full border px-2.5 py-1 transition-colors ${on ? "bg-[#FFD60A]/15 border-[#FFD60A]/50 text-[#FFD60A] font-medium" : "border-border text-muted-foreground hover:text-foreground hover:border-[#FFD60A]/30"}`}>
+              {f.label}
+            </button>
+          );
+        })}
+        {filters.size > 0 && (
+          <button onClick={() => setFilters(new Set())}
+            className="text-[11px] rounded-full border border-border px-2.5 py-1 text-muted-foreground hover:text-[#ff9b9b] hover:border-[#ff9b9b]/40 inline-flex items-center gap-1 transition-colors">
+            Clear all ({filters.size}) <X className="w-3 h-3" />
           </button>
-        </div>
-      )}
+        )}
+      </div>
 
       {loading ? (
         <div className="text-center text-muted-foreground py-16">Loading…</div>
@@ -1635,7 +1667,7 @@ export default function CrmPage() {
       ) : (
         <div className="flex gap-3 overflow-x-auto pb-4">
           {FUNNEL.map((s) => {
-            const col = sortCards(rows.filter((x) => matchQuery(x, q) && passesFilter(x, filter) && (x.stage || "new_reply") === s.key), sortBy);
+            const col = sortCards(rows.filter((x) => matchQuery(x, q) && passesAll(x, filters) && (x.stage || "new_reply") === s.key), sortBy);
             return (
               <BoardColumn key={s.key} title={s.title} hint={s.hint} tone={s.tone}
                 accent={s.key === "new_reply"} rows={col} onOpen={openRecord}
