@@ -996,6 +996,17 @@ function Row({ k, v }: { k: string; v: ReactNode }) {
 // collapsible so the rail stays clean by default.
 function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f?: boolean) => void }) {
   const [tools, setTools] = useState(false);
+  const [fuOpen, setFuOpen] = useState(false);
+  const [fuChan, setFuChan] = useState(d.next?.next_channel || "email");
+  const [fuDate, setFuDate] = useState(d.next?.next_touch_at ? d.next.next_touch_at.slice(0, 10) : "");
+  const [fuBusy, setFuBusy] = useState(false);
+  const saveFu = (clear = false) => {
+    setFuBusy(true);
+    fetch(`${API}/api/crm/prospect/${d.id}/follow-up`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ channel: fuChan, at: clear ? null : (fuDate ? new Date(`${fuDate}T09:00:00`).toISOString() : null) }),
+    }).then((r) => { if (r.ok) { reload(true); setFuOpen(false); } }).finally(() => setFuBusy(false));
+  };
   const build = d.build_url
     ? (d.build_delivered ? { t: "Delivered", c: "#26D07C" } : d.build_published ? { t: "Published", c: "#FFD60A" } : { t: "Built", c: "#f0b45f" })
     : null;
@@ -1008,8 +1019,38 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
           <Row k="Segment" v={d.category || "—"} />
           <Row k="Replied" v={<span className="tabular-nums">{timeAgo(d.last_reply_at)}</span>} />
           <Row k="Last touch" v={<span className="tabular-nums">{d.last_touch_at ? `${timeAgo(d.last_touch_at)}${d.last_channel ? ` · ${d.last_channel}` : ""}` : "—"}</span>} />
-          <Row k="Next step" v={d.next?.next_channel ? <span className="text-[#FFD60A]">{d.next.next_channel} · {fmtDate(d.next.next_touch_at)}</span> : <span className="text-muted-foreground">none</span>} />
+          <Row k="Next step" v={
+            <button onClick={() => setFuOpen((v) => !v)} className="text-[#FFD60A] hover:underline decoration-dotted underline-offset-2">
+              {d.next?.next_touch_at ? `${d.next.next_channel || "email"} · ${fmtDate(d.next.next_touch_at)}` : "set follow-up"}
+            </button>
+          } />
         </dl>
+        {fuOpen && (
+          <div className="mt-3 rounded-lg border border-[#FFD60A]/30 bg-[#FFD60A]/[0.04] p-3 space-y-2">
+            <div className="text-[10px] uppercase tracking-[0.16em] text-[#FFD60A] font-semibold">Set follow-up</div>
+            <div className="flex items-center gap-2">
+              <select value={fuChan} onChange={(e) => setFuChan(e.target.value)}
+                className="bg-background border border-border rounded-lg px-2 py-1.5 text-[12px] text-foreground focus:outline-none focus:ring-1 focus:ring-[#FFD60A]/50">
+                <option value="email">Email</option>
+                <option value="linkedin">LinkedIn</option>
+                <option value="whatsapp">WhatsApp</option>
+                <option value="call">Call</option>
+              </select>
+              <input type="date" value={fuDate} onChange={(e) => setFuDate(e.target.value)}
+                className="flex-1 bg-background border border-border rounded-lg px-2 py-1.5 text-[12px] text-foreground focus:outline-none focus:ring-1 focus:ring-[#FFD60A]/50" />
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={() => saveFu(false)} disabled={fuBusy || !fuDate}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#FFD60A] px-3 py-1.5 text-[12px] font-semibold text-[#0A0E1A] hover:bg-[#ffdf3a] disabled:opacity-40 transition-colors">
+                {fuBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CalendarClock className="w-3.5 h-3.5" />} Save reminder
+              </button>
+              {d.next?.next_touch_at && (
+                <button onClick={() => saveFu(true)} disabled={fuBusy}
+                  className="rounded-lg border border-border px-3 py-1.5 text-[12px] text-muted-foreground hover:text-foreground transition-colors">Clear</button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* REACH THEM — always visible so Jose can call / WhatsApp / LinkedIn / email right now */}
@@ -1049,6 +1090,10 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
           <button onClick={() => navigator.clipboard.writeText(d.email)}
             className="text-left text-[12.5px] rounded-lg border border-border bg-card px-3 py-2 text-foreground hover:border-[#FFD60A]/40 transition-colors inline-flex items-center gap-2">
             <Copy className="w-3.5 h-3.5" /> Copy email
+          </button>
+          <button onClick={() => setFuOpen(true)}
+            className="text-left text-[12.5px] rounded-lg border border-border bg-card px-3 py-2 text-foreground hover:border-[#FFD60A]/40 transition-colors inline-flex items-center gap-2">
+            <CalendarClock className="w-3.5 h-3.5" /> Set follow-up
           </button>
         </div>
       </div>
@@ -1094,11 +1139,60 @@ function RecordBody({ d, id, themName, reload, both }: { d: Detail; id: number; 
   );
 }
 
+const STAGES: { key: string; label: string }[] = [
+  { key: "new_reply", label: "New reply" },
+  { key: "in_conversation", label: "In conversation" },
+  { key: "discovery_booked", label: "Discovery booked" },
+  { key: "proposal_sent", label: "Proposal sent" },
+  { key: "won", label: "Won" },
+  { key: "lost", label: "Lost / Parked" },
+];
+
+// Stage selector in the card header — advances the prospect along the funnel via the same
+// endpoint as dragging on the board, so a deal moves without leaving the card. Picking
+// "Discovery booked" or "Won" also marks the meeting booked server-side (status stays in sync).
+function StageMenu({ d, onChanged }: { d: Detail; onChanged: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const cur = STAGES.find((s) => s.key === d.stage) || STAGES[0];
+  const pick = (key: string) => {
+    setOpen(false);
+    if (key === d.stage) return;
+    setBusy(true);
+    fetch(`${API}/api/crm/prospect/${d.id}/stage`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ stage: key }),
+    }).then((r) => { if (r.ok) onChanged(); }).finally(() => setBusy(false));
+  };
+  return (
+    <div className="relative">
+      <button onClick={() => setOpen((o) => !o)} disabled={busy}
+        className="inline-flex items-center gap-2 rounded-lg border border-[#26D07C]/40 bg-[#22c55e]/10 px-3 py-2 text-sm font-medium text-[#5fe08a] hover:bg-[#22c55e]/15 disabled:opacity-40 transition-colors">
+        {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <CalendarClock className="w-4 h-4" />}
+        {cur.label}
+        <ChevronRight className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-90" : ""}`} />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 mt-1 w-52 rounded-lg border border-border bg-popover shadow-xl z-20 py-1">
+            {STAGES.map((s) => (
+              <button key={s.key} onClick={() => pick(s.key)}
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-secondary transition-colors ${s.key === d.stage ? "text-[#FFD60A]" : "text-foreground"}`}>
+                <span className="inline-block w-3">{s.key === d.stage ? "●" : ""}</span> {s.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function Record({ id, initial, onClose, onChanged }: { id: number; initial?: Card; onClose: () => void; onChanged: () => void }) {
   const [d, setD] = useState<Detail | null>(null);
   const [themName, setThemName] = useState(initial?.name?.trim().split(/\s+/)[0] || "Them");
   const [loading, setLoading] = useState(true);
-  const [booking, setBooking] = useState(false);
 
   const reload = useCallback((force = false) => {
     setLoading(true);
@@ -1116,13 +1210,7 @@ function Record({ id, initial, onClose, onChanged }: { id: number; initial?: Car
   }, [onClose]);
 
   const both = () => { reload(true); onChanged(); };
-  const book = () => {
-    setBooking(true);
-    fetch(`${API}/api/crm/prospect/${id}/book`, { method: "POST" })
-      .then((r) => { if (r.ok) both(); }).finally(() => setBooking(false));
-  };
 
-  const booked = d?.status === "meeting_booked";
   const head = d ?? initial;
   const h = head ? heatChip(head.heat) : null;
   const headDomain = head ? domainOf(head.email) : "";
@@ -1150,16 +1238,7 @@ function Record({ id, initial, onClose, onChanged }: { id: number; initial?: Car
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            {booked ? (
-              <span className="inline-flex items-center gap-1.5 rounded-lg border border-[#5fe08a]/40 bg-[#22c55e]/10 px-3 py-2 text-sm text-[#5fe08a]">
-                <CalendarClock className="w-4 h-4" /> Booked
-              </span>
-            ) : (
-              <button onClick={book} disabled={booking || !d}
-                className="inline-flex items-center gap-2 rounded-lg border border-[#5fe08a]/40 bg-[#22c55e]/10 px-3 py-2 text-sm font-medium text-[#5fe08a] hover:bg-[#22c55e]/15 disabled:opacity-40 transition-colors">
-                {booking ? <Loader2 className="w-4 h-4 animate-spin" /> : <CalendarClock className="w-4 h-4" />} Mark booked
-              </button>
-            )}
+            {d && <StageMenu d={d} onChanged={both} />}
             <button onClick={onClose} className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary">
               <X className="w-5 h-5" />
             </button>
