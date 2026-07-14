@@ -609,6 +609,7 @@ function Composer({ c }: { c: ComposerCtl }) {
 
   return (
     <div className="border border-border rounded-xl bg-popover/95 p-4 space-y-2.5">
+      <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70 font-semibold">Compose · pick a channel</div>
       {/* channel tabs + how it sends */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1">
@@ -1105,6 +1106,7 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
 // Copilot share one draft. Keyed by prospect id so switching cards resets the draft.
 function RecordBody({ d, id, themName, reload, both }: { d: Detail; id: number; themName: string; reload: (f?: boolean) => void; both: () => void }) {
   const c = useComposer(d, both);
+  const [focus, setFocus] = useState(false);   // expand the conversation: collapse composer + preview
   const a = actNow(d);
   const tone = a.tone === "green" ? "border-[#5fe08a]/40 bg-[#22c55e]/8 text-[#5fe08a]"
     : a.tone === "gold" ? "border-[#FFD60A]/40 bg-[#FFD60A]/8 text-[#FFD60A]" : "border-border bg-card text-foreground";
@@ -1115,18 +1117,40 @@ function RecordBody({ d, id, themName, reload, both }: { d: Detail; id: number; 
         <DealRail d={d} both={both} reload={reload} />
       </div>
 
-      {/* CENTER: what-to-do banner + conversation hero + docked composer */}
+      {/* CENTER: composer on top · positive-reply preview · expandable conversation */}
       <div className="flex flex-col lg:min-h-0 lg:border-r border-border">
-        <div className="flex-1 lg:min-h-0 lg:overflow-y-auto p-4 lg:p-5 space-y-3">
-          <div className={`rounded-xl border px-3.5 py-2.5 ${tone}`}>
-            <div className="flex items-center gap-2 text-sm font-semibold"><Zap className="w-4 h-4" /> {a.title}</div>
-            <p className="text-[12.5px] text-muted-foreground mt-0.5">{a.detail}</p>
+        {/* 1 · composer at the top (collapses to a slim bar while reading the thread) */}
+        {focus ? (
+          <button onClick={() => setFocus(false)}
+            className="shrink-0 m-4 lg:mx-5 lg:mt-5 rounded-lg border border-border bg-card px-3 py-2 text-left text-sm text-muted-foreground hover:text-foreground hover:border-[#FFD60A]/40 transition-colors inline-flex items-center gap-2">
+            <PenLine className="w-4 h-4" /> Write a reply…
+          </button>
+        ) : (
+          <div className="shrink-0 p-4 lg:p-5 border-b border-border">
+            <Composer c={c} />
           </div>
-          <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">// CONVERSATION · NEWEST_FIRST</div>
+        )}
+
+        {/* 2 · positive-reply preview (what to do), hidden while the thread is expanded */}
+        {!focus && (
+          <div className="shrink-0 px-4 lg:px-5 pt-3">
+            <div className={`rounded-xl border px-3.5 py-2.5 ${tone}`}>
+              <div className="flex items-center gap-2 text-sm font-semibold"><Zap className="w-4 h-4" /> {a.title}</div>
+              <p className="text-[12.5px] text-muted-foreground mt-0.5">{a.detail}</p>
+            </div>
+          </div>
+        )}
+
+        {/* 3 · conversation — the expandable block, fills the rest and scrolls */}
+        <div className="flex-1 lg:min-h-0 lg:overflow-y-auto p-4 lg:p-5 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">// CONVERSATION · NEWEST_FIRST</div>
+            <button onClick={() => setFocus((v) => !v)} title={focus ? "Show composer" : "Expand the conversation"}
+              className="text-[11px] text-muted-foreground hover:text-[#FFD60A] transition-colors inline-flex items-center gap-1 shrink-0">
+              {focus ? "⤡ Collapse" : "⤢ Expand"}
+            </button>
+          </div>
           <Conversation id={id} themName={themName} fallback={d.reply_text} />
-        </div>
-        <div className="shrink-0 p-4 lg:p-5 border-t border-border">
-          <Composer c={c} />
         </div>
       </div>
 
