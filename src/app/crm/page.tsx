@@ -126,6 +126,16 @@ function timeAgo(s: string | null): string {
   return `${days}d ago`;
 }
 
+// Tidy a reply snippet for the card: collapse newlines/whitespace, drop a leading quote or
+// list marker ("1.", "-", "•") and any greeting so the preview opens on the real content.
+function cleanSnippet(s: string): string {
+  let t = (s || "").replace(/\s+/g, " ").trim();
+  t = t.replace(/^["“”'`\s]+/, "");
+  t = t.replace(/^(\d+[.)]\s+|[-•]\s+)/, "");
+  t = t.replace(/^(hi|hello|hey|dear)\b[^,]*,\s*/i, "");
+  return t.trim();
+}
+
 function daysSince(s: string | null): number {
   if (!s) return 0;
   const t = new Date(s).getTime();
@@ -239,6 +249,24 @@ const CHANNEL_BRAND: Record<string, string> = {
   email: "gmail.com", linkedin: "linkedin.com", whatsapp: "whatsapp.com", call: "",
 };
 
+// Per-source brand identity for the conversation. Each thread block is one mailbox/channel,
+// so a burner email reads as Instantly, jose@luxvance.com as Gmail, and LinkedIn/WhatsApp
+// as themselves. The bar/ring tint the bubbles so the thread feels wired to the real tool.
+type Src = "gmail" | "instantly" | "linkedin" | "whatsapp";
+const SRC: Record<Src, { logo: string; name: string; bar: string; ring: string; tint: string }> = {
+  gmail:     { logo: "gmail.com",    name: "Gmail",     bar: "#EA4335", ring: "rgba(234,67,53,.30)",  tint: "rgba(234,67,53,.08)" },
+  instantly: { logo: "instantly.ai", name: "Instantly", bar: "#6D5EF7", ring: "rgba(109,94,247,.32)", tint: "rgba(109,94,247,.09)" },
+  linkedin:  { logo: "linkedin.com", name: "LinkedIn",  bar: "#0A66C2", ring: "rgba(10,102,194,.35)", tint: "rgba(10,102,194,.10)" },
+  whatsapp:  { logo: "whatsapp.com", name: "WhatsApp",  bar: "#25D366", ring: "rgba(37,211,102,.35)", tint: "rgba(37,211,102,.10)" },
+};
+// A conversation block is one channel: derive its source for the logo + tint.
+function convoSource(c: Convo): Src {
+  const ch = `${c.channel || ""} ${c.kind || ""}`.toLowerCase();
+  if (ch.includes("linkedin")) return "linkedin";
+  if (ch.includes("whatsapp") || ch.includes("wa_")) return "whatsapp";
+  return c.kind === "work_mailbox" ? "gmail" : "instantly";
+}
+
 function linkedinSearchUrl(name: string, company: string): string {
   const q = [name, company].filter(Boolean).join(" ");
   return `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(q)}`;
@@ -287,24 +315,33 @@ function Tile({ label, value, accent, icon, onClick, active }: {
 }
 
 // ── landing briefing: where we stand ─────────────────────────────────
+// Collapsible: it's a great morning read but pure summary, so on a laptop it should be able
+// to fold away and give the board the vertical room. State persists across reloads.
 function Briefing({ onOpen }: { onOpen: (id: number) => void }) {
   const [s, setS] = useState<Summary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [open, setOpen] = useState(true);
+  useEffect(() => {
+    if (typeof window !== "undefined") setOpen(localStorage.getItem("crm.briefing") !== "0");
+  }, []);
+  const toggle = () => setOpen((o) => { const n = !o; if (typeof window !== "undefined") localStorage.setItem("crm.briefing", n ? "1" : "0"); return n; });
   useEffect(() => {
     setLoading(true);
     fetch(`${API}/api/crm/summary`)
       .then((r) => r.json()).then(setS).catch(() => setS(null)).finally(() => setLoading(false));
   }, []);
   return (
-    <div className="bg-gradient-to-br from-card to-card/40 border border-[#FFD60A]/20 rounded-2xl p-5 mb-5">
-      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider mb-2">
+    <div className="bg-gradient-to-br from-card to-card/40 border border-[#FFD60A]/20 rounded-2xl px-5 py-4 mb-4">
+      <button onClick={toggle} className="w-full flex items-center gap-2 text-xs font-semibold uppercase tracking-wider">
         <Sparkles className="w-4 h-4 text-[#FFD60A]" />
         <span className="neon-hl">// WHERE_YOU_STAND</span>
-      </div>
-      {loading ? (
-        <div className="text-sm text-muted-foreground">Reading the pipeline…</div>
+        {!open && s && <span className="normal-case tracking-normal text-muted-foreground font-normal truncate ml-1">— {s.counts.waiting_us} your turn · {s.counts.hot_now} hot · {s.counts.wants_meeting} want to meet</span>}
+        <ChevronRight className={`w-4 h-4 text-muted-foreground ml-auto transition-transform ${open ? "rotate-90" : ""}`} />
+      </button>
+      {open && (loading ? (
+        <div className="text-sm text-muted-foreground mt-2">Reading the pipeline…</div>
       ) : s ? (
-        <>
+        <div className="mt-2.5">
           <p className="text-[15px] text-foreground leading-relaxed max-w-3xl">{s.briefing}</p>
           {s.top.length > 0 && (
             <div className="flex flex-wrap gap-2 mt-3">
@@ -322,10 +359,10 @@ function Briefing({ onOpen }: { onOpen: (id: number) => void }) {
               })}
             </div>
           )}
-        </>
+        </div>
       ) : (
-        <div className="text-sm text-muted-foreground">Could not load the briefing.</div>
-      )}
+        <div className="text-sm text-muted-foreground mt-2">Could not load the briefing.</div>
+      ))}
     </div>
   );
 }
@@ -338,7 +375,6 @@ function cleanSubject(s: string): string {
   const t = (s || "").replace(/^((re|fwd|fw)\s*:\s*)+/i, "").replace(/\s+/g, " ").trim();
   return t || "(no subject)";
 }
-function addrDomain(a: string): string { return (a || "").split("@")[1] || ""; }
 function shortAddr(a: string): string {
   a = a || "";
   return a.length <= 28 ? a : `${a.slice(0, 14)}…${a.slice(-11)}`;
@@ -346,89 +382,125 @@ function shortAddr(a: string): string {
 // Direction-agnostic identity of a message: same two addresses = same route.
 function routeKey(m: ThreadMsg): string { return [m.from_addr, m.to_addr].filter(Boolean).sort().join("|"); }
 
+// One conversation = one mailbox/burner = one campaign the prospect went through.
+// The backend groups the full cross-campaign history this way so a prospect hit by two
+// campaigns reads as two clean threads, each labeled with the burner that ran it.
+type Convo = {
+  eaccount: string; domain: string; channel: string; kind: string;
+  replied: boolean; active: boolean; count: number; reply_count: number;
+  sent_count: number; first_at: string | null; last_at: string | null;
+  last_reply_at: string | null; subject: string; messages: ThreadMsg[];
+};
+
+// A single campaign thread: a labeled, collapsible block. The burner + a REPLIED/no-reply
+// badge sit in the header so Jose knows at a glance which mailbox ran it and whether the
+// prospect ever answered. Open by default only for the primary (most-recent replied) one.
+function ConvoBlock({ c, themName, defaultOpen }: { c: Convo; themName: string; defaultOpen: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
+  const src = SRC[convoSource(c)];
+  const routeShow = c.messages.map((m, i) => i === 0 || routeKey(m) !== routeKey(c.messages[i - 1]));
+  const ordered = [...c.messages].reverse(); // newest first inside the block
+  return (
+    <div className={`rounded-xl border overflow-hidden ${
+      c.active ? "border-[#FFD60A]/40 bg-[#FFD60A]/[0.02]"
+      : c.replied ? "border-border" : "border-border/60"}`}>
+      <button type="button" onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-secondary/40 transition-colors">
+        <Favicon domain={src.logo} label={src.name} size={18} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[12px] font-semibold text-foreground truncate">{cleanSubject(c.subject) || "(no subject)"}</span>
+            {c.active && <span className="shrink-0 text-[8.5px] uppercase tracking-[0.1em] px-1 py-px rounded bg-[#FFD60A]/15 text-[#FFD60A]">active</span>}
+          </div>
+          <div className="text-[10.5px] text-muted-foreground truncate">
+            <span style={{ color: src.bar }}>{src.name}</span> · {c.eaccount}
+          </div>
+        </div>
+        {c.replied
+          ? <span className="shrink-0 text-[10px] font-medium text-[#26D07C]">{c.reply_count} repl{c.reply_count > 1 ? "ies" : "y"}</span>
+          : <span className="shrink-0 text-[10px] text-muted-foreground/80">no reply</span>}
+        <span className="shrink-0 text-[10px] text-muted-foreground tabular-nums">{c.sent_count} sent</span>
+        <span className="shrink-0 text-[10px] text-muted-foreground tabular-nums">{timeAgo(c.last_at)}</span>
+        <span className="shrink-0 text-[10px] text-muted-foreground w-3 text-center">{open ? "▾" : "▸"}</span>
+      </button>
+      {open && (
+        <div className="px-3 pb-3 pt-2.5 space-y-3 border-t border-border">
+          {ordered.map((m, i) => {
+            const orig = c.messages.length - 1 - i;
+            const who = m.from_me ? "You" : themName;
+            const latest = i === 0 && !m.from_me;
+            const route = routeShow[orig] && (m.from_addr || m.to_addr) ? (
+              <>{shortAddr(m.from_addr)} <span style={{ color: src.bar }}>&gt;</span> {shortAddr(m.to_addr)}</>
+            ) : null;
+            return (
+              <div key={i} className={`flex gap-2.5 ${m.from_me ? "flex-row-reverse" : ""}`}>
+                <div className="shrink-0 w-8 h-8 rounded-full grid place-items-center text-[11px] font-semibold overflow-hidden"
+                  style={m.from_me ? { background: "rgba(255,214,10,.15)", color: "#FFD60A" } : { background: src.tint }}>
+                  {m.from_me ? "JB" : <Favicon domain={src.logo} label={src.name} size={16} />}
+                </div>
+                {m.from_me ? (
+                  // OUR reply — dark bubble tinted with the channel colour it went out on
+                  <div className="max-w-[82%] rounded-2xl px-3.5 py-2.5 text-sm border"
+                    style={{ background: src.tint, borderColor: src.ring }}>
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="text-[11px] font-semibold" style={{ color: src.bar }}>You</span>
+                      <span className="text-[11px] text-muted-foreground tabular-nums">{timeAgo(m.at)}</span>
+                      <span className="text-[9px] uppercase tracking-wide" style={{ color: src.bar }}>via {src.name}</span>
+                    </div>
+                    {route && <div className="text-[10.5px] text-muted-foreground/80 mb-1.5 truncate">{route}</div>}
+                    <div className="text-foreground whitespace-pre-wrap leading-relaxed">{m.text}</div>
+                  </div>
+                ) : (
+                  // THEIR reply — white "paper" like the real inbox, so HTML email renders faithfully
+                  <div className="max-w-[82%] rounded-2xl overflow-hidden border shadow-sm bg-white"
+                    style={{ borderColor: latest ? src.ring : "rgba(0,0,0,.10)", borderLeft: `3px solid ${src.bar}` }}>
+                    <div className="px-3.5 py-2.5 text-sm text-[#1a1a1a]">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-[11px] font-semibold text-[#111]">{who}</span>
+                        <span className="text-[11px] text-[#6b7280] tabular-nums">{timeAgo(m.at)}</span>
+                        {latest && <span className="text-[10px] font-medium" style={{ color: src.bar }}>latest</span>}
+                      </div>
+                      {route && <div className="text-[10.5px] text-[#6b7280] mb-1.5 truncate">{route}</div>}
+                      <div className="whitespace-pre-wrap leading-relaxed text-[#1a1a1a]">{m.text}</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Conversation({ id, themName, fallback }: { id: number; themName: string; fallback?: string }) {
-  const [msgs, setMsgs] = useState<ThreadMsg[] | null>(null);
-  const [burner, setBurner] = useState("");
-  const [hidden, setHidden] = useState(0);
-  const [subject, setSubject] = useState("");
+  const [convos, setConvos] = useState<Convo[] | null>(null);
   useEffect(() => {
-    setMsgs(null);
+    setConvos(null);
     fetch(`${API}/api/crm/prospect/${id}/thread`)
       .then((r) => r.json())
-      .then((j) => { setMsgs(j.messages || []); setBurner(j.burner || ""); setHidden(j.hidden || 0); setSubject(j.subject || ""); })
-      .catch(() => setMsgs([]));
+      .then((j) => setConvos(j.conversations || []))
+      .catch(() => setConvos([]));
   }, [id]);
 
-  if (msgs === null) return <div className="text-sm text-muted-foreground p-2">Loading conversation…</div>;
-  if (msgs.length === 0) {
+  if (convos === null) return <div className="text-sm text-muted-foreground p-2">Loading conversation…</div>;
+  if (convos.length === 0) {
     return fallback
       ? <div className="bg-card border border-border rounded-xl p-4 text-sm text-foreground whitespace-pre-wrap">{fallback}</div>
       : <div className="text-sm text-muted-foreground p-2">No email thread found in Instantly.</div>;
   }
-  // Compute in chronological order (msgs oldest first):
-  // route line shows only when the {from,to} pair changes (opener + any switch).
-  const routeShow = msgs.map((m, i) => i === 0 || routeKey(m) !== routeKey(msgs[i - 1]));
-  // graduation = our outbound from-domain moving off the burner onto luxvance.com.
-  let gradIndex = -1, sawBurnerOut = false;
-  for (let i = 0; i < msgs.length; i++) {
-    const m = msgs[i];
-    if (!m.from_me || !m.from_addr) continue;
-    if (addrDomain(m.from_addr) === "luxvance.com") { if (sawBurnerOut) { gradIndex = i; break; } }
-    else sawBurnerOut = true;
-  }
-  const graduated = burner.endsWith("luxvance.com");
-  // Newest on top: Jose sees the latest reply first, no scrolling.
-  const ordered = [...msgs].reverse();
+  const repliedCount = convos.filter((c) => c.replied).length;
   return (
-    <div className="space-y-3">
-      {/* thread header: subject once + the current sending identity */}
-      <div className="pb-2.5 mb-1 border-b border-border">
-        <div className="text-[10px] uppercase tracking-[0.12em] text-[#FFD60A]/65 mb-0.5">// THREAD</div>
-        <div className="text-[13px] font-semibold text-foreground truncate">{cleanSubject(subject)}</div>
-        {burner && (
-          <div className={`text-[11px] mt-0.5 ${graduated ? "text-[#FFD60A]/85" : "text-muted-foreground"}`}>
-            via {burner}{hidden > 0 && <span className="text-muted-foreground/70"> · {hidden} hidden from other campaigns</span>}
-          </div>
-        )}
+    <div className="space-y-2.5">
+      <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.12em] text-[#FFD60A]/65">
+        <span>// CONVERSATIONS · {convos.length}</span>
+        {repliedCount > 0 && <span className="text-[#26D07C]/70 normal-case tracking-normal">{repliedCount} replied</span>}
+        {convos.length - repliedCount > 0 && <span className="text-muted-foreground/60 normal-case tracking-normal">{convos.length - repliedCount} cold campaign{convos.length - repliedCount > 1 ? "s" : ""}</span>}
       </div>
-      {ordered.map((m, i) => {
-        const orig = msgs.length - 1 - i;
-        const who = m.from_me ? "You" : themName;
-        const latest = i === 0;
-        const divider = gradIndex > 0 && orig === gradIndex - 1; // boundary, rendered above older half
-        return (
-          <div key={i}>
-            {divider && (
-              <div className="flex items-center gap-3 my-3 text-[10px] uppercase tracking-[0.12em] text-[#FFD60A]">
-                <span className="flex-1 h-px bg-[#FFD60A]/35" />
-                // MOVED TO DIRECT · jose@luxvance.com
-                <span className="flex-1 h-px bg-[#FFD60A]/35" />
-              </div>
-            )}
-            <div className={`flex gap-2.5 ${m.from_me ? "flex-row-reverse" : ""}`}>
-              <div className={`shrink-0 w-8 h-8 rounded-full grid place-items-center text-[11px] font-semibold ${
-                m.from_me ? "bg-[#FFD60A]/15 text-[#FFD60A]" : "bg-secondary text-muted-foreground"}`}>
-                {m.from_me ? "JB" : initials(themName)}
-              </div>
-              <div className={`max-w-[82%] rounded-2xl px-3.5 py-2.5 text-sm border ${
-                m.from_me ? "bg-[#FFD60A]/8 border-[#FFD60A]/25"
-                : latest ? "bg-card border-[#FFD60A]/40 ring-1 ring-[#FFD60A]/20" : "bg-card border-border"}`}>
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className={`text-[11px] font-semibold ${m.from_me ? "text-[#FFD60A]" : "text-foreground"}`}>{who}</span>
-                  <span className="text-[11px] text-muted-foreground tabular-nums">{timeAgo(m.at)}</span>
-                  {latest && !m.from_me && <span className="text-[10px] text-[#FFD60A] font-medium">latest</span>}
-                </div>
-                {routeShow[orig] && (m.from_addr || m.to_addr) && (
-                  <div className="text-[10.5px] text-muted-foreground/80 mb-1.5 truncate">
-                    {shortAddr(m.from_addr)} <span className="text-[#FFD60A]">&gt;</span> {shortAddr(m.to_addr)}
-                  </div>
-                )}
-                <div className="text-foreground whitespace-pre-wrap leading-relaxed">{m.text}</div>
-              </div>
-            </div>
-          </div>
-        );
-      })}
+      {convos.map((c, i) => (
+        <ConvoBlock key={c.eaccount} c={c} themName={themName} defaultOpen={i === 0} />
+      ))}
     </div>
   );
 }
@@ -438,7 +510,7 @@ type DraftResp = { channel: string; step: number; goal: string; draft: string; c
 type Chan = "email" | "linkedin" | "whatsapp" | "call";
 type CoLog = { role: "you" | "copilot"; content: string };
 
-function ReplyComposer({ d, onSent }: { d: Detail; onSent: () => void }) {
+function useComposer(d: Detail, onSent: () => void) {
   const id = d.id;
   const [chan, setChan] = useState<Chan>("email");
   const [drafts, setDrafts] = useState<Record<Chan, string>>({ email: "", linkedin: "", whatsapp: "", call: "" });
@@ -493,20 +565,61 @@ function ReplyComposer({ d, onSent }: { d: Detail; onSent: () => void }) {
   const canSendEmail = chan === "email" && d.can_send_email;
   const gmailLive = d.live_channel === "gmail";
   const draftLabel = chan === "email" ? "Draft with AI" : chan === "linkedin" ? "Draft LinkedIn" : chan === "whatsapp" ? "Draft WhatsApp" : "Talking points";
+  return { d, chan, setChan, text, setDraft, gen, send, askCopilot, drafting, sending, sent, setSent, co, setCo, coBusy, coLog, canSendEmail, gmailLive, draftLabel };
+}
+type ComposerCtl = ReturnType<typeof useComposer>;
+
+// Copilot chat-to-edit — lifted out of the composer so it can sit in the right rail (per
+// the redesign) while still editing the composer's draft, which lives in the shared state.
+function Copilot({ c }: { c: ComposerCtl }) {
+  const { co, setCo, askCopilot, coBusy, coLog } = c;
+  return (
+    <div className="rounded-xl border border-[#FFD60A]/25 bg-[#FFD60A]/[0.04] p-3 space-y-2">
+      <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-[#FFD60A] font-semibold">
+        <Bot className="w-4 h-4" /> Ask copilot
+      </div>
+      {coLog.length > 0 && (
+        <div className="space-y-1.5 max-h-40 overflow-y-auto text-xs">
+          {coLog.map((l, i) => (
+            <div key={i} className={l.role === "you" ? "text-muted-foreground" : "text-[#FFD60A]"}>
+              <span className="font-semibold">{l.role === "you" ? "You: " : "Copilot: "}</span>{l.content}
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <Sparkles className="w-4 h-4 text-[#FFD60A] absolute left-3 top-1/2 -translate-y-1/2" />
+          <input value={co} onChange={(e) => setCo(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); askCopilot(); } }}
+            placeholder="shorter, warmer, add the Build link…"
+            className="w-full bg-background border border-border rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#FFD60A]/50" />
+        </div>
+        <button onClick={askCopilot} disabled={coBusy || !co.trim()}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-[#FFD60A]/40 px-3 py-2 text-sm text-[#FFD60A] hover:bg-[#FFD60A]/10 disabled:opacity-40 transition-colors">
+          {coBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Composer({ c }: { c: ComposerCtl }) {
+  const { d, chan, setChan, text, setDraft, gen, send, drafting, sending, sent, setSent, canSendEmail, gmailLive, draftLabel } = c;
 
   return (
-    <div className="border-b border-border bg-popover/95 p-4 space-y-2.5">
+    <div className="border border-border rounded-xl bg-popover/95 p-4 space-y-2.5">
       {/* channel tabs + how it sends */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1">
-          {(["email", "linkedin", "whatsapp", "call"] as Chan[]).map((c) => (
-            <button key={c} onClick={() => { setChan(c); setSent(null); }}
+          {(["email", "linkedin", "whatsapp", "call"] as Chan[]).map((ch) => (
+            <button key={ch} onClick={() => { setChan(ch); setSent(null); }}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                chan === c ? "bg-[#FFD60A]/12 text-[#FFD60A]" : "text-muted-foreground hover:bg-secondary"}`}>
-              {CHANNEL_BRAND[c]
-                ? <Favicon domain={CHANNEL_BRAND[c]} label={CHANNEL_META[c].label} size={14} />
+                chan === ch ? "bg-[#FFD60A]/12 text-[#FFD60A]" : "text-muted-foreground hover:bg-secondary"}`}>
+              {CHANNEL_BRAND[ch]
+                ? <Favicon domain={CHANNEL_BRAND[ch]} label={CHANNEL_META[ch].label} size={14} />
                 : <Phone className="w-3.5 h-3.5 text-[#5fe08a]" />}
-              {CHANNEL_META[c].label}
+              {CHANNEL_META[ch].label}
             </button>
           ))}
         </div>
@@ -520,10 +633,20 @@ function ReplyComposer({ d, onSent }: { d: Detail; onSent: () => void }) {
       {/* always-visible reply box */}
       <textarea
         value={text} onChange={(e) => setDraft(chan, e.target.value)}
-        placeholder={`Write your ${CHANNEL_META[chan].label} message, or click ${draftLabel}…`}
+        placeholder={`Write your ${CHANNEL_META[chan].label} message, or ask the copilot…`}
         rows={Math.min(12, Math.max(4, text.split("\n").length + 1))}
         className="w-full bg-background border border-border rounded-lg p-3 text-sm text-foreground leading-relaxed focus:outline-none focus:ring-1 focus:ring-[#FFD60A]/50 resize-y"
       />
+
+      {/* the branded Luxvance signature is attached automatically on send */}
+      {chan === "email" && (
+        <div className="flex items-center gap-2 rounded-lg border border-[#C9A84C]/25 bg-[#C9A84C]/[0.06] px-2.5 py-1.5">
+          <Favicon domain="luxvance.com" label="Luxvance" size={16} />
+          <span className="text-[11px] text-muted-foreground leading-tight">
+            <span className="text-[#C9A84C] font-medium">Luxvance signature</span> attached on send · logo · tagline · book link. Just end with a sign-off like <span className="text-foreground">Best,</span>
+          </span>
+        </div>
+      )}
 
       {/* one-click: drop the Build (lead magnet) link into the message */}
       {d.build_url && (
@@ -536,32 +659,6 @@ function ReplyComposer({ d, onSent }: { d: Detail; onSent: () => void }) {
           <span className="text-[11px] text-muted-foreground truncate">{d.build_name || "Their Build"}</span>
         </div>
       )}
-
-      {/* copilot chat-to-edit */}
-      {coLog.length > 0 && (
-        <div className="space-y-1.5 max-h-24 overflow-y-auto text-xs">
-          {coLog.map((l, i) => (
-            <div key={i} className={l.role === "you" ? "text-muted-foreground" : "text-[#FFD60A]"}>
-              <span className="font-semibold">{l.role === "you" ? "You: " : "Copilot: "}</span>{l.content}
-            </div>
-          ))}
-        </div>
-      )}
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1">
-          <Bot className="w-4 h-4 text-[#FFD60A] absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            value={co} onChange={(e) => setCo(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); askCopilot(); } }}
-            placeholder="Ask copilot: shorter, warmer, add the Build link…"
-            className="w-full bg-background border border-border rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#FFD60A]/50"
-          />
-        </div>
-        <button onClick={askCopilot} disabled={coBusy || !co.trim()}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-[#FFD60A]/40 px-3 py-2 text-sm text-[#FFD60A] hover:bg-[#FFD60A]/10 disabled:opacity-40 transition-colors">
-          {coBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-        </button>
-      </div>
 
       {/* actions */}
       {sent === "ok" ? (
@@ -871,17 +968,143 @@ function IntelPanel({ d }: { d: Detail }) {
   );
 }
 
-function Record({ id, onClose, onChanged }: { id: number; onClose: () => void; onChanged: () => void }) {
+// Detail cache: hovering a board card warms its detail so the click opens instantly.
+// The backend now serves the intent read and Build check from a per-row cache, so an
+// unchanged card never pays the gpt-5 + 8s-HEAD cost again. force=true (the ↻ button,
+// or any mutation) bypasses both caches and recomputes fresh.
+const _detailCache = new Map<number, Promise<Detail | null>>();
+function loadDetail(id: number, force = false): Promise<Detail | null> {
+  if (!force && _detailCache.has(id)) return _detailCache.get(id)!;
+  const p = fetch(`${API}/api/crm/prospect/${id}${force ? "?refresh=true" : ""}`)
+    .then((r) => (r.ok ? (r.json() as Promise<Detail>) : null))
+    .catch(() => null);
+  _detailCache.set(id, p);
+  return p;
+}
+
+function Row({ k, v }: { k: string; v: ReactNode }) {
+  return (
+    <div className="flex justify-between gap-3">
+      <dt className="text-muted-foreground shrink-0">{k}</dt>
+      <dd className="text-foreground text-right truncate">{v}</dd>
+    </div>
+  );
+}
+
+// The left rail: who-and-where a closer needs at a glance — deal facts, which channels are
+// reachable, the Build status, and quick actions. Build/contact management tools tuck into a
+// collapsible so the rail stays clean by default.
+function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f?: boolean) => void }) {
+  const [tools, setTools] = useState(false);
+  const build = d.build_url
+    ? (d.build_delivered ? { t: "Delivered", c: "#26D07C" } : d.build_published ? { t: "Published", c: "#FFD60A" } : { t: "Built", c: "#f0b45f" })
+    : null;
+  return (
+    <div className="space-y-5">
+      <div>
+        <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70 font-semibold mb-2">Deal</div>
+        <dl className="space-y-2 text-[12.5px]">
+          <Row k="Source" v={d.reply_campaign || "Cold outbound"} />
+          <Row k="Segment" v={d.category || "—"} />
+          <Row k="Replied" v={<span className="tabular-nums">{timeAgo(d.last_reply_at)}</span>} />
+          <Row k="Last touch" v={<span className="tabular-nums">{d.last_touch_at ? `${timeAgo(d.last_touch_at)}${d.last_channel ? ` · ${d.last_channel}` : ""}` : "—"}</span>} />
+          <Row k="Next step" v={d.next?.next_channel ? <span className="text-[#FFD60A]">{d.next.next_channel} · {fmtDate(d.next.next_touch_at)}</span> : <span className="text-muted-foreground">none</span>} />
+        </dl>
+      </div>
+
+      {/* REACH THEM — always visible so Jose can call / WhatsApp / LinkedIn / email right now */}
+      <div>
+        <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70 font-semibold mb-2">Reach them</div>
+        <ContactActions d={d} onChanged={() => reload(true)} />
+      </div>
+
+      {/* BUILD — compact status + open; generate/optimize behind a toggle */}
+      <div>
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70 font-semibold">Build</span>
+          <button onClick={() => setTools((v) => !v)} className="ml-auto text-[11px] text-muted-foreground hover:text-[#FFD60A]">
+            {tools ? "Hide" : d.build_url ? "Manage" : "Generate"}
+          </button>
+        </div>
+        {build ? (
+          <div className="flex items-center gap-2 text-[12px]">
+            <span style={{ color: build.c }}>● {build.t}</span>
+            {d.build_slug && <span className="text-muted-foreground/70 truncate">/{d.build_slug}</span>}
+            {d.build_url && <a href={d.build_url} target="_blank" rel="noreferrer" className="ml-auto text-[#FFD60A] hover:underline shrink-0">Open</a>}
+          </div>
+        ) : (
+          <div className="text-[12px] text-muted-foreground">No Build yet.</div>
+        )}
+        {tools && <div className="mt-3"><BuildCard d={d} onChanged={both} /></div>}
+      </div>
+
+      {/* QUICK ACTIONS */}
+      <div>
+        <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70 font-semibold mb-2">Quick actions</div>
+        <div className="flex flex-col gap-1.5">
+          <button onClick={() => reload(true)}
+            className="text-left text-[12.5px] rounded-lg border border-border bg-card px-3 py-2 text-foreground hover:border-[#FFD60A]/40 transition-colors inline-flex items-center gap-2">
+            <RefreshCw className="w-3.5 h-3.5" /> Refresh intelligence
+          </button>
+          <button onClick={() => navigator.clipboard.writeText(d.email)}
+            className="text-left text-[12.5px] rounded-lg border border-border bg-card px-3 py-2 text-foreground hover:border-[#FFD60A]/40 transition-colors inline-flex items-center gap-2">
+            <Copy className="w-3.5 h-3.5" /> Copy email
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// The 3-column workspace. useComposer lives here so the centre Composer and the right-rail
+// Copilot share one draft. Keyed by prospect id so switching cards resets the draft.
+function RecordBody({ d, id, themName, reload, both }: { d: Detail; id: number; themName: string; reload: (f?: boolean) => void; both: () => void }) {
+  const c = useComposer(d, both);
+  const a = actNow(d);
+  const tone = a.tone === "green" ? "border-[#5fe08a]/40 bg-[#22c55e]/8 text-[#5fe08a]"
+    : a.tone === "gold" ? "border-[#FFD60A]/40 bg-[#FFD60A]/8 text-[#FFD60A]" : "border-border bg-card text-foreground";
+  return (
+    <div className="flex-1 min-h-0 overflow-y-auto lg:overflow-hidden grid grid-cols-1 lg:grid-cols-[23%_1fr_30%]">
+      {/* LEFT rail */}
+      <div className="lg:overflow-y-auto p-4 lg:p-5 lg:border-r border-border">
+        <DealRail d={d} both={both} reload={reload} />
+      </div>
+
+      {/* CENTER: what-to-do banner + conversation hero + docked composer */}
+      <div className="flex flex-col lg:min-h-0 lg:border-r border-border">
+        <div className="flex-1 lg:min-h-0 lg:overflow-y-auto p-4 lg:p-5 space-y-3">
+          <div className={`rounded-xl border px-3.5 py-2.5 ${tone}`}>
+            <div className="flex items-center gap-2 text-sm font-semibold"><Zap className="w-4 h-4" /> {a.title}</div>
+            <p className="text-[12.5px] text-muted-foreground mt-0.5">{a.detail}</p>
+          </div>
+          <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">// CONVERSATION · NEWEST_FIRST</div>
+          <Conversation id={id} themName={themName} fallback={d.reply_text} />
+        </div>
+        <div className="shrink-0 p-4 lg:p-5 border-t border-border">
+          <Composer c={c} />
+        </div>
+      </div>
+
+      {/* RIGHT: intelligence + copilot */}
+      <div className="lg:overflow-y-auto p-4 lg:p-5 space-y-4">
+        <IntelPanel d={d} />
+        <Copilot c={c} />
+      </div>
+    </div>
+  );
+}
+
+function Record({ id, initial, onClose, onChanged }: { id: number; initial?: Card; onClose: () => void; onChanged: () => void }) {
   const [d, setD] = useState<Detail | null>(null);
-  const [themName, setThemName] = useState("Them");
+  const [themName, setThemName] = useState(initial?.name?.trim().split(/\s+/)[0] || "Them");
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(false);
 
-  const reload = useCallback(() => {
-    fetch(`${API}/api/crm/prospect/${id}`).then((r) => r.json())
-      .then((j) => setD(j)).catch(() => setD(null)).finally(() => setLoading(false));
+  const reload = useCallback((force = false) => {
+    setLoading(true);
+    loadDetail(id, force).then((j) => setD(j)).finally(() => setLoading(false));
   }, [id]);
-  useEffect(() => { setLoading(true); reload(); }, [id, reload]);
+  useEffect(() => { reload(); }, [id, reload]);
   useEffect(() => {
     fetch(`${API}/api/crm/prospect/${id}/thread`).then((r) => r.json())
       .then((j) => setThemName(j.them_name || "Them")).catch(() => {});
@@ -892,7 +1115,7 @@ function Record({ id, onClose, onChanged }: { id: number; onClose: () => void; o
     return () => window.removeEventListener("keydown", h);
   }, [onClose]);
 
-  const both = () => { reload(); onChanged(); };
+  const both = () => { reload(true); onChanged(); };
   const book = () => {
     setBooking(true);
     fetch(`${API}/api/crm/prospect/${id}/book`, { method: "POST" })
@@ -900,25 +1123,31 @@ function Record({ id, onClose, onChanged }: { id: number; onClose: () => void; o
   };
 
   const booked = d?.status === "meeting_booked";
-  const h = d ? heatChip(d.heat) : null;
+  const head = d ?? initial;
+  const h = head ? heatChip(head.heat) : null;
+  const headDomain = head ? domainOf(head.email) : "";
 
   return (
     <div className="fixed inset-0 z-50 flex">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative ml-auto w-full max-w-6xl h-full bg-popover border-l border-border flex flex-col">
-        {/* header / highlights strip */}
-        <div className="shrink-0 border-b border-border px-6 py-4 flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-lg font-semibold text-foreground truncate">{d?.name || "…"}</h2>
-              {h && <Badge text={h.hot ? "🔥 Hot" : h.label} className={h.cls} />}
-              {d?.wants_meeting && !booked && <Badge text="📅 wants to meet" className="bg-[#22c55e]/15 text-[#5fe08a]" />}
-              {d?.category && <Badge text={d.category} className="bg-[#FFD60A]/12 text-[#FFD60A]" />}
+      <div className="relative m-auto w-full h-full lg:h-[94vh] lg:my-[3vh] max-w-[1600px] bg-popover border border-border lg:rounded-2xl flex flex-col overflow-hidden shadow-2xl">
+        {/* header */}
+        <div className="shrink-0 border-b border-border px-5 py-3.5 flex items-start justify-between gap-4">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-lg grid place-items-center text-sm font-bold shrink-0 bg-[#26D07C]/12 text-[#26D07C] border border-[#26D07C]/30">
+              {initials(head?.name || "?")}
             </div>
-            <p className="text-sm text-muted-foreground mt-0.5 truncate flex items-center gap-1.5">
-              {d && domainOf(d.email) && <Favicon domain={domainOf(d.email)} label={d.company} size={16} />}
-              <span className="truncate">{d?.job_title ? `${d.job_title} · ` : ""}{d?.company}{d?.country ? ` · ${d.country}` : ""}</span>
-            </p>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-lg font-semibold text-foreground truncate">{head?.name || "…"}</h2>
+                {h && <Badge text={h.hot ? "🔥 Hot" : h.label} className={h.cls} />}
+                {head?.category && <Badge text={head.category} className="bg-[#FFD60A]/12 text-[#FFD60A]" />}
+              </div>
+              <p className="text-sm text-muted-foreground mt-0.5 truncate flex items-center gap-1.5">
+                {headDomain && <Favicon domain={headDomain} label={head?.company} size={16} />}
+                <span className="truncate">{head?.job_title ? `${head.job_title} · ` : ""}{head?.company}{head?.country ? ` · ${head.country}` : ""}</span>
+              </p>
+            </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {booked ? (
@@ -926,7 +1155,7 @@ function Record({ id, onClose, onChanged }: { id: number; onClose: () => void; o
                 <CalendarClock className="w-4 h-4" /> Booked
               </span>
             ) : (
-              <button onClick={book} disabled={booking}
+              <button onClick={book} disabled={booking || !d}
                 className="inline-flex items-center gap-2 rounded-lg border border-[#5fe08a]/40 bg-[#22c55e]/10 px-3 py-2 text-sm font-medium text-[#5fe08a] hover:bg-[#22c55e]/15 disabled:opacity-40 transition-colors">
                 {booking ? <Loader2 className="w-4 h-4 animate-spin" /> : <CalendarClock className="w-4 h-4" />} Mark booked
               </button>
@@ -937,48 +1166,12 @@ function Record({ id, onClose, onChanged }: { id: number; onClose: () => void; o
           </div>
         </div>
 
-        {loading || !d ? (
+        {loading && !d ? (
           <div className="p-6 text-muted-foreground text-sm">Loading…</div>
+        ) : d ? (
+          <RecordBody key={id} d={d} id={id} themName={themName} reload={reload} both={both} />
         ) : (
-          <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)]">
-            {/* LEFT: context + actions */}
-            <div className="overflow-y-auto p-6 space-y-5 lg:border-r border-border">
-              {/* act now */}
-              {(() => {
-                const a = actNow(d);
-                const tone = a.tone === "green" ? "border-[#5fe08a]/40 bg-[#22c55e]/8"
-                  : a.tone === "gold" ? "border-[#FFD60A]/40 bg-[#FFD60A]/8" : "border-border bg-card";
-                const txt = a.tone === "green" ? "text-[#5fe08a]" : a.tone === "gold" ? "text-[#FFD60A]" : "text-foreground";
-                return (
-                  <div className={`rounded-xl border p-4 ${tone}`}>
-                    <div className={`flex items-center gap-2 text-sm font-semibold ${txt}`}>
-                      <Zap className="w-4 h-4" /> {a.title}
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-1">{a.detail}</p>
-                  </div>
-                );
-              })()}
-
-              <IntelPanel d={d} />
-              <BuildCard d={d} onChanged={both} />
-              <ContactActions d={d} onChanged={reload} />
-
-              <div className="text-xs text-muted-foreground border-t border-border pt-4">
-                {d.live_channel === "gmail"
-                  ? "Live thread is on Gmail (jose@luxvance.com). Reply from your inbox, not the burner."
-                  : "Email sends go on-thread via Instantly. LinkedIn, WhatsApp and calls are copy-and-send by hand. Nothing sends until you click."}
-              </div>
-            </div>
-
-            {/* RIGHT: composer on top, newest-first conversation below */}
-            <div className="flex flex-col min-h-0">
-              <ReplyComposer d={d} onSent={both} />
-              <div className="flex-1 min-h-0 overflow-y-auto p-6">
-                <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">// CONVERSATION · NEWEST_FIRST</div>
-                <Conversation id={id} themName={themName} fallback={d.reply_text} />
-              </div>
-            </div>
-          </div>
+          <div className="p-6 text-muted-foreground text-sm">Could not load this prospect.</div>
         )}
       </div>
     </div>
@@ -990,7 +1183,7 @@ function ProspectRow({ r, onOpen }: { r: Card; onOpen: (id: number) => void }) {
   const mine = r.waiting_on === "us";
   const h = heatChip(r.heat);
   return (
-    <tr onClick={() => onOpen(r.id)}
+    <tr onClick={() => onOpen(r.id)} onMouseEnter={() => loadDetail(r.id)}
       className={`border-b border-border/60 last:border-0 hover:bg-secondary/60 cursor-pointer ${rotEdge(r)}`}>
       <td className="px-4 py-3">
         <div className="font-medium text-foreground flex items-center gap-2">
@@ -1068,30 +1261,35 @@ function BoardCard({ r, onOpen }: { r: Card; onOpen: (id: number) => void }) {
       : { text: r.stage_label || r.status_label, cls: "text-muted-foreground" };
   return (
     <button onClick={() => onOpen(r.id)} draggable
+      onMouseEnter={() => loadDetail(r.id)}
       onDragStart={(e) => e.dataTransfer.setData("text/plain", String(r.id))}
       className={`w-full text-left bg-card border border-border rounded-xl p-3 hover:border-[#FFD60A]/50 transition-colors ${rotEdge(r)}`}>
-      {/* name + heat */}
+      {/* person → title → company (with its logo), heat on the right */}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="font-medium text-foreground text-sm truncate flex items-center gap-1.5">
-            {r.wants_meeting && r.waiting_on !== "closed" && <span className="text-[11px]">📅</span>}{r.name}
+          {/* 1 · person name */}
+          <div className="font-semibold text-foreground text-sm truncate flex items-center gap-1.5">
+            {r.wants_meeting && r.waiting_on !== "closed" && <span className="text-[11px]" title="Asked to meet">📅</span>}{r.name}
           </div>
-          <div className="text-xs text-muted-foreground truncate flex items-center gap-1">
-            {domainOf(r.email) && <Favicon domain={domainOf(r.email)} label={r.company} size={13} />}
-            <span className="truncate">{[r.job_title, r.company].filter(Boolean).join(" · ") || r.email}</span>
+          {/* 2 · their title */}
+          {r.job_title && <div className="text-[11px] text-muted-foreground/90 truncate mt-0.5">{r.job_title}</div>}
+          {/* 3 · company + logo */}
+          <div className="text-xs text-muted-foreground truncate flex items-center gap-1.5 mt-0.5">
+            {domainOf(r.email) && <Favicon domain={domainOf(r.email)} label={r.company} size={14} />}
+            <span className="truncate">{r.company || r.email}</span>
           </div>
         </div>
         {r.waiting_on !== "closed" && (
-          <span className={`shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${h.cls}`}>
+          <span className={`shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${h.cls}`} title={`Heat ${r.heat}${r.heat_reason ? " · " + r.heat_reason : ""}`}>
             {h.hot && <Flame className="w-2.5 h-2.5" />}{r.heat}
           </span>
         )}
       </div>
 
       {/* their actual words — the context that makes this a cockpit, not a list */}
-      {r.reply_snippet && (
-        <p className="mt-2 text-[11px] leading-snug text-muted-foreground/90 line-clamp-2 border-l border-border pl-2">
-          “{r.reply_snippet}”
+      {cleanSnippet(r.reply_snippet) && (
+        <p className="mt-2 text-[11px] leading-snug text-muted-foreground/90 line-clamp-2 border-l-2 border-[#FFD60A]/25 pl-2">
+          {cleanSnippet(r.reply_snippet)}
         </p>
       )}
 
@@ -1101,11 +1299,11 @@ function BoardCard({ r, onOpen }: { r: Card; onOpen: (id: number) => void }) {
         {r.country && <span className="text-muted-foreground/70 truncate max-w-[5rem]">{r.country}</span>}
         <span className={`ml-auto tabular-nums ${clock.cls}`}>{clock.text}</span>
         {(r.build_delivered || r.has_build) && (
-          <span title={r.build_delivered ? "Build sent" : "Build ready"}
+          <span title={r.build_delivered ? "Build delivered — the prospect got their lead magnet" : "Build ready — not sent yet"}
             className={`inline-block w-1.5 h-1.5 rounded-full ${r.build_delivered ? "bg-[#26D07C]" : "bg-[#FFD60A]"}`} />
         )}
-        {r.has_phone && <span title="Phone on file" className="text-muted-foreground/60">☎</span>}
-        {r.has_linkedin && <span title="LinkedIn on file" className="text-[#5fd0e0]/70 font-semibold">in</span>}
+        {r.has_phone && <span title="Phone on file — you can call / WhatsApp" className="text-muted-foreground/60">☎</span>}
+        {r.has_linkedin && <span title="LinkedIn on file — you can view the profile / connect" className="text-[#5fd0e0]/70 font-semibold">in</span>}
       </div>
     </button>
   );
@@ -1123,7 +1321,7 @@ function BoardColumn({ title, hint, accent, tone, rows, onOpen, onDrop }: {
       onDragOver={onDrop ? (e) => { e.preventDefault(); setOver(true); } : undefined}
       onDragLeave={() => setOver(false)}
       onDrop={onDrop ? (e) => { e.preventDefault(); setOver(false); const id = Number(e.dataTransfer.getData("text/plain")); if (id) onDrop(id); } : undefined}
-      className={`shrink-0 w-[17rem] rounded-xl p-2 transition-colors ${over ? ring : "bg-card/30"}`}>
+      className={`shrink-0 w-[19rem] rounded-xl p-2 transition-colors ${over ? ring : "bg-card/30"}`}>
       <div className="px-2 py-1.5 mb-1 border-b border-border/60">
         <div className="flex items-center gap-2">
           <h3 className={`text-xs font-semibold uppercase tracking-wide ${accent ? "text-[#FFD60A]" : tone === "green" ? "text-[#5fe08a]" : "text-foreground"}`}>{title}</h3>
@@ -1131,7 +1329,7 @@ function BoardColumn({ title, hint, accent, tone, rows, onOpen, onDrop }: {
         </div>
         {hint && <p className="text-[10px] text-muted-foreground/70 mt-0.5">{hint}</p>}
       </div>
-      <div className="space-y-2 max-h-[calc(100vh-20rem)] overflow-y-auto pr-1 pt-1">
+      <div className="space-y-2 max-h-[calc(100vh-13rem)] overflow-y-auto pr-1 pt-1">
         {rows.map((r) => <BoardCard key={r.id} r={r} onOpen={onOpen} />)}
         {rows.length === 0 && <div className="text-[11px] text-muted-foreground/50 px-2 py-6 text-center border border-dashed border-border/50 rounded-lg">drop here</div>}
       </div>
@@ -1156,6 +1354,28 @@ function catRank(cat: string): number {
   if (c.includes("mql")) return 2;
   if (c.includes("neg") || c.includes("not")) return 0;
   return 1;
+}
+// The tiles double as board filters — click "Hot now" and the whole pipeline narrows to hot
+// cards, click again to clear. null = no filter (show everything).
+type BoardFilter = null | "us" | "hot" | "wants" | "them" | "meetings";
+const FILTER_LABEL: Record<Exclude<BoardFilter, null>, string> = {
+  us: "⚡ Your turn", hot: "🔥 Hot now", wants: "📅 Want to meet",
+  them: "Waiting on them", meetings: "Meetings booked",
+};
+function passesFilter(c: Card, f: BoardFilter): boolean {
+  switch (f) {
+    case "us": return c.waiting_on === "us";
+    case "hot": return c.heat >= 70;
+    case "wants": return c.wants_meeting;
+    case "them": return c.waiting_on === "them";
+    case "meetings": return c.status === "meeting_booked";
+    default: return true;
+  }
+}
+function matchQuery(c: Card, q: string): boolean {
+  if (!q.trim()) return true;
+  const t = q.toLowerCase();
+  return c.name.toLowerCase().includes(t) || c.company.toLowerCase().includes(t) || c.email.toLowerCase().includes(t);
 }
 function sortCards(list: Card[], by: SortKey): Card[] {
   const ms = (s: string | null) => (s ? new Date(s).getTime() : 0);
@@ -1189,7 +1409,7 @@ export default function CrmPage() {
   const [rows, setRows] = useState<Card[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
-  const [onlyMine, setOnlyMine] = useState(false);
+  const [filter, setFilter] = useState<BoardFilter>(null);
   const [view, setView] = useState<"queue" | "board">("board");
   const [sortBy, setSortBy] = useState<SortKey>("heat");
   const [openId, setOpenId] = useState<number | null>(null);
@@ -1235,92 +1455,84 @@ export default function CrmPage() {
   };
 
   const groups = useMemo(() => {
-    let r = rows;
-    if (q.trim()) {
-      const t = q.toLowerCase();
-      r = r.filter((x) => x.name.toLowerCase().includes(t) || x.company.toLowerCase().includes(t) || x.email.toLowerCase().includes(t));
-    }
+    const r = rows.filter((x) => matchQuery(x, q) && passesFilter(x, filter));
     const ms = (s: string | null) => (s ? new Date(s).getTime() : 0);
     // Hottest first: heat desc, then most-overdue.
     const us = r.filter((x) => x.waiting_on === "us").sort((a, b) => b.heat - a.heat || ms(a.last_reply_at) - ms(b.last_reply_at));
     const them = r.filter((x) => x.waiting_on === "them").sort((a, b) => ms(a.next_touch_at) - ms(b.next_touch_at));
     const closed = r.filter((x) => x.waiting_on === "closed");
     return { us, them, closed };
-  }, [rows, q]);
+  }, [rows, q, filter]);
 
   return (
-    <div className="p-6 md:p-8 max-w-[1600px] mx-auto">
-      <div className="flex items-end justify-between mb-5 gap-4 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-bold neon tracking-tight">// LUXVANCE_CRM</h1>
-          <p className="text-sm text-muted-foreground mt-1 term-prompt">reply pipeline · work the queue, book the call</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center bg-card border border-border rounded-lg p-0.5">
-            <button onClick={() => setView("queue")}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${view === "queue" ? "bg-[#FFD60A]/12 text-[#FFD60A]" : "text-muted-foreground"}`}>
-              <List className="w-4 h-4" /> Queue
-            </button>
-            <button onClick={() => setView("board")}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${view === "board" ? "bg-[#FFD60A]/12 text-[#FFD60A]" : "text-muted-foreground"}`}>
-              <LayoutGrid className="w-4 h-4" /> Board
-            </button>
-          </div>
-          <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortKey)}
-            title="Sort each column"
-            className="bg-card border border-border rounded-lg px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground focus:outline-none focus:ring-1 focus:ring-[#FFD60A]/40 cursor-pointer">
-            {SORT_OPTIONS.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
-          </select>
-          <button onClick={load} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground px-2 py-1.5">
-            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> Refresh
-          </button>
-        </div>
-      </div>
-
-      <Briefing onOpen={openRecord} />
-
-      {funnel && (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-          <Tile label="⚡ Your turn" value={funnel.waiting_us} accent active={onlyMine} onClick={() => setOnlyMine((v) => !v)} />
-          <Tile label="Hot now" value={funnel.hot_now} icon={<Flame className="w-4 h-4 text-[#ff9b9b]" />} />
-          <Tile label="Want to meet" value={funnel.wants_meeting} />
-          <Tile label="Waiting on them" value={funnel.waiting_them} />
-          <Tile label="Meetings" value={funnel.by_status?.meeting_booked?.count || 0} />
-        </div>
-      )}
-
-      <div className="flex items-center gap-3 mb-5">
-        <div className="relative flex-1 max-w-sm">
+    <div className="max-w-[1760px] mx-auto">
+      {/* one compact command bar: identity · search · view · sort · refresh */}
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
+        <h1 className="text-xl font-bold neon tracking-tight mr-1 shrink-0">// LUXVANCE_CRM</h1>
+        <div className="relative flex-1 min-w-[180px] max-w-md">
           <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, company, email…"
             className="w-full bg-card border border-border rounded-lg pl-9 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-[#FFD60A]/50" />
         </div>
-        {view === "queue" && (
-          <button onClick={() => setOnlyMine((v) => !v)}
-            className={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${onlyMine ? "bg-[#FFD60A]/10 text-[#FFD60A] border-[#FFD60A]/40" : "text-muted-foreground border-border hover:bg-secondary"}`}>
-            Only your turn
+        <div className="flex items-center bg-card border border-border rounded-lg p-0.5 shrink-0">
+          <button onClick={() => setView("board")}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${view === "board" ? "bg-[#FFD60A]/12 text-[#FFD60A]" : "text-muted-foreground"}`}>
+            <LayoutGrid className="w-4 h-4" /> Board
           </button>
-        )}
+          <button onClick={() => setView("queue")}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${view === "queue" ? "bg-[#FFD60A]/12 text-[#FFD60A]" : "text-muted-foreground"}`}>
+            <List className="w-4 h-4" /> Queue
+          </button>
+        </div>
+        <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortKey)}
+          title="Sort each column"
+          className="bg-card border border-border rounded-lg px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground focus:outline-none focus:ring-1 focus:ring-[#FFD60A]/40 cursor-pointer shrink-0">
+          {SORT_OPTIONS.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
+        </select>
+        <button onClick={load} title="Refresh" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground px-2 py-1.5 shrink-0">
+          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+        </button>
       </div>
+
+      <Briefing onOpen={openRecord} />
+
+      {/* the tiles ARE the filters: click to narrow the pipeline, click again to clear */}
+      {funnel && (
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+          <Tile label="⚡ Your turn" value={funnel.waiting_us} accent active={filter === "us"} onClick={() => setFilter((f) => (f === "us" ? null : "us"))} />
+          <Tile label="Hot now" value={funnel.hot_now} icon={<Flame className="w-4 h-4 text-[#ff9b9b]" />} active={filter === "hot"} onClick={() => setFilter((f) => (f === "hot" ? null : "hot"))} />
+          <Tile label="Want to meet" value={funnel.wants_meeting} active={filter === "wants"} onClick={() => setFilter((f) => (f === "wants" ? null : "wants"))} />
+          <Tile label="Waiting on them" value={funnel.waiting_them} active={filter === "them"} onClick={() => setFilter((f) => (f === "them" ? null : "them"))} />
+          <Tile label="Meetings" value={funnel.by_status?.meeting_booked?.count || 0} active={filter === "meetings"} onClick={() => setFilter((f) => (f === "meetings" ? null : "meetings"))} />
+        </div>
+      )}
+
+      {/* active-filter chip, so it's obvious the pipeline is narrowed + how to clear it */}
+      {filter && (
+        <div className="flex items-center gap-2 mb-3 text-xs">
+          <span className="text-muted-foreground">Filtered:</span>
+          <button onClick={() => setFilter(null)}
+            className="inline-flex items-center gap-1.5 rounded-full bg-[#FFD60A]/10 border border-[#FFD60A]/40 text-[#FFD60A] px-2.5 py-1 font-medium hover:bg-[#FFD60A]/15 transition-colors">
+            {FILTER_LABEL[filter]} <X className="w-3 h-3" />
+          </button>
+        </div>
+      )}
 
       {loading ? (
         <div className="text-center text-muted-foreground py-16">Loading…</div>
       ) : view === "queue" ? (
         <>
-          <PipelineSection title="// YOUR_TURN" hint="they replied, the ball is with us · hottest first" rows={groups.us} onOpen={openRecord} accent />
-          {!onlyMine && <PipelineSection title="// WAITING_ON_THEM" hint="we replied last" rows={groups.them} onOpen={openRecord} />}
-          {!onlyMine && <PipelineSection title="// BOOKED_&_CLOSED" rows={groups.closed} onOpen={openRecord} />}
+          {groups.us.length > 0 && <PipelineSection title="// YOUR_TURN" hint="they replied, the ball is with us · hottest first" rows={groups.us} onOpen={openRecord} accent />}
+          {groups.them.length > 0 && <PipelineSection title="// WAITING_ON_THEM" hint="we replied last" rows={groups.them} onOpen={openRecord} />}
+          {groups.closed.length > 0 && <PipelineSection title="// BOOKED_&_CLOSED" rows={groups.closed} onOpen={openRecord} />}
           {groups.us.length === 0 && groups.them.length === 0 && groups.closed.length === 0 && (
-            <div className="text-center text-muted-foreground py-16">No prospects.</div>
+            <div className="text-center text-muted-foreground py-16">No prospects match.</div>
           )}
         </>
       ) : (
         <div className="flex gap-3 overflow-x-auto pb-4">
           {FUNNEL.map((s) => {
-            const col = sortCards((q.trim()
-              ? rows.filter((x) => x.name.toLowerCase().includes(q.toLowerCase()) || x.company.toLowerCase().includes(q.toLowerCase()) || x.email.toLowerCase().includes(q.toLowerCase()))
-              : rows
-            ).filter((x) => (x.stage || "new_reply") === s.key), sortBy);
+            const col = sortCards(rows.filter((x) => matchQuery(x, q) && passesFilter(x, filter) && (x.stage || "new_reply") === s.key), sortBy);
             return (
               <BoardColumn key={s.key} title={s.title} hint={s.hint} tone={s.tone}
                 accent={s.key === "new_reply"} rows={col} onOpen={openRecord}
@@ -1330,7 +1542,7 @@ export default function CrmPage() {
         </div>
       )}
 
-      {openId !== null && <Record id={openId} onClose={() => openRecord(null)} onChanged={load} />}
+      {openId !== null && <Record id={openId} initial={rows.find((r) => r.id === openId)} onClose={() => openRecord(null)} onChanged={load} />}
     </div>
   );
 }
