@@ -156,6 +156,14 @@ function chLabel(c?: string | null): string {
   return x === "linkedin" ? "LinkedIn" : x === "whatsapp" ? "WhatsApp" : x === "call" ? "Call"
     : x === "email" ? "Email" : (c || "");
 }
+// Exact "Jul 12, 15:40" for the pulse panel, so timing is unambiguous, not just "3d ago".
+function fmtExact(s?: string | null): string {
+  if (!s) return "";
+  const d = new Date(s);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleDateString(undefined, { day: "2-digit", month: "short" }) + ", " +
+    d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+}
 
 // Tidy a reply snippet for the card: collapse newlines/whitespace, drop a leading quote or
 // list marker ("1.", "-", "•") and any greeting so the preview opens on the real content.
@@ -1130,17 +1138,19 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
   const owe = d.waiting_on === "us";
   return (
     <div className="space-y-5">
-      {/* PULSE — the timing on both sides: their last reply vs our last send. The side that
-          moved LAST tells you whose court the ball is in; the gap tells you how cold it's going. */}
+      {/* PULSE — the timing on both sides, unambiguous: ↙ THEY last wrote vs ↗ WE last wrote.
+          The side that moved LAST tells you whose court the ball is in; the gap = how cold. */}
       <div className="flex items-stretch rounded-lg border border-border bg-card/40 overflow-hidden">
-        <div className={`flex-1 px-3 py-2 ${owe ? "bg-[#FFD60A]/[0.05]" : ""}`}>
-          <div className="text-[9px] uppercase tracking-[0.14em] text-muted-foreground/60">Them · last reply</div>
+        <div className={`flex-1 px-3 py-2 ${owe ? "bg-[#5aa2ff]/[0.06]" : ""}`}>
+          <div className="text-[9px] uppercase tracking-[0.14em] text-[#5aa2ff]/80">↙ They last wrote</div>
           <div className={`text-[13px] tabular-nums mt-0.5 ${owe ? "text-[#FFD60A]" : "text-foreground"}`}>{timeAgo(d.last_reply_at)}</div>
+          {fmtExact(d.last_reply_at) && <div className="text-[10px] text-muted-foreground/60 tabular-nums">{fmtExact(d.last_reply_at)}</div>}
         </div>
         <div className="w-px bg-border" />
-        <div className={`flex-1 px-3 py-2 ${!owe && d.waiting_on !== "closed" ? "bg-[#FFD60A]/[0.05]" : ""}`}>
-          <div className="text-[9px] uppercase tracking-[0.14em] text-muted-foreground/60">You · last send{d.last_channel ? ` · ${chLabel(d.last_channel)}` : ""}</div>
+        <div className={`flex-1 px-3 py-2 ${!owe && d.waiting_on !== "closed" ? "bg-[#26D07C]/[0.05]" : ""}`}>
+          <div className="text-[9px] uppercase tracking-[0.14em] text-[#26D07C]/80">↗ We last wrote{d.last_channel ? ` · ${chLabel(d.last_channel)}` : ""}</div>
           <div className="text-[13px] tabular-nums mt-0.5 text-foreground">{d.last_touch_at ? timeAgo(d.last_touch_at) : "—"}</div>
+          {fmtExact(d.last_touch_at) && <div className="text-[10px] text-muted-foreground/60 tabular-nums">{fmtExact(d.last_touch_at)}</div>}
         </div>
       </div>
 
@@ -1327,7 +1337,6 @@ function RecordBody({ d, id, themName, reload, both }: { d: Detail; id: number; 
 }
 
 const STAGES: { key: string; label: string }[] = [
-  { key: "neutral", label: "Neutral" },
   { key: "mql", label: "MQL" },
   { key: "sql", label: "SQL" },
   { key: "discovery", label: "Discovery call" },
@@ -1638,11 +1647,10 @@ function BoardCard({ r, onOpen }: { r: Card; onOpen: (id: number) => void }) {
         <span className={`ml-auto tabular-nums ${clock.cls}`}>{clock.text}</span>
       </div>
 
-      {/* pulse — last move on each side, so you read the momentum + the gap at a glance */}
-      <div className="flex items-center gap-2 mt-1.5 text-[10px] text-muted-foreground/70">
-        <span title="Prospect's last reply"><span className="text-muted-foreground/45">them</span> <span className="tabular-nums">{agoShort(r.last_reply_at)}</span></span>
-        <span className="text-muted-foreground/25">·</span>
-        <span title="Our last send"><span className="text-muted-foreground/45">you</span> <span className="tabular-nums">{agoShort(r.last_touch_at)}</span>{r.last_channel ? ` ${chLabel(r.last_channel)}` : ""}</span>
+      {/* pulse — who moved last, with direction: ↙ they replied · ↗ we sent (+channel) */}
+      <div className="flex items-center gap-2.5 mt-1.5 text-[10px]">
+        <span title="Last time THEY wrote to us" className="text-[#5aa2ff]/85">↙ they replied <span className="tabular-nums">{agoShort(r.last_reply_at)}</span></span>
+        <span title="Last time WE wrote to them" className="text-[#26D07C]/80">↗ we sent <span className="tabular-nums">{agoShort(r.last_touch_at)}</span>{r.last_channel ? ` · ${chLabel(r.last_channel)}` : ""}</span>
       </div>
 
       {/* channels — reachability at a glance + one-click open (email / call / WhatsApp / LinkedIn / Build) */}
@@ -1851,8 +1859,7 @@ function sortCards(list: Card[], by: SortKey): Card[] {
 }
 
 const FUNNEL: { key: string; title: string; hint: string; tone?: "green" | "muted" }[] = [
-  { key: "neutral",       title: "Neutral",       hint: "replied · not yet qualified" },
-  { key: "mql",           title: "MQL",           hint: "mild interest · nurturing" },
+  { key: "mql",           title: "MQL",           hint: "replied · mild interest" },
   { key: "sql",           title: "SQL",           hint: "real intent + fit" },
   { key: "discovery",     title: "Discovery call", hint: "call booked / held" },
   { key: "proposal_sent", title: "Proposal sent", hint: "after they saw the Build" },
@@ -2035,7 +2042,7 @@ export default function CrmPage() {
       ) : (
         <div ref={boardRef} onDragOver={autoScroll} className="flex gap-3 overflow-x-auto pb-4">
           {FUNNEL.map((s) => {
-            const col = sortCards(rows.filter((x) => matchQuery(x, q) && passesAll(x, filters) && (x.stage || "neutral") === s.key), sortBy);
+            const col = sortCards(rows.filter((x) => matchQuery(x, q) && passesAll(x, filters) && (x.stage || "mql") === s.key), sortBy);
             return (
               <BoardColumn key={s.key} title={s.title} hint={s.hint} tone={s.tone}
                 accent={s.key === "sql"} rows={col} onOpen={openRecord}
