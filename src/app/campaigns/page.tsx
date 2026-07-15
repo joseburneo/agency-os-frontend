@@ -7,6 +7,16 @@ import { supabase } from "@/lib/supabase";
 
 const API_BASE = "https://agency-os-api.onrender.com";
 
+// ---- Active Workspaces ----
+// The Luxvance App is a per-workspace platform. It shows ONLY the workspaces we
+// actively run: Luxvance's own outbound + each live client. Archived clients
+// (Kcal, GFV, CAMB.AI, CapQuest, Connect Resources, Remly, ...) are hidden.
+// Match is case-insensitive + substring, so "Arco Irish" / "Arco" both resolve.
+// To add a workspace later, append its client-name fragment here.
+const ACTIVE_WORKSPACES = ["luxvance", "arco"];
+const isActiveWorkspace = (clientName: string) =>
+  ACTIVE_WORKSPACES.some(w => (clientName || "").toLowerCase().includes(w));
+
 // ---- Tier Helpers ----
 type TierLabel = "Excellent" | "Good" | "Average" | "Below Avg" | "Critical" | "Evaluating";
 
@@ -300,13 +310,15 @@ export default function CampaignsPage() {
     const { data, error } = await supabase.from("campaigns").select(`id, campaign_name, emails_sent, open_rate, reply_rate, opportunities, replies, copy_errors, is_compliant, status, clients(name)`).order('last_updated', { ascending: false });
     if (error) console.error("Error fetching campaigns:", error);
     else if (data) {
-      setCampaigns(data.map((c: any) => ({
-        id: c.id, name: c.campaign_name, client: c.clients?.name || "Unknown",
-        sent: c.emails_sent, open: c.open_rate, reply: c.reply_rate,
-        opportunities: c.opportunities || 0, replies: c.replies || 0,
-        copyErrors: Array.isArray(c.copy_errors) ? c.copy_errors : [],
-        isCompliant: c.is_compliant, status: c.status || 'Active'
-      })));
+      setCampaigns(data
+        .map((c: any) => ({
+          id: c.id, name: c.campaign_name, client: c.clients?.name || "Unknown",
+          sent: c.emails_sent, open: c.open_rate, reply: c.reply_rate,
+          opportunities: c.opportunities || 0, replies: c.replies || 0,
+          copyErrors: Array.isArray(c.copy_errors) ? c.copy_errors : [],
+          isCompliant: c.is_compliant, status: c.status || 'Active'
+        }))
+        .filter((c) => isActiveWorkspace(c.client)));
     }
     setLoading(false);
   };

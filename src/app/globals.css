@@ -1,15 +1,15 @@
 @import "tailwindcss";
 
 :root {
-  /* Luxvance Portal Theme — navy + gold (matches builds.luxvance.com) */
-  --background: #0A0E1A; /* Deep navy */
-  --foreground: #F5F5F7;
+  /* Luxvance CRM — futuristic terminal: near-black + neon gold, monospace */
+  --background: #0A0D14; /* Deep navy-black terminal (lifted a touch, echoes the site) */
+  --foreground: #EDEFF2;
 
-  --card: rgba(255, 255, 255, 0.035); /* Panel over navy */
-  --card-foreground: #F5F5F7;
+  --card: rgba(255, 214, 10, 0.02); /* Faint gold-tinted panel */
+  --card-foreground: #EDEFF2;
 
-  --popover: #0E1424;
-  --popover-foreground: #F5F5F7;
+  --popover: #0A0D11;
+  --popover-foreground: #EDEFF2;
 
   --primary: #FFD60A; /* Luxvance Gold */
   --primary-foreground: #0A0E1A;
@@ -59,16 +59,84 @@
 body {
   background-color: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans);
-  /* Subtle gold ambient backdrop */
-  background-image: radial-gradient(circle at top right, rgba(255, 214, 10, 0.05), transparent 420px),
-                    radial-gradient(circle at bottom left, rgba(255, 214, 10, 0.03), transparent 420px);
+  font-family: var(--font-mono);
+  letter-spacing: -0.01em;
+  /* Flat near-black. European minimal: no ambient wash, restraint. */
 }
 
-/* Base Glassmorphism classes for components that use bg-card */
+/* Terminal panels: one neutral hairline, flat. No glass, no heavy shadow. */
 .bg-card {
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--border);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: none;
 }
+
+/* ── ambient background ────────────────────────────────────────────── */
+/* A whisper of the website's atmosphere behind the board — two low-opacity radial glows
+   (gold up-right, green down-left) that drift very slowly. Deliberately faint and slow: a
+   working data board can't carry a busy galaxy without hurting legibility. */
+.crm-ambient {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(900px 520px at 88% -12%, rgba(255, 214, 10, 0.05), transparent 60%),
+    radial-gradient(820px 500px at -6% 112%, rgba(38, 208, 124, 0.045), transparent 55%),
+    radial-gradient(1100px 700px at 50% 50%, rgba(120, 140, 200, 0.02), transparent 70%);
+  animation: crmdrift 26s ease-in-out infinite alternate;
+}
+@keyframes crmdrift {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(0, -16px, 0); }
+}
+@media (prefers-reduced-motion: reduce) { .crm-ambient { animation: none; } }
+
+/* ── subtle scrollbars ─────────────────────────────────────────────── */
+/* The default chunky white scrollbars between board columns read as aggressive.
+   Make every scroll surface thin, dim, and only faintly visible until hovered. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.10) transparent;
+}
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.09);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.18); background-clip: padding-box; }
+*::-webkit-scrollbar-corner { background: transparent; }
+
+/* ── terminal / neon utilities ─────────────────────────────────────── */
+/* `// LABEL` section headers, dim (like `// OFF THE RADAR`) */
+.term-label::before { content: "// "; opacity: 0.55; }
+/* `> ` prompt lines */
+.term-prompt::before { content: "> "; color: #FFD60A; opacity: 0.8; }
+
+/* Neon-gold text with a soft, restrained glow (the single accent) */
+.neon {
+  color: #FFD60A;
+  text-shadow: 0 0 10px rgba(255, 214, 10, 0.40);
+}
+/* Highlighted header block, like `// THE TALKS`: faint gold wash behind + glow */
+.neon-hl {
+  color: #FFD60A;
+  background: rgba(255, 214, 10, 0.07);
+  box-shadow: 0 0 22px rgba(255, 214, 10, 0.13);
+  padding: 0.1em 0.4em;
+  border-radius: 3px;
+  text-shadow: 0 0 8px rgba(255, 214, 10, 0.35);
+}
+/* Very subtle glow lift for the primary button (minimal, not loud) */
+.neon-btn {
+  box-shadow: 0 0 18px -6px rgba(255, 214, 10, 0.55);
+}
+/* Blinking terminal caret */
+.caret::after {
+  content: "_";
+  color: #FFD60A;
+  animation: blink 1.1s steps(1) infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
