@@ -1,13 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Target, Download, Search, ExternalLink, PenLine, Eye } from "lucide-react";
-import type { Workspace, WorkspaceData } from "@/lib/portal/types";
+import { Target, Download, Search, ExternalLink, PenLine, Eye, X, Send } from "lucide-react";
+import type { Workspace, WorkspaceData, Lead } from "@/lib/portal/types";
 import { ModuleHeader, Panel, Pill, CompanyMark, ChannelDots, cn } from "@/components/portal/ui";
 
 export function TargetListsView({ ws, data }: { ws: Workspace; data: WorkspaceData }) {
   const [activeList, setActiveList] = useState(data.lists[0]?.id ?? "");
   const [q, setQ] = useState("");
+  const [preview, setPreview] = useState<Lead | null>(null);
 
   const list = data.lists.find((l) => l.id === activeList) ?? data.lists[0];
   const leads = useMemo(() => {
@@ -125,27 +126,51 @@ export function TargetListsView({ ws, data }: { ws: Workspace; data: WorkspaceDa
                   <td className="px-4 py-3 text-muted-foreground">{l.sector}</td>
                   <td className="px-4 py-3">
                     {l.linkedin ? (
-                      <span className="inline-flex items-center gap-1 text-[13px] text-blue-300">
-                        View <ExternalLink className="w-3 h-3" />
-                      </span>
+                      l.linkedinUrl ? (
+                        <a
+                          href={l.linkedinUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[13px] text-blue-300 hover:text-blue-200"
+                        >
+                          View <ExternalLink className="w-3 h-3" />
+                        </a>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[13px] text-blue-300">
+                          View <ExternalLink className="w-3 h-3" />
+                        </span>
+                      )
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-2">
-                      {l.hasDraft ? (
-                        <button className="inline-flex items-center gap-1.5 rounded-md border border-[#FFD60A]/25 bg-[#FFD60A]/10 px-2.5 py-1.5 text-[12px] font-medium text-[#FFD60A] hover:bg-[#FFD60A]/15 transition-colors">
+                      {l.mailto ? (
+                        <a
+                          href={l.mailto}
+                          className="inline-flex items-center gap-1.5 rounded-md border border-[#FFD60A]/25 bg-[#FFD60A]/10 px-2.5 py-1.5 text-[12px] font-medium text-[#FFD60A] hover:bg-[#FFD60A]/15 transition-colors"
+                          title={`Opens your mail app to ${l.hasEmail ? l.emailMasked : "the lead"}`}
+                        >
                           <PenLine className="w-3.5 h-3.5" /> Draft
-                        </button>
+                        </a>
                       ) : l.hasEmail ? (
                         <span className="text-[11px] text-muted-foreground">draft pending</span>
                       ) : (
                         <span className="text-[11px] text-muted-foreground">no email yet</span>
                       )}
-                      <button className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1.5 text-[12px] font-medium text-foreground hover:border-white/20 transition-colors">
-                        <Eye className="w-3.5 h-3.5" /> Preview
-                      </button>
+                      {l.emailBody ? (
+                        <button
+                          onClick={() => setPreview(l)}
+                          className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1.5 text-[12px] font-medium text-foreground hover:border-white/20 transition-colors"
+                        >
+                          <Eye className="w-3.5 h-3.5" /> Preview
+                        </button>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 rounded-md border border-border/50 px-2.5 py-1.5 text-[12px] text-muted-foreground/50">
+                          <Eye className="w-3.5 h-3.5" /> Preview
+                        </span>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -166,6 +191,71 @@ export function TargetListsView({ ws, data }: { ws: Workspace; data: WorkspaceDa
         <Pill tone="muted">Enriched</Pill>
         Each lead carries role, company, sector, LinkedIn and a verified email, plus a per-contact dossier feeding the first line.
       </div>
+
+      {/* Email preview drawer */}
+      {preview && (
+        <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true">
+          <button
+            aria-label="Close preview"
+            onClick={() => setPreview(null)}
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+          />
+          <div className="relative w-full max-w-xl h-full bg-card border-l border-border shadow-2xl flex flex-col animate-in slide-in-from-right">
+            <div className="flex items-start justify-between gap-4 p-5 border-b border-border">
+              <div className="flex items-center gap-3 min-w-0">
+                <CompanyMark name={preview.company} domain={preview.domain} size={32} />
+                <div className="min-w-0">
+                  <div className="font-semibold text-foreground truncate">{preview.name}</div>
+                  <div className="text-[12px] text-muted-foreground truncate">
+                    {preview.role} · {preview.company}
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setPreview(null)}
+                className="shrink-0 grid place-items-center w-8 h-8 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:border-white/20 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-4">
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground mb-1">To</div>
+                <div className="text-sm font-mono text-foreground">
+                  {preview.hasEmail ? preview.emailMasked : "no email yet"}
+                </div>
+              </div>
+              {preview.emailSubject && (
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground mb-1">Subject</div>
+                  <div className="text-sm font-medium text-foreground">{preview.emailSubject}</div>
+                </div>
+              )}
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground mb-1">Message</div>
+                <div className="rounded-lg border border-border bg-input p-4 text-[13px] leading-relaxed text-foreground whitespace-pre-wrap">
+                  {preview.emailBody}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-5 border-t border-border flex items-center justify-between gap-3">
+              <span className="text-[11px] text-muted-foreground">
+                Email 1 · sends in {preview.company}&apos;s inbox in your voice.
+              </span>
+              {preview.mailto && (
+                <a
+                  href={preview.mailto}
+                  className="inline-flex items-center gap-2 rounded-lg border border-[#FFD60A]/30 bg-[#FFD60A]/10 px-4 py-2 text-[13px] font-semibold text-[#FFD60A] hover:bg-[#FFD60A]/15 transition-colors"
+                >
+                  <Send className="w-4 h-4" /> Open in mail
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

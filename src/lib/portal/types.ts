@@ -48,10 +48,17 @@ export interface Lead {
   company: string;
   sector: string;
   domain: string; // for the favicon
-  emailMasked: string; // never the raw address in the client UI
+  emailMasked: string; // masked for display
   linkedin: boolean;
+  linkedinUrl?: string; // real profile URL (owner view) for the "View" link
   hasEmail: boolean;
   hasDraft: boolean;
+  // Draft/Preview payload — present in the owner (client) view so Paul can read
+  // and send the rendered Email 1. Built server-side; mailto carries the raw
+  // recipient (the owner sends to their own leads).
+  emailSubject?: string;
+  emailBody?: string;
+  mailto?: string;
 }
 
 // ── Email + LinkedIn campaigns ──────────────────────────────────────────

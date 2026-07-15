@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { MessageCircle, Phone } from "lucide-react";
 import { getWorkspace, getWorkspaceData } from "@/lib/portal/mock";
+import { loadPortal } from "@/lib/portal/data";
 import { ModuleHeader, Panel, SectionLabel, StatTile, Pill } from "@/components/portal/ui";
 import type { PhoneTouch, TouchOutcome } from "@/lib/portal/types";
 
@@ -39,8 +40,9 @@ function TouchIcon({ touch }: { touch: PhoneTouch }) {
 
 export default async function WhatsappPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const ws = getWorkspace(slug);
-  const data = getWorkspaceData(slug);
+  const live = await loadPortal(slug);
+  const ws = live?.ws ?? getWorkspace(slug);
+  const data = live?.data ?? getWorkspaceData(slug);
   if (!ws || !data) notFound();
 
   const touches = data.phoneTouches;

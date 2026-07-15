@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { LayoutDashboard, ArrowRight, Mail, MessageCircle, Phone, KanbanSquare } from "lucide-react";
 import { getWorkspace, getWorkspaceData } from "@/lib/portal/mock";
+import { loadPortal } from "@/lib/portal/data";
 import { SectionLabel, StatTile, ModuleHeader, ChannelDots, Panel, Pill, Linkedin } from "@/components/portal/ui";
 import type { CrmStage, OutreachChannel } from "@/lib/portal/types";
 
@@ -20,8 +21,9 @@ const ACT_ICON: Record<OutreachChannel | "crm", React.ComponentType<{ className?
 
 export default async function DashboardPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const ws = getWorkspace(slug);
-  const data = getWorkspaceData(slug);
+  const live = await loadPortal(slug);
+  const ws = live?.ws ?? getWorkspace(slug);
+  const data = live?.data ?? getWorkspaceData(slug);
   if (!ws || !data) notFound();
 
   const stageCounts = STAGE_ORDER.map((s) => ({
