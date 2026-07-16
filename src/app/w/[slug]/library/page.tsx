@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { Library, FileText, BookOpen, Search, Package, Layers } from "lucide-react";
 import { getWorkspace, getWorkspaceData } from "@/lib/portal/mock";
+import { isModuleEnabled } from "@/lib/portal/modules";
 import { loadPortal } from "@/lib/portal/data";
 import { ModuleHeader, Panel, Pill, SectionLabel } from "@/components/portal/ui";
 import type { LibraryKind, JourneyKind } from "@/lib/portal/types";
@@ -36,6 +37,7 @@ const KIND_META: Record<
 
 export default async function LibraryPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
+  if (!isModuleEnabled(slug, "library")) notFound();
   const live = await loadPortal(slug);
   const ws = live?.ws ?? getWorkspace(slug);
   const data = live?.data ?? getWorkspaceData(slug);

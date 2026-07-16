@@ -7,19 +7,23 @@ import {
   LayoutDashboard, Target, Mail, MessageCircle,
   CalendarDays, KanbanSquare, Library, ChevronsUpDown, ArrowLeft, Check,
 } from "lucide-react";
-import { WORKSPACES, getWorkspace } from "@/lib/portal/mock";
 import { cn, Linkedin } from "./ui";
+import type { Workspace } from "@/lib/portal/types";
+import { enabledModules } from "@/lib/portal/modules";
 
 type NavItem = { key: string; label: string; icon: React.ComponentType<{ className?: string }>; badge?: string };
 type NavGroup = { group: string; items: NavItem[] };
+type WsLite = { slug: string; name: string; accent: string };
 
-function buildNav(w: ReturnType<typeof getWorkspace>): NavGroup[] {
-  return [
+// Counts come live from the parent layout; hide a badge at 0 so an empty
+// workspace (e.g. Luxvance before its leads land) reads clean, not "0".
+function buildNav(w: Workspace | null, enabled: Set<string>): NavGroup[] {
+  const groups: NavGroup[] = [
     { group: "Overview", items: [{ key: "dashboard", label: "Dashboard", icon: LayoutDashboard }] },
     {
       group: "Cold · outreach",
       items: [
-        { key: "target-lists", label: "Target Lists", icon: Target, badge: w ? w.coldLeads.toLocaleString() : undefined },
+        { key: "target-lists", label: "Target Lists", icon: Target, badge: w && w.coldLeads > 0 ? w.coldLeads.toLocaleString() : undefined },
         { key: "email", label: "Email Campaigns", icon: Mail },
         { key: "linkedin", label: "LinkedIn Campaigns", icon: Linkedin },
         { key: "whatsapp", label: "WhatsApp & Phone", icon: MessageCircle },
@@ -28,16 +32,20 @@ function buildNav(w: ReturnType<typeof getWorkspace>): NavGroup[] {
     },
     {
       group: "Warm · pipeline",
-      items: [{ key: "crm", label: "Sales CRM", icon: KanbanSquare, badge: w ? String(w.warmLeads) : undefined }],
+      items: [{ key: "crm", label: "Sales CRM", icon: KanbanSquare, badge: w && w.warmLeads > 0 ? String(w.warmLeads) : undefined }],
     },
     { group: "Intelligence", items: [{ key: "library", label: "Intelligence Library", icon: Library }] },
   ];
+  // Per-workspace visibility: keep only enabled modules, drop now-empty groups.
+  return groups
+    .map((g) => ({ ...g, items: g.items.filter((it) => enabled.has(it.key)) }))
+    .filter((g) => g.items.length > 0);
 }
 
-export function WorkspaceSidebar({ slug }: { slug: string }) {
+export function WorkspaceSidebar({ slug, ws, workspaces }: { slug: string; ws: Workspace | null; workspaces: WsLite[] }) {
   const pathname = usePathname();
-  const w = getWorkspace(slug);
-  const nav = buildNav(w);
+  const w = ws;
+  const nav = buildNav(w, new Set(enabledModules(slug)));
   const [open, setOpen] = useState(false);
   const initials = (w?.name || "?").split(" ").map((s) => s[0]).slice(0, 2).join("").toUpperCase();
 
@@ -73,7 +81,7 @@ export function WorkspaceSidebar({ slug }: { slug: string }) {
           <>
             <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
             <div className="absolute z-40 mt-1 w-full rounded-xl border border-border bg-popover shadow-xl overflow-hidden">
-              {WORKSPACES.map((ws) => (
+              {workspaces.map((ws) => (
                 <Link
                   key={ws.slug}
                   href={`/w/${ws.slug}/dashboard`}

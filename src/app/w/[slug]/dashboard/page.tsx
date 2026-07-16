@@ -3,6 +3,7 @@ import Link from "next/link";
 import { LayoutDashboard, ArrowRight, Mail, MessageCircle, Phone, KanbanSquare } from "lucide-react";
 import { getWorkspace, getWorkspaceData } from "@/lib/portal/mock";
 import { loadPortal } from "@/lib/portal/data";
+import { enabledModules } from "@/lib/portal/modules";
 import { SectionLabel, StatTile, ModuleHeader, ChannelDots, Panel, Pill, Linkedin } from "@/components/portal/ui";
 import type { CrmStage, OutreachChannel } from "@/lib/portal/types";
 
@@ -31,6 +32,13 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
     n: data.crm.filter((c) => c.stage === s.key).length,
   }));
   const maxStage = Math.max(1, ...stageCounts.map((s) => s.n));
+
+  // Channels shown reflect this workspace's enabled modules — never ads/Meta.
+  const mods = new Set(enabledModules(slug));
+  const channels: OutreachChannel[] = [];
+  if (mods.has("email")) channels.push("email");
+  if (mods.has("linkedin")) channels.push("linkedin");
+  if (mods.has("whatsapp")) channels.push("whatsapp", "call");
 
   return (
     <div className="flex flex-col gap-7">
@@ -107,7 +115,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
         <div>
           <SectionLabel>Channels running</SectionLabel>
           <div className="mt-2 flex items-center gap-4">
-            <ChannelDots channels={["email", "linkedin", "whatsapp", "call", "ads"]} size={18} />
+            <ChannelDots channels={channels} size={18} />
             <span className="text-[12px] text-muted-foreground">The agents work every channel from one shared memory.</span>
           </div>
         </div>
