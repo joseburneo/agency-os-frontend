@@ -22,6 +22,9 @@ export async function GET(req: NextRequest) {
   }
 
   const token = await demoToken(secret, slug);
-  const base = process.env.NEXT_PUBLIC_APP_URL || "https://app.luxvance.com";
+  // Default to the host this request came from, so a link minted on a preview
+  // deploy points at that preview (and prod points at prod). NEXT_PUBLIC_APP_URL
+  // overrides when we want to force the branded domain.
+  const base = process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin;
   return NextResponse.json({ slug, url: `${base}/w/${slug}?k=${token}` });
 }
