@@ -27,9 +27,10 @@ export default async function WorkspaceLayout({
   return (
     <div className="w-full">
       {demo && <DemoBanner name={ws.name} />}
-      <div className="flex gap-6 items-start">
+      {/* Mobile: column (sticky top bar above content). Desktop: original row. */}
+      <div className="flex flex-col lg:flex-row lg:gap-6 lg:items-start">
         <WorkspaceSidebar slug={slug} ws={ws} workspaces={workspaces} demo={demo} mode={mode} />
-        <div className="flex-1 min-w-0 pb-10">{children}</div>
+        <div className="flex-1 w-full min-w-0 overflow-x-hidden pt-4 lg:pt-0 pb-10">{children}</div>
       </div>
     </div>
   );

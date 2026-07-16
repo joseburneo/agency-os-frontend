@@ -13,7 +13,8 @@ export type ModuleKey =
   | "content"
   | "crm"
   | "library"
-  | "blocklist";
+  | "blocklist"
+  | "roadmap";
 
 export interface Workspace {
   slug: string;
@@ -150,6 +151,51 @@ export type JourneyKind = "call" | "milestone" | "decision" | "build" | "launch"
 export interface JourneyItem {
   id: string;
   date: string; // ISO date (no time) — pass in, never Date.now()
+  kind: JourneyKind;
+  title: string;
+  detail: string;
+  tags?: string[];
+}
+
+// ── Intelligence Library (Octave-style client brain) ────────────────────
+// One Supabase table (`intelligence_library`, one row per section) is the SINGLE
+// source of truth: the portal renders it AND the reply/outreach LLM loads it as
+// mandatory context before writing anything. Edit once → client view and every
+// agent update together. Sections are typed so the UI can group them.
+export type IntelligenceKind =
+  | "overview"        // who they are, the one-liner
+  | "founder"         // the owner/sender's background + pedigree
+  | "voice"           // how they write (tone, do/don't)
+  | "icp"             // who they sell to
+  | "offer"           // what they sell
+  | "differentiator"  // why they win
+  | "proof"           // named recommendations / testimonials
+  | "segment"         // a target segment / campaign
+  | "persona"         // a buyer persona
+  | "objection"       // objection → response
+  | "asset"           // links, signature, infra
+  | "call_note"       // notes from a call
+  | "research";       // Google / LinkedIn / website research
+
+export interface IntelligenceSection {
+  id: string;
+  kind: IntelligenceKind;
+  title: string;
+  body: string;
+  meta?: Record<string, string>; // author, role, date, source, url…
+  sort: number;
+  updatedAt: string;
+}
+
+// ── Client Success Roadmap (delivery log + what's next) ─────────────────
+// Its OWN module, separate from the Intelligence Library: everything done since
+// kickoff plus what's still pending. Reuses the milestone kinds; adds a status.
+export type RoadmapStatus = "done" | "in_progress" | "planned";
+
+export interface RoadmapItem {
+  id: string;
+  date: string;      // ISO date, or "" when a planned item has no fixed date
+  status: RoadmapStatus;
   kind: JourneyKind;
   title: string;
   detail: string;

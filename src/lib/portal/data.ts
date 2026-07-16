@@ -2,6 +2,7 @@ import { db } from "./server";
 import type {
   Workspace, WorkspaceData, TargetList, Lead, OutreachChannel, Kpi, JourneyItem,
   CrmCard, CrmStage, ReplyCategory, BlocklistEntry, BlocklistReason, BlocklistSource,
+  IntelligenceSection, IntelligenceKind, RoadmapItem,
 } from "./types";
 
 // Relationship timeline shown inside the Library module. Seeded per workspace
@@ -243,6 +244,65 @@ export async function loadBlocklist(slug: string): Promise<BlocklistEntry[]> {
     global: r.workspace_id == null,
     createdAt: String(r.created_at ?? ""),
   }));
+}
+
+// ── Intelligence Library (Octave-style client brain) ─────────────────────────
+// ONE table, two readers: this portal renders it, and the reply/outreach LLM
+// loads the very same rows as mandatory context before writing. Tolerant: []
+// until the table exists, so the module shows an honest empty state.
+const INTEL_KINDS: IntelligenceKind[] = [
+  "overview", "founder", "voice", "icp", "offer", "differentiator", "proof",
+  "segment", "persona", "objection", "asset", "call_note", "research",
+];
+function toIntelKind(v: unknown): IntelligenceKind {
+  const s = String(v ?? "");
+  return INTEL_KINDS.includes(s as IntelligenceKind) ? (s as IntelligenceKind) : "overview";
+}
+
+export async function loadIntelligence(slug: string): Promise<IntelligenceSection[]> {
+  const sb = db();
+  if (!sb) return [];
+  const { data: wsRow } = await sb.from("workspaces").select("id").eq("slug", slug).maybeSingle();
+  if (!wsRow) return [];
+  const { data, error } = await sb
+    .from("intelligence_library")
+    .select("*")
+    .eq("workspace_id", wsRow.id as string)
+    .order("sort", { ascending: true });
+  if (error || !data) return [];
+
+  return (data as Record<string, unknown>[]).map((r) => ({
+    id: String(r.id),
+    kind: toIntelKind(r.kind),
+    title: String(r.title ?? ""),
+    body: String(r.body ?? ""),
+    meta: (r.meta && typeof r.meta === "object" ? (r.meta as Record<string, string>) : undefined),
+    sort: Number(r.sort ?? 0),
+    updatedAt: String(r.updated_at ?? ""),
+  }));
+}
+
+// ── Client Success Roadmap (delivery log + what's next) ──────────────────────
+// Its own module. Operational log of what Luxvance has done for the client since
+// kickoff, plus what's still pending. Seeded per workspace here (never any client
+// relationship / competitor names — that's the Blocklist's job). Move to a
+// `client_roadmap` table when the volume justifies it.
+const ROADMAP_SEED: Record<string, RoadmapItem[]> = {
+  "arco-irish": [
+    { id: "r1", date: "2026-06-25", status: "done", kind: "call", title: "Onboarding & discovery call", detail: "Captured Paul's voice, ICP and assets: boutique executive search selling to the CEO (not HR), British English, punchy but not too formal.", tags: ["voice", "ICP"] },
+    { id: "r2", date: "2026-07-01", status: "done", kind: "milestone", title: "Retainer starts", detail: "Build & Operate plan begins. Arco Irish is the first Apex pilot.", tags: ["commercial"] },
+    { id: "r3", date: "2026-07-03", status: "done", kind: "decision", title: "ICP & blocklist locked", detail: "Confirmed 30–300 employees with no in-house HR proxy. The do-not-contact list was locked and moved into the Blocklist module.", tags: ["targeting"] },
+    { id: "r4", date: "2026-07-14", status: "done", kind: "build", title: "Campaign built · list live", detail: "1,113 verified leads sourced across 4 target lists. Copy drafted and the intelligence library went live.", tags: ["build", "leads"] },
+    { id: "r5", date: "2026-07-15", status: "done", kind: "decision", title: "Review call — copy in Paul's voice", detail: "Locked Paul's single canonical version (no randomisation), added his phone to the signature and agreed LinkedIn content twice a month.", tags: ["copy", "voice"] },
+    { id: "r6", date: "2026-07-16", status: "in_progress", kind: "build", title: "Client workspace live", detail: "Arco's own portal: target lists, the Live Deals CRM, the intelligence library, the blocklist and this roadmap — all in one place.", tags: ["platform"] },
+    { id: "r7", date: "", status: "planned", kind: "launch", title: "Campaign go-live", detail: "Approve the final copy with Paul, then start sending about two emails a week with a three-day follow-up. Target 5% reply rate.", tags: ["launch"] },
+    { id: "r8", date: "", status: "planned", kind: "milestone", title: "LinkedIn content · twice a month", detail: "Repurpose Paul's older posts into a steady organic presence, plus a short trust-building video down the line.", tags: ["content"] },
+    { id: "r9", date: "2026-08-08", status: "planned", kind: "milestone", title: "August cover — Apex pilot", detail: "While Paul is away (8–16 Aug), Apex drafts replies, pre-books from the calendar and alerts Paul on WhatsApp within seconds.", tags: ["apex"] },
+  ],
+};
+
+export async function loadRoadmap(slug: string): Promise<RoadmapItem[]> {
+  return ROADMAP_SEED[slug] ?? [];
 }
 
 // Whole-workspace load for every module. Target Lists (cold population) is fully

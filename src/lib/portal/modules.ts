@@ -14,13 +14,15 @@ export const ALL_MODULES: ModuleKey[] = [
   "crm",
   "library",
   "blocklist",
+  "roadmap",
 ];
 
 const OVERRIDES: Record<string, ModuleKey[]> = {
   // Arco Irish — cold-outreach engagement: email + LinkedIn + CRM, plus its lead
-  // lists (the Build), intelligence library (the Journey) and its do-not-contact
-  // blocklist. No WhatsApp, no content calendar, no ads / Meta.
-  "arco-irish": ["dashboard", "target-lists", "email", "linkedin", "crm", "library", "blocklist"],
+  // lists (the Build), intelligence library (the client brain), do-not-contact
+  // blocklist and the client-success roadmap. No WhatsApp, no content calendar,
+  // no ads / Meta.
+  "arco-irish": ["dashboard", "target-lists", "email", "linkedin", "crm", "library", "blocklist", "roadmap"],
 };
 
 export function enabledModules(slug: string): ModuleKey[] {

@@ -24,5 +24,5 @@ export default async function TargetListsPage({ params }: { params: Promise<{ sl
 
 const EMPTY_DATA = {
   kpis: [], activity: [], lists: [], leads: [], emailCampaigns: [],
-  linkedinCampaigns: [], phoneTouches: [], content: [], crm: [], library: [],
+  linkedinCampaigns: [], phoneTouches: [], content: [], crm: [], library: [], journey: [],
 };
