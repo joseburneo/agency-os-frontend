@@ -7,6 +7,7 @@ import {
   LayoutDashboard, Target, Mail, MessageCircle,
   CalendarDays, KanbanSquare, Library, ChevronsUpDown, ArrowLeft, Check,
   Settings, LogOut, PanelLeftClose, PanelLeftOpen, ShieldBan, Route, Menu, X,
+  Megaphone, Flame,
 } from "lucide-react";
 import { cn, Linkedin } from "./ui";
 import type { Workspace } from "@/lib/portal/types";
@@ -18,14 +19,30 @@ type WsLite = { slug: string; name: string; accent: string };
 
 // Counts come live from the parent layout; hide a badge at 0 so an empty
 // workspace (e.g. Luxvance before its leads land) reads clean, not "0".
-// Groups follow the funnel: overview → cold → pipeline → intelligence → success.
+// Layout (Jose 2026-07-16): the three "whole-workspace" views sit at the very top
+// with no header (Dashboard · Intelligence Library · Client Success Roadmap), then
+// the funnel sections follow: Targeted lists → Cold outreach → Ads → CRM, with the
+// Blocklist as a standalone guard at the bottom. A group with group:"" renders its
+// items without a section header.
 function buildNav(w: Workspace | null, enabled: Set<string>): NavGroup[] {
   const groups: NavGroup[] = [
-    { group: "Overview", items: [{ key: "dashboard", label: "Dashboard", icon: LayoutDashboard }] },
+    {
+      group: "",
+      items: [
+        { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+        { key: "library", label: "Intelligence Library", icon: Library },
+        { key: "roadmap", label: "Client Success Roadmap", icon: Route },
+      ],
+    },
+    {
+      group: "Targeted lists",
+      items: [
+        { key: "target-lists", label: "Targeted Cold Leads", icon: Target, badge: w && w.coldLeads > 0 ? w.coldLeads.toLocaleString() : undefined },
+      ],
+    },
     {
       group: "Cold outreach",
       items: [
-        { key: "target-lists", label: "Targeted Cold Leads", icon: Target, badge: w && w.coldLeads > 0 ? w.coldLeads.toLocaleString() : undefined },
         { key: "email", label: "Email Campaigns", icon: Mail },
         { key: "linkedin", label: "LinkedIn Campaigns", icon: Linkedin },
         { key: "whatsapp", label: "WhatsApp & Phone", icon: MessageCircle },
@@ -33,19 +50,19 @@ function buildNav(w: Workspace | null, enabled: Set<string>): NavGroup[] {
       ],
     },
     {
-      group: "Pipeline",
-      items: [{ key: "crm", label: "Live Deals", icon: KanbanSquare, badge: w && w.warmLeads > 0 ? String(w.warmLeads) : undefined }],
-    },
-    {
-      group: "Intelligence",
+      group: "Ads",
       items: [
-        { key: "library", label: "Intelligence Library", icon: Library },
-        { key: "blocklist", label: "Blocklist", icon: ShieldBan },
+        { key: "linkedin-ads", label: "LinkedIn Ads", icon: Linkedin },
+        { key: "meta-ads", label: "Meta Ads", icon: Megaphone },
       ],
     },
     {
-      group: "Success",
-      items: [{ key: "roadmap", label: "Client Success Roadmap", icon: Route }],
+      group: "CRM",
+      items: [{ key: "crm", label: "Hot Leads", icon: Flame, badge: w && w.warmLeads > 0 ? String(w.warmLeads) : undefined }],
+    },
+    {
+      group: "",
+      items: [{ key: "blocklist", label: "Blocklist", icon: ShieldBan }],
     },
   ];
   // Per-workspace visibility: keep only enabled modules, drop now-empty groups.
@@ -166,9 +183,9 @@ export function WorkspaceSidebar({ slug, ws, workspaces, demo = false, mode = "c
   // Grouped module nav. Drawer passes isCollapsed=false + onNavigate to close itself.
   const renderNav = (isCollapsed: boolean, onNavigate?: () => void) => (
     <nav className="flex flex-col gap-4">
-      {nav.map((grp) => (
-        <div key={grp.group} className="flex flex-col gap-0.5">
-          {!isCollapsed && (
+      {nav.map((grp, gi) => (
+        <div key={gi} className="flex flex-col gap-0.5">
+          {!isCollapsed && grp.group && (
             <div className="px-2 pb-1 text-[10px] uppercase tracking-[0.18em] text-muted-foreground/70">{grp.group}</div>
           )}
           {grp.items.map(({ key, label, icon: Icon, badge }) => {

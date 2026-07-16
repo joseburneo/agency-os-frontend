@@ -11,6 +11,8 @@ export const ALL_MODULES: ModuleKey[] = [
   "linkedin",
   "whatsapp",
   "content",
+  "linkedin-ads",
+  "meta-ads",
   "crm",
   "library",
   "blocklist",
