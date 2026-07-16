@@ -1,7 +1,7 @@
 import { db } from "./server";
 import type {
   Workspace, WorkspaceData, TargetList, Lead, OutreachChannel, Kpi, JourneyItem,
-  CrmCard, CrmStage, ReplyCategory,
+  CrmCard, CrmStage, ReplyCategory, BlocklistEntry, BlocklistReason, BlocklistSource,
 } from "./types";
 
 // Relationship timeline shown inside the Library module. Seeded per workspace
@@ -203,6 +203,46 @@ export async function loadCrm(
   } catch {
     return empty;
   }
+}
+
+// ── Blocklist (do-not-contact) ───────────────────────────────────────────────
+// This workspace's own entries plus any global (workspace_id null) ones. Tolerant:
+// returns [] if the table doesn't exist yet or the DB is absent, so the module
+// renders an empty state instead of erroring.
+const BL_REASONS: BlocklistReason[] = ["client", "competitor", "unsubscribe"];
+function toReason(v: unknown): BlocklistReason {
+  const s = String(v ?? "");
+  return BL_REASONS.includes(s as BlocklistReason) ? (s as BlocklistReason) : "competitor";
+}
+
+export async function loadBlocklist(slug: string): Promise<BlocklistEntry[]> {
+  const sb = db();
+  if (!sb) return [];
+  const { data: wsRow } = await sb.from("workspaces").select("id").eq("slug", slug).maybeSingle();
+  if (!wsRow) return [];
+  const wsId = wsRow.id as string;
+
+  const { data, error } = await sb
+    .from("blocklist")
+    .select("*")
+    .or(`workspace_id.eq.${wsId},workspace_id.is.null`)
+    .order("reason", { ascending: true })
+    .order("company_name", { ascending: true });
+  if (error || !data) return [];
+
+  return (data as Record<string, unknown>[]).map((r) => ({
+    id: String(r.id),
+    reason: toReason(r.reason),
+    companyName: String(r.company_name ?? ""),
+    domain: String(r.domain ?? ""),
+    email: String(r.email ?? ""),
+    personName: String(r.person_name ?? ""),
+    linkedinUrl: String(r.linkedin_url ?? ""),
+    note: String(r.note ?? ""),
+    source: (String(r.source ?? "manual") as BlocklistSource),
+    global: r.workspace_id == null,
+    createdAt: String(r.created_at ?? ""),
+  }));
 }
 
 // Whole-workspace load for every module. Target Lists (cold population) is fully

@@ -40,3 +40,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Confidential per-client seed data — never commit to this public repo
+supabase/seeds.local/
