@@ -3,7 +3,22 @@ import { Library, FileText, BookOpen, Search, Package, Layers } from "lucide-rea
 import { getWorkspace, getWorkspaceData } from "@/lib/portal/mock";
 import { loadPortal } from "@/lib/portal/data";
 import { ModuleHeader, Panel, Pill, SectionLabel } from "@/components/portal/ui";
-import type { LibraryKind } from "@/lib/portal/types";
+import type { LibraryKind, JourneyKind } from "@/lib/portal/types";
+
+// Journey timeline colors, by milestone kind.
+const KIND_C: Record<JourneyKind, string> = {
+  call: "#FFD60A",
+  decision: "#26D07C",
+  build: "#5AA2FF",
+  milestone: "#26D07C",
+  launch: "#A98BFF",
+};
+
+function fmtDate(iso: string): string {
+  const d = new Date(iso + "T00:00:00");
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
 
 const KIND_META: Record<
   LibraryKind,
@@ -27,6 +42,7 @@ export default async function LibraryPage({ params }: { params: Promise<{ slug: 
   if (!ws || !data) notFound();
 
   const items = data.library;
+  const journey = data.journey;
   const totalSources = items.reduce((sum, it) => sum + it.sources, 0);
 
   return (
@@ -60,6 +76,47 @@ export default async function LibraryPage({ params }: { params: Promise<{ slug: 
           what actually lands.
         </p>
       </Panel>
+
+      {/* Journey — the relationship timeline */}
+      {journey.length > 0 && (
+        <div className="flex flex-col gap-4">
+          <SectionLabel>Journey</SectionLabel>
+          <Panel className="p-5 md:p-6">
+            <ol className="relative flex flex-col gap-6">
+              {journey.map((j, i) => (
+                <li key={j.id} className="relative pl-8">
+                  {i < journey.length - 1 && (
+                    <span className="absolute left-[6px] top-5 -bottom-6 w-px bg-border" />
+                  )}
+                  <span
+                    className="absolute left-0 top-1.5 w-3.5 h-3.5 rounded-full border-2"
+                    style={{
+                      borderColor: KIND_C[j.kind],
+                      background: "var(--background)",
+                      boxShadow: `0 0 8px ${KIND_C[j.kind]}55`,
+                    }}
+                  />
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <span className="text-[11px] tabular-nums text-muted-foreground">{fmtDate(j.date)}</span>
+                    <span className="text-[10px] uppercase tracking-[0.14em] font-semibold" style={{ color: KIND_C[j.kind] }}>
+                      {j.kind}
+                    </span>
+                  </div>
+                  <div className="text-[14px] font-semibold text-foreground mt-1">{j.title}</div>
+                  <p className="text-[13px] text-muted-foreground leading-relaxed mt-1 max-w-3xl">{j.detail}</p>
+                  {j.tags && j.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-2.5">
+                      {j.tags.map((t) => (
+                        <Pill key={t} tone="muted">{t}</Pill>
+                      ))}
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ol>
+          </Panel>
+        </div>
+      )}
 
       <div className="flex flex-col gap-4">
         <SectionLabel>Library</SectionLabel>

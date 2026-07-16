@@ -143,6 +143,18 @@ export interface LibraryItem {
   updated: string; // human label
 }
 
+// ── Journey (relationship timeline, lives inside the Library module) ─────
+export type JourneyKind = "call" | "milestone" | "decision" | "build" | "launch";
+
+export interface JourneyItem {
+  id: string;
+  date: string; // ISO date (no time) — pass in, never Date.now()
+  kind: JourneyKind;
+  title: string;
+  detail: string;
+  tags?: string[];
+}
+
 // ── Dashboard ───────────────────────────────────────────────────────────
 export interface Kpi {
   label: string;
@@ -169,4 +181,5 @@ export interface WorkspaceData {
   content: ContentPost[];
   crm: CrmCard[];
   library: LibraryItem[];
+  journey: JourneyItem[];
 }

@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { ArrowRight, Users, Snowflake, Flame, CalendarCheck, TrendingUp } from "lucide-react";
 import { WORKSPACES } from "@/lib/portal/mock";
+import { loadWorkspaces } from "@/lib/portal/data";
 import { SectionLabel, StatTile, Pill, usd } from "@/components/portal/ui";
 
 // AGENCY VIEW — the front door. Jose sees his own workspace + every client
 // workspace, with a cross-workspace rollup. Enter one to get the client view.
-export default function AgencyView() {
-  const total = WORKSPACES.reduce(
+export default async function AgencyView() {
+  const workspaces = (await loadWorkspaces()) ?? WORKSPACES;
+  const total = workspaces.reduce(
     (a, w) => ({
       cold: a.cold + w.coldLeads,
       warm: a.warm + w.warmLeads,
@@ -39,7 +41,7 @@ export default function AgencyView() {
       <div>
         <SectionLabel className="mb-3">Across all workspaces</SectionLabel>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          <StatTile label="Workspaces" value={String(WORKSPACES.length)} sub="active" />
+          <StatTile label="Workspaces" value={String(workspaces.length)} sub="active" />
           <StatTile label="Cold leads" value={total.cold.toLocaleString()} sub="in target lists" />
           <StatTile label="Warm pipeline" value={String(total.warm)} sub="replied · working" tone="good" />
           <StatTile label="Meetings" value={String(total.meet)} sub="this quarter" tone="good" />
@@ -51,7 +53,7 @@ export default function AgencyView() {
       <div>
         <SectionLabel className="mb-3">Workspaces</SectionLabel>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {WORKSPACES.map((w) => {
+          {workspaces.map((w) => {
             const initials = w.name.split(" ").map((s) => s[0]).slice(0, 2).join("").toUpperCase();
             return (
               <Link

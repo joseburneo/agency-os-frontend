@@ -119,6 +119,7 @@ const ARCO: WorkspaceData = {
     { id: "lib4", title: "Per-contact dossiers · List 1", kind: "dossier", summary: "447 CEO profiles with company facts + why-fit, feeding the personalized first line.", sources: 6, updated: "1d ago" },
     { id: "lib5", title: "Brand kit & email templates", kind: "asset", summary: "Approved tone, signature, and the 4 proven Step-1 shapes for Arco.", sources: 2, updated: "3w ago" },
   ],
+  journey: [],
 };
 
 // ── Luxvance own-outbound workspace (leaner, founder-led) ──
@@ -178,6 +179,7 @@ const LUXVANCE: WorkspaceData = {
     { id: "llib2", title: "Proven campaign templates", kind: "playbook", summary: "Creative Ideas, New Hire, Lookalike — the three that always run.", sources: 5, updated: "4d ago" },
     { id: "llib3", title: "The Build — sales asset", kind: "asset", summary: "The per-prospect lead magnet that doubles as the product demo.", sources: 3, updated: "2d ago" },
   ],
+  journey: [],
 };
 
 const DATA: Record<string, WorkspaceData> = {

@@ -1,5 +1,18 @@
 import { db } from "./server";
-import type { Workspace, WorkspaceData, TargetList, Lead, OutreachChannel, Kpi } from "./types";
+import type { Workspace, WorkspaceData, TargetList, Lead, OutreachChannel, Kpi, JourneyItem } from "./types";
+
+// Relationship timeline shown inside the Library module. Seeded per workspace
+// here (real milestones); move to a `workspace_events` table when the volume
+// justifies it. Dates are ISO literals — never computed at runtime.
+const JOURNEY_SEED: Record<string, JourneyItem[]> = {
+  "arco-irish": [
+    { id: "aj1", date: "2026-06-25", kind: "call", title: "Onboarding & discovery call", detail: "Captured Paul's voice, ICP and assets: boutique executive search, sells to CEO/founder (not HR), British English, punchy-not-formal.", tags: ["voice", "ICP"] },
+    { id: "aj2", date: "2026-07-01", kind: "milestone", title: "Retainer starts", detail: "Build & Operate plan begins. Arco Irish is the first Apex pilot.", tags: ["commercial"] },
+    { id: "aj3", date: "2026-07-03", kind: "decision", title: "ICP & blocklist locked", detail: "Confirmed 30–300 employees, no in-house HR proxy. Do-not-contact list locked (6 clients + anchors + 26 competitors).", tags: ["targeting"] },
+    { id: "aj4", date: "2026-07-14", kind: "build", title: "Campaign built · list live", detail: "1,113 verified leads sourced across 4 lists (No-HR, Has-HR, Company Direct, VIP). Copy drafted, intelligence library live.", tags: ["build", "leads"] },
+    { id: "aj5", date: "2026-07-15", kind: "decision", title: "Review call — copy in Paul's voice", detail: "Reverted to Paul's single canonical version (no randomisation), added his phone to the signature, removed Zartis, agreed LinkedIn content 2x/month. CRM in build.", tags: ["copy", "voice"] },
+  ],
+};
 
 // Workspace-scoped reads from Supabase. Every function returns null when the DB
 // client is absent (no service key) so callers fall back to mock data. Emails
@@ -142,6 +155,33 @@ export async function loadPortal(
     content: [],
     crm: [],
     library: [],
+    journey: JOURNEY_SEED[slug] ?? [],
   };
   return { ws, data };
+}
+
+// Agency view: every workspace with a live cold-lead count. The warm / meetings
+// / pipeline figures come from the CRM loader once that module is wired to a
+// live source, so they read 0 today rather than mock numbers. Returns null when
+// the DB is absent so the agency page falls back to the mock roster.
+export async function loadWorkspaces(): Promise<Workspace[] | null> {
+  const sb = db();
+  if (!sb) return null;
+
+  const { data: rows } = await sb
+    .from("workspaces")
+    .select("*")
+    .order("is_agency", { ascending: false })
+    .order("name", { ascending: true });
+  if (!rows) return null;
+
+  const out: Workspace[] = [];
+  for (const row of rows) {
+    const { count } = await sb
+      .from("target_list_leads")
+      .select("id", { count: "exact", head: true })
+      .eq("workspace_id", row.id as string);
+    out.push(workspaceFromRow(row as Record<string, unknown>, count ?? 0));
+  }
+  return out;
 }
