@@ -1,9 +1,38 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Target, Download, Search, ExternalLink, PenLine, Eye, X, Send } from "lucide-react";
+import { Target, Download, Search, ExternalLink, Eye, X, Send } from "lucide-react";
 import type { Workspace, WorkspaceData, Lead } from "@/lib/portal/types";
 import { ModuleHeader, Panel, Pill, CompanyMark, ChannelDots, cn } from "@/components/portal/ui";
+
+// Underline the parts of the email that are personalized to this lead — the
+// first name, the company (both appear in the body), and the P.S. fact line.
+// Approximates the old Build's highlighting without needing template markers.
+function renderPersonalized(body: string, firstName: string, company: string) {
+  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const tokens = [firstName, company].filter((t) => t && t.length > 1).map(esc);
+  if (tokens.length === 0) return body;
+  const re = new RegExp(`(${tokens.join("|")}|P\\.S\\.[^\\n]*)`, "g");
+  const out: React.ReactNode[] = [];
+  let last = 0;
+  let m: RegExpExecArray | null;
+  let i = 0;
+  while ((m = re.exec(body)) !== null) {
+    if (m.index > last) out.push(body.slice(last, m.index));
+    out.push(
+      <span
+        key={i++}
+        className="underline decoration-[#FFD60A]/70 decoration-2 underline-offset-2 text-[#FFD60A]"
+      >
+        {m[0]}
+      </span>
+    );
+    last = m.index + m[0].length;
+    if (m[0].length === 0) re.lastIndex++;
+  }
+  if (last < body.length) out.push(body.slice(last));
+  return out;
+}
 
 export function TargetListsView({ ws, data }: { ws: Workspace; data: WorkspaceData }) {
   const [activeList, setActiveList] = useState(data.lists[0]?.id ?? "");
@@ -17,7 +46,9 @@ export function TargetListsView({ ws, data }: { ws: Workspace; data: WorkspaceDa
       .filter((l) => l.listId === activeList)
       .filter((l) =>
         !term ? true : [l.name, l.company, l.sector, l.role].some((f) => f.toLowerCase().includes(term))
-      );
+      )
+      // Well-ordered: ready-to-send first, then have-email, then the rest.
+      .sort((a, b) => Number(b.hasDraft) - Number(a.hasDraft) || Number(b.hasEmail) - Number(a.hasEmail));
   }, [data.leads, activeList, q]);
 
   return (
@@ -150,9 +181,9 @@ export function TargetListsView({ ws, data }: { ws: Workspace; data: WorkspaceDa
                         <a
                           href={l.mailto}
                           className="inline-flex items-center gap-1.5 rounded-md border border-[#FFD60A]/25 bg-[#FFD60A]/10 px-2.5 py-1.5 text-[12px] font-medium text-[#FFD60A] hover:bg-[#FFD60A]/15 transition-colors"
-                          title={`Opens your mail app to ${l.hasEmail ? l.emailMasked : "the lead"}`}
+                          title={`Opens your mail app to ${l.hasEmail ? l.emailMasked : "the lead"}, ready to send`}
                         >
-                          <PenLine className="w-3.5 h-3.5" /> Draft
+                          <Send className="w-3.5 h-3.5" /> Send
                         </a>
                       ) : l.hasEmail ? (
                         <span className="text-[11px] text-muted-foreground">draft pending</span>
@@ -233,23 +264,28 @@ export function TargetListsView({ ws, data }: { ws: Workspace; data: WorkspaceDa
                 </div>
               )}
               <div>
-                <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground mb-1">Message</div>
+                <div className="flex items-center justify-between mb-1">
+                  <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Message</div>
+                  <div className="text-[10px] text-muted-foreground">
+                    <span className="underline decoration-[#FFD60A]/70 decoration-2 underline-offset-2 text-[#FFD60A]">underlined</span> = personalized to this lead
+                  </div>
+                </div>
                 <div className="rounded-lg border border-border bg-input p-4 text-[13px] leading-relaxed text-foreground whitespace-pre-wrap">
-                  {preview.emailBody}
+                  {renderPersonalized(preview.emailBody ?? "", preview.name.split(" ")[0] ?? "", preview.company)}
                 </div>
               </div>
             </div>
 
             <div className="p-5 border-t border-border flex items-center justify-between gap-3">
               <span className="text-[11px] text-muted-foreground">
-                Email 1 · sends in {preview.company}&apos;s inbox in your voice.
+                Email 1 · opens in your mail app, from you, signature and all.
               </span>
               {preview.mailto && (
                 <a
                   href={preview.mailto}
                   className="inline-flex items-center gap-2 rounded-lg border border-[#FFD60A]/30 bg-[#FFD60A]/10 px-4 py-2 text-[13px] font-semibold text-[#FFD60A] hover:bg-[#FFD60A]/15 transition-colors"
                 >
-                  <Send className="w-4 h-4" /> Open in mail
+                  <Send className="w-4 h-4" /> Send through my email
                 </a>
               )}
             </div>
