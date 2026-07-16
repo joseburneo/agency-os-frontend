@@ -1868,7 +1868,7 @@ const FUNNEL: { key: string; title: string; hint: string; tone?: "green" | "mute
 ];
 
 // ── page ─────────────────────────────────────────────────────────────
-export function CrmBoard({ workspace, basePath = "/crm" }: { workspace?: string; basePath?: string }) {
+export function CrmBoard({ workspace, basePath = "/crm", live = true }: { workspace?: string; basePath?: string; live?: boolean }) {
   const [funnel, setFunnel] = useState<Funnel | null>(null);
   const [rows, setRows] = useState<Card[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1884,12 +1884,15 @@ export function CrmBoard({ workspace, basePath = "/crm" }: { workspace?: string;
   const [openId, setOpenId] = useState<number | null>(null);
 
   const load = useCallback(() => {
+    // Until engaged_prospects carries a per-client column, only Luxvance's book
+    // is real; a client workspace shows an honest empty pipeline (not Luxvance's).
+    if (!live) { setRows([]); setFunnel(null); setLoading(false); return; }
     setLoading(true);
     fetch(`${API}/api/crm/prospects${workspace ? `?workspace=${encodeURIComponent(workspace)}` : ""}`).then((r) => r.json())
       .then((j) => { setFunnel(j.funnel); setRows(j.prospects || []); })
       .catch(() => { setFunnel(null); setRows([]); })
       .finally(() => setLoading(false));
-  }, []);
+  }, [live]);
   useEffect(() => { load(); }, [load]);
 
   // Deep link: /crm?lead=<id> opens that prospect straight away (from a Slack alert).
@@ -1907,11 +1910,12 @@ export function CrmBoard({ workspace, basePath = "/crm" }: { workspace?: string;
   // Live-sync: on open, ask the server to refresh the queue from the real Instantly
   // threads (catches replies/sends made anywhere), then pull the fresh data.
   useEffect(() => {
+    if (!live) return;
     fetch(`${API}/api/crm/refresh${workspace ? `?workspace=${encodeURIComponent(workspace)}` : ""}`, { method: "POST" })
       .then((r) => r.json())
       .then((j) => { if (j.started) setTimeout(load, 12000); })
       .catch(() => {});
-  }, [load]);
+  }, [load, live]);
 
   // Drag a card to a funnel column → persist the stage, then refresh so the queue/cadence
   // (which the backend keeps in sync with the stage) and the board agree.
@@ -1957,6 +1961,20 @@ export function CrmBoard({ workspace, basePath = "/crm" }: { workspace?: string;
     if (e.clientX > rect.right - edge) el.scrollLeft += 24;
     else if (e.clientX < rect.left + edge) el.scrollLeft -= 24;
   };
+
+  if (!live) {
+    return (
+      <div className="w-full">
+        <h1 className="text-xl font-bold neon tracking-tight mb-6">// {(workspace ?? "warm").toUpperCase().replace(/-/g, "_")}_PIPELINE</h1>
+        <div className="rounded-2xl border border-border bg-card p-12 text-center">
+          <div className="text-[15px] font-semibold text-foreground">No warm leads yet</div>
+          <p className="mt-1.5 text-[13px] text-muted-foreground max-w-md mx-auto leading-relaxed">
+            When a prospect replies to a campaign they land here as a warm lead — replied, scored and ready to close.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full">

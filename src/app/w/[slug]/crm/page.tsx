@@ -8,5 +8,9 @@ import { CrmBoard } from "@/components/crm/CrmBoard";
 export default async function WorkspaceCrmPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   await assertModuleVisible(slug, "crm");
-  return <CrmBoard workspace={slug} basePath={`/w/${slug}/crm`} />;
+  // Only Luxvance's engaged_prospects book is real today; a client shows an honest
+  // empty pipeline until engaged_prospects carries a per-client column + the API
+  // filters on it. Then flip this to always-live.
+  const live = slug === "luxvance";
+  return <CrmBoard workspace={slug} basePath={`/w/${slug}/crm`} live={live} />;
 }
