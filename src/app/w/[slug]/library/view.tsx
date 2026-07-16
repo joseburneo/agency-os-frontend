@@ -13,6 +13,7 @@ import {
   Link as LinkIcon,
   Phone,
   Search,
+  BookMarked,
 } from "lucide-react";
 import type { IntelligenceSection, IntelligenceKind } from "@/lib/portal/types";
 import { ModuleHeader, Panel, Pill, SectionLabel, StatTile } from "@/components/portal/ui";
@@ -24,6 +25,7 @@ const GROUPS: {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
 }[] = [
+  { kind: "playbook", label: "Rules of engagement", icon: BookMarked },
   { kind: "overview", label: "Overview", icon: Building2 },
   { kind: "founder", label: "Founder", icon: User },
   { kind: "voice", label: "Voice & tone", icon: MessageSquareQuote },

@@ -251,8 +251,8 @@ export async function loadBlocklist(slug: string): Promise<BlocklistEntry[]> {
 // loads the very same rows as mandatory context before writing. Tolerant: []
 // until the table exists, so the module shows an honest empty state.
 const INTEL_KINDS: IntelligenceKind[] = [
-  "overview", "founder", "voice", "icp", "offer", "differentiator", "proof",
-  "segment", "persona", "objection", "asset", "call_note", "research",
+  "playbook", "overview", "founder", "voice", "icp", "offer", "differentiator",
+  "proof", "segment", "persona", "objection", "asset", "call_note", "research",
 ];
 function toIntelKind(v: unknown): IntelligenceKind {
   const s = String(v ?? "");

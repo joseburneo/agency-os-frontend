@@ -163,6 +163,7 @@ export interface JourneyItem {
 // mandatory context before writing anything. Edit once → client view and every
 // agent update together. Sections are typed so the UI can group them.
 export type IntelligenceKind =
+  | "playbook"        // rules of engagement the agents obey above all
   | "overview"        // who they are, the one-liner
   | "founder"         // the owner/sender's background + pedigree
   | "voice"           // how they write (tone, do/don't)

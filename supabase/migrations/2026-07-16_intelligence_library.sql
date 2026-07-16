@@ -15,7 +15,7 @@ create table if not exists public.intelligence_library (
   id            uuid primary key default gen_random_uuid(),
   workspace_id  uuid not null references public.workspaces(id) on delete cascade,
   kind          text not null check (kind in (
-                  'overview','founder','voice','icp','offer','differentiator',
+                  'playbook','overview','founder','voice','icp','offer','differentiator',
                   'proof','segment','persona','objection','asset','call_note','research')),
   title         text not null,
   body          text not null default '',
