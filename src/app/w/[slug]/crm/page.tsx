@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { KanbanSquare, ArrowRight } from "lucide-react";
 import { getWorkspace, getWorkspaceData } from "@/lib/portal/mock";
-import { isModuleEnabled } from "@/lib/portal/modules";
+import { assertModuleVisible } from "@/lib/portal/access";
 import { loadPortal } from "@/lib/portal/data";
 import {
   cn,
@@ -90,7 +90,7 @@ function CrmCardView({ card, lost }: { card: CrmCard; lost: boolean }) {
 
 export default async function CrmPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  if (!isModuleEnabled(slug, "crm")) notFound();
+  await assertModuleVisible(slug, "crm");
   const live = await loadPortal(slug);
   const ws = live?.ws ?? getWorkspace(slug);
   const data = live?.data ?? getWorkspaceData(slug);

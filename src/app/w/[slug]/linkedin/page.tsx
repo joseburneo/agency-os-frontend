@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { getWorkspace, getWorkspaceData } from "@/lib/portal/mock";
-import { isModuleEnabled } from "@/lib/portal/modules";
+import { assertModuleVisible } from "@/lib/portal/access";
 import { loadPortal } from "@/lib/portal/data";
 import { SectionLabel, StatTile, ModuleHeader, Panel, StatusPill, CHANNEL_META } from "@/components/portal/ui";
 import type { LinkedInCampaign } from "@/lib/portal/types";
@@ -10,7 +10,7 @@ const LI_COLOR = CHANNEL_META.linkedin.color; // #60A5FA
 
 export default async function LinkedInPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  if (!isModuleEnabled(slug, "linkedin")) notFound();
+  await assertModuleVisible(slug, "linkedin");
   const live = await loadPortal(slug);
   const ws = live?.ws ?? getWorkspace(slug);
   const data = live?.data ?? getWorkspaceData(slug);

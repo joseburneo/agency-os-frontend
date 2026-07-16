@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { cn, Linkedin } from "./ui";
 import type { Workspace } from "@/lib/portal/types";
-import { enabledModules } from "@/lib/portal/modules";
+import { visibleModules } from "@/lib/portal/modules";
 
 type NavItem = { key: string; label: string; icon: React.ComponentType<{ className?: string }>; badge?: string };
 type NavGroup = { group: string; items: NavItem[] };
@@ -42,27 +42,34 @@ function buildNav(w: Workspace | null, enabled: Set<string>): NavGroup[] {
     .filter((g) => g.items.length > 0);
 }
 
-export function WorkspaceSidebar({ slug, ws, workspaces }: { slug: string; ws: Workspace | null; workspaces: WsLite[] }) {
+export function WorkspaceSidebar({ slug, ws, workspaces, demo = false }: { slug: string; ws: Workspace | null; workspaces: WsLite[]; demo?: boolean }) {
   const pathname = usePathname();
   const w = ws;
-  const nav = buildNav(w, new Set(enabledModules(slug)));
+  const nav = buildNav(w, new Set(visibleModules(slug, demo)));
   const [open, setOpen] = useState(false);
   const initials = (w?.name || "?").split(" ").map((s) => s[0]).slice(0, 2).join("").toUpperCase();
 
   return (
     <aside className="w-[236px] shrink-0 self-start sticky top-0 flex flex-col gap-4">
-      <Link
-        href="/"
-        className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-muted-foreground hover:text-foreground transition-colors"
-      >
-        <ArrowLeft className="w-3.5 h-3.5" /> All workspaces
-      </Link>
+      {/* Prospects in a demo can't leave their own workspace — no back link. */}
+      {!demo && (
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" /> All workspaces
+        </Link>
+      )}
 
-      {/* Workspace chip + switcher */}
+      {/* Workspace chip. In demo it's a static badge (no switcher). */}
       <div className="relative">
         <button
-          onClick={() => setOpen((o) => !o)}
-          className="w-full flex items-center gap-3 rounded-xl border border-border bg-card px-3 py-2.5 text-left hover:border-white/20 transition-colors"
+          onClick={() => !demo && setOpen((o) => !o)}
+          disabled={demo}
+          className={cn(
+            "w-full flex items-center gap-3 rounded-xl border border-border bg-card px-3 py-2.5 text-left transition-colors",
+            !demo && "hover:border-white/20"
+          )}
         >
           <span
             className="grid place-items-center w-9 h-9 rounded-lg text-xs font-bold shrink-0"
@@ -72,12 +79,14 @@ export function WorkspaceSidebar({ slug, ws, workspaces }: { slug: string; ws: W
           </span>
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-semibold text-foreground truncate">{w?.name ?? slug}</span>
-            <span className="block text-[11px] text-muted-foreground truncate">{w?.owner} · workspace</span>
+            <span className="block text-[11px] text-muted-foreground truncate">
+              {demo ? "preview" : `${w?.owner} · workspace`}
+            </span>
           </span>
-          <ChevronsUpDown className="w-4 h-4 text-muted-foreground shrink-0" />
+          {!demo && <ChevronsUpDown className="w-4 h-4 text-muted-foreground shrink-0" />}
         </button>
 
-        {open && (
+        {open && !demo && (
           <>
             <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
             <div className="absolute z-40 mt-1 w-full rounded-xl border border-border bg-popover shadow-xl overflow-hidden">

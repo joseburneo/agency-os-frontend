@@ -29,3 +29,19 @@ export function enabledModules(slug: string): ModuleKey[] {
 export function isModuleEnabled(slug: string, key: ModuleKey): boolean {
   return enabledModules(slug).includes(key);
 }
+
+// Demo (prospect preview) shows only the "feel the product" modules, read-mostly:
+// their real 50 leads (Target Lists), the exact outreach (Email + LinkedIn), and
+// the pipeline it fills (CRM). No Library/Journey, WhatsApp or Content in a demo.
+export const DEMO_MODULES: ModuleKey[] = ["dashboard", "target-lists", "email", "linkedin", "crm"];
+
+// What a given visitor sees: the workspace's own set, further trimmed to the
+// demo set when this is a prospect preview.
+export function visibleModules(slug: string, demo: boolean): ModuleKey[] {
+  const base = enabledModules(slug);
+  return demo ? base.filter((m) => DEMO_MODULES.includes(m)) : base;
+}
+
+export function isModuleVisible(slug: string, key: ModuleKey, demo: boolean): boolean {
+  return visibleModules(slug, demo).includes(key);
+}

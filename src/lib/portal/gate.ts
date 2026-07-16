@@ -13,6 +13,8 @@
 
 export const AGENCY_COOKIE = "lxv_agency";
 export const wsCookie = (slug: string) => `lxv_ws_${slug}`;
+// Demo (prospect preview): unlocked by a signed link, not a password.
+export const demoCookie = (slug: string) => `lxv_demo_${slug}`;
 
 // HMAC-SHA256(secret, scope) → compact base64. Same input → same token, so the
 // route (setting the cookie) and the proxy (checking it) agree without a DB.
@@ -29,6 +31,13 @@ export async function scopeToken(secret: string, scope: string): Promise<string>
   let s = "";
   for (const b of new Uint8Array(sig)) s += String.fromCharCode(b);
   return btoa(s).replace(/[^a-zA-Z0-9]/g, "");
+}
+
+// Demo access token — carried in the magnet link (?k=<token>). Signed like the
+// cookie tokens so we validate it statelessly, no per-link storage. The token
+// never expires by design; urgency lives in the copy, not the link.
+export function demoToken(secret: string, slug: string): Promise<string> {
+  return scopeToken(secret, `demo:${slug}`);
 }
 
 // "arco-irish:arco-irish-2026,luxvance:luxvance-2026" → { "arco-irish": "arco-irish-2026", … }

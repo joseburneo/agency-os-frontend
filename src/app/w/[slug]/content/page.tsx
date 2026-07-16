@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { CalendarDays } from "lucide-react";
 import { getWorkspace, getWorkspaceData } from "@/lib/portal/mock";
-import { isModuleEnabled } from "@/lib/portal/modules";
+import { assertModuleVisible } from "@/lib/portal/access";
 import { loadPortal } from "@/lib/portal/data";
 import { ModuleHeader, Panel, Pill, SectionLabel, cn } from "@/components/portal/ui";
 import type { ContentPost, ContentStatus } from "@/lib/portal/types";
@@ -62,7 +62,7 @@ function PostCard({ post }: { post: ContentPost }) {
 
 export default async function ContentPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  if (!isModuleEnabled(slug, "content")) notFound();
+  await assertModuleVisible(slug, "content");
   const live = await loadPortal(slug);
   const ws = live?.ws ?? getWorkspace(slug);
   const data = live?.data ?? getWorkspaceData(slug);

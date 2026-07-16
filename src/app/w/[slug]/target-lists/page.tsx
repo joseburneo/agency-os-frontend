@@ -1,12 +1,12 @@
 import { notFound } from "next/navigation";
 import { getWorkspace, getWorkspaceData } from "@/lib/portal/mock";
-import { isModuleEnabled } from "@/lib/portal/modules";
+import { assertModuleVisible } from "@/lib/portal/access";
 import { loadTargetLists } from "@/lib/portal/data";
 import { TargetListsView } from "./view";
 
 export default async function TargetListsPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  if (!isModuleEnabled(slug, "target-lists")) notFound();
+  await assertModuleVisible(slug, "target-lists");
 
   // Prefer live Supabase (service key present); fall back to mock otherwise.
   const live = await loadTargetLists(slug);
