@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { KanbanSquare, ArrowRight } from "lucide-react";
 import { getWorkspace, getWorkspaceData } from "@/lib/portal/mock";
-import { isModuleEnabled } from "@/lib/portal/modules";
+import { assertModuleVisible } from "@/lib/portal/access";
 import { loadPortal } from "@/lib/portal/data";
 import {
   cn,
@@ -90,7 +90,7 @@ function CrmCardView({ card, lost }: { card: CrmCard; lost: boolean }) {
 
 export default async function CrmPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  if (!isModuleEnabled(slug, "crm")) notFound();
+  await assertModuleVisible(slug, "crm");
   const live = await loadPortal(slug);
   const ws = live?.ws ?? getWorkspace(slug);
   const data = live?.data ?? getWorkspaceData(slug);
@@ -113,8 +113,8 @@ export default async function CrmPage({ params }: { params: Promise<{ slug: stri
     <div className="flex flex-col gap-7">
       <ModuleHeader
         icon={KanbanSquare}
-        title="Sales CRM"
-        desc="Replied prospects, warmed into booked calls. Every reply the agents earn lands here and moves right toward Won."
+        title="Warm Leads"
+        desc="Prospects who replied, warmed into booked calls. Every reply the agents earn lands here and moves right toward Won."
         actions={
           <span className="inline-flex items-center gap-2 text-[11px] text-muted-foreground">
             <span className="w-1.5 h-1.5 rounded-full bg-[#26D07C] shadow-[0_0_6px_#26D07C]" /> live

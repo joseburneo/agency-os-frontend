@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
 import { WorkspaceSidebar } from "@/components/portal/WorkspaceSidebar";
+import { DemoBanner } from "@/components/portal/DemoBanner";
 import { getWorkspace, WORKSPACES } from "@/lib/portal/mock";
 import { loadWorkspaces } from "@/lib/portal/data";
+import { portalMode } from "@/lib/portal/access";
 
 export default async function WorkspaceLayout({
   children,
@@ -17,12 +19,18 @@ export default async function WorkspaceLayout({
   const ws = all.find((w) => w.slug === slug) ?? getWorkspace(slug) ?? null;
   if (!ws) notFound();
 
-  const workspaces = all.map((w) => ({ slug: w.slug, name: w.name, accent: w.accent }));
+  const mode = await portalMode(slug);
+  const demo = mode === "demo";
+  // In demo the prospect can't hop to other workspaces; the switcher is hidden.
+  const workspaces = demo ? [] : all.map((w) => ({ slug: w.slug, name: w.name, accent: w.accent }));
 
   return (
-    <div className="flex gap-6 items-start max-w-[1500px] mx-auto">
-      <WorkspaceSidebar slug={slug} ws={ws} workspaces={workspaces} />
-      <div className="flex-1 min-w-0 pb-10">{children}</div>
+    <div className="max-w-[1500px] mx-auto">
+      {demo && <DemoBanner name={ws.name} />}
+      <div className="flex gap-6 items-start">
+        <WorkspaceSidebar slug={slug} ws={ws} workspaces={workspaces} demo={demo} mode={mode} />
+        <div className="flex-1 min-w-0 pb-10">{children}</div>
+      </div>
     </div>
   );
 }

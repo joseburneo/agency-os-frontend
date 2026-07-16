@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { AGENCY_COOKIE, wsCookie, scopeToken, parseWsKeys } from "@/lib/portal/gate";
+import { getWorkspaceHash, verifyPassword } from "@/lib/portal/auth";
 
 // Validates a submitted key against the agency password OR the target
 // workspace's key, then sets the matching scope cookie. The agency password
@@ -36,11 +37,19 @@ export async function POST(request: NextRequest) {
     return res;
   }
 
-  // 2) This workspace's own key — unlocks only /w/<scope>.
-  if (secret && scope !== "agency" && wsKeys[scope] && password === wsKeys[scope]) {
-    const res = NextResponse.redirect(new URL(next, request.url), { status: 303 });
-    res.cookies.set(wsCookie(scope), await scopeToken(secret, `ws:${scope}`), COOKIE_OPTS);
-    return res;
+  // 2) This workspace — the client's own password (DB hash) if they've set one,
+  //    otherwise the bootstrap key from PORTAL_WS_KEYS (the temp password we
+  //    emailed them). Either way it unlocks only /w/<scope>.
+  if (secret && scope !== "agency") {
+    const dbHash = await getWorkspaceHash(scope);
+    const ok = dbHash
+      ? await verifyPassword(password, dbHash)
+      : Boolean(wsKeys[scope] && password === wsKeys[scope]);
+    if (ok) {
+      const res = NextResponse.redirect(new URL(next, request.url), { status: 303 });
+      res.cookies.set(wsCookie(scope), await scopeToken(secret, `ws:${scope}`), COOKIE_OPTS);
+      return res;
+    }
   }
 
   // 3) Wrong key — back to the gate for this scope.

@@ -1,5 +1,8 @@
 import { db } from "./server";
-import type { Workspace, WorkspaceData, TargetList, Lead, OutreachChannel, Kpi, JourneyItem } from "./types";
+import type {
+  Workspace, WorkspaceData, TargetList, Lead, OutreachChannel, Kpi, JourneyItem,
+  CrmCard, CrmStage, ReplyCategory,
+} from "./types";
 
 // Relationship timeline shown inside the Library module. Seeded per workspace
 // here (real milestones); move to a `workspace_events` table when the volume
@@ -119,6 +122,89 @@ export async function loadTargetLists(
   return { ws: workspaceFromRow(wsRow, leads.length), lists, leads };
 }
 
+// ── Warm pipeline (CRM) ──────────────────────────────────────────────────────
+// Sourced from the same Render CRM API the internal cockpit uses, so the portal
+// and the cockpit always show identical numbers.
+//
+// engaged_prospects has NO per-client column yet, so today the table IS
+// Luxvance's own agency book. Until the reply engine tags each prospect with its
+// client workspace (add engaged_prospects.workspace_id, filter in crm_api.py),
+// only Luxvance's CRM is wired; a client like Arco stays honestly empty until its
+// first reply lands. When that column exists, drop this allowlist and the API
+// filters by the ?workspace param we already send.
+const CRM_API = process.env.NEXT_PUBLIC_BACKEND_URL || "https://agency-os-api.onrender.com";
+const CRM_WORKSPACES = new Set(["luxvance"]);
+
+const STAGES: CrmStage[] = ["neutral", "mql", "sql", "discovery", "proposal_sent", "won", "lost"];
+const CATEGORIES: ReplyCategory[] = ["Positive/SQL", "MQL", "Neutral", "Negative"];
+const CH_MAP: Record<string, OutreachChannel> = {
+  email: "email", linkedin: "linkedin", whatsapp: "whatsapp", call: "call",
+};
+
+function toStage(v: unknown): CrmStage {
+  const s = String(v ?? "");
+  return STAGES.includes(s as CrmStage) ? (s as CrmStage) : "neutral";
+}
+function toCategory(v: unknown): ReplyCategory {
+  const s = String(v ?? "");
+  return CATEGORIES.includes(s as ReplyCategory) ? (s as ReplyCategory) : "Neutral";
+}
+function toChannel(v: unknown): OutreachChannel | null {
+  return CH_MAP[String(v ?? "").toLowerCase()] ?? null;
+}
+
+export async function loadCrm(
+  slug: string
+): Promise<{ cards: CrmCard[]; warm: number; meetings: number }> {
+  const empty = { cards: [] as CrmCard[], warm: 0, meetings: 0 };
+  if (!CRM_WORKSPACES.has(slug)) return empty;
+  try {
+    const [pRes, sRes] = await Promise.all([
+      fetch(`${CRM_API}/api/crm/prospects?workspace=${encodeURIComponent(slug)}`, { next: { revalidate: 60 } }),
+      fetch(`${CRM_API}/api/crm/summary?workspace=${encodeURIComponent(slug)}`, { next: { revalidate: 60 } }),
+    ]);
+    const pJson = pRes.ok ? await pRes.json() : null;
+    const sJson = sRes.ok ? await sRes.json() : null;
+    const rows: Record<string, unknown>[] = Array.isArray(pJson)
+      ? pJson
+      : Array.isArray(pJson?.prospects)
+        ? pJson.prospects
+        : [];
+
+    const cards: CrmCard[] = rows.map((r) => {
+      const chans = [toChannel(r.last_channel), toChannel(r.next_channel)];
+      if (r.has_linkedin) chans.push("linkedin");
+      const channels = Array.from(new Set(chans.filter(Boolean))) as OutreachChannel[];
+      const nextCh = toChannel(r.next_channel);
+      const next = r.wants_meeting
+        ? "Send calendar link"
+        : nextCh
+          ? `Next: ${nextCh[0].toUpperCase()}${nextCh.slice(1)}`
+          : String(r.stage_label ?? "Follow up");
+      return {
+        id: String(r.id),
+        stage: toStage(r.stage),
+        company: String(r.company ?? ""),
+        person: String(r.name ?? ""),
+        personRole: String(r.job_title ?? ""),
+        category: toCategory(r.category),
+        snippet: String(r.reply_snippet ?? ""),
+        country: String(r.country ?? ""),
+        heat: Number(r.heat ?? 0),
+        next,
+        channels,
+        buildSent: Boolean(r.has_build || r.build_delivered),
+      };
+    });
+
+    const warm = Number(sJson?.counts?.total ?? cards.length);
+    const meetings = Number(sJson?.counts?.meetings ?? 0);
+    return { cards, warm, meetings };
+  } catch {
+    return empty;
+  }
+}
+
 // Whole-workspace load for every module. Target Lists (cold population) is fully
 // live. The warm/campaign/content modules read live too, but their source tables
 // are only populated as the campaign runs, so today they come back EMPTY — the
@@ -135,13 +221,15 @@ export async function loadPortal(
   const readyToSend = leads.filter((l) => l.hasDraft).length;
   const withLinkedin = leads.filter((l) => l.linkedin).length;
 
+  const crm = await loadCrm(slug);
+
   const kpis: Kpi[] = [
     { label: "Cold leads live", value: leads.length.toLocaleString(), sub: `across ${lists.length} target lists` },
     { label: "Emails on file", value: withEmail.toLocaleString(), sub: "ready to personalize" },
     { label: "Drafts ready", value: readyToSend.toLocaleString(), sub: "one click to send", tone: "good" },
     { label: "On LinkedIn", value: withLinkedin.toLocaleString(), sub: "for the connect + follow" },
-    { label: "Warm in pipeline", value: "0", sub: "replies land here", tone: "good" },
-    { label: "Meetings booked", value: "0", sub: "this quarter" },
+    { label: "Warm in pipeline", value: crm.warm.toLocaleString(), sub: "replies land here", tone: "good" },
+    { label: "Meetings booked", value: crm.meetings.toLocaleString(), sub: "this quarter" },
   ];
 
   const data: WorkspaceData = {
@@ -153,7 +241,7 @@ export async function loadPortal(
     linkedinCampaigns: [],
     phoneTouches: [],
     content: [],
-    crm: [],
+    crm: crm.cards,
     library: [],
     journey: JOURNEY_SEED[slug] ?? [],
   };
@@ -181,7 +269,12 @@ export async function loadWorkspaces(): Promise<Workspace[] | null> {
       .from("target_list_leads")
       .select("id", { count: "exact", head: true })
       .eq("workspace_id", row.id as string);
-    out.push(workspaceFromRow(row as Record<string, unknown>, count ?? 0));
+    const w = workspaceFromRow(row as Record<string, unknown>, count ?? 0);
+    // Warm/meetings from the same CRM source (wired for Luxvance today).
+    const crm = await loadCrm(w.slug);
+    w.warmLeads = crm.warm;
+    w.meetings = crm.meetings;
+    out.push(w);
   }
   return out;
 }
