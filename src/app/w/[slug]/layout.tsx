@@ -25,7 +25,7 @@ export default async function WorkspaceLayout({
   const workspaces = demo ? [] : all.map((w) => ({ slug: w.slug, name: w.name, accent: w.accent }));
 
   return (
-    <div className="max-w-[1500px] mx-auto">
+    <div className="w-full">
       {demo && <DemoBanner name={ws.name} />}
       <div className="flex gap-6 items-start">
         <WorkspaceSidebar slug={slug} ws={ws} workspaces={workspaces} demo={demo} mode={mode} />

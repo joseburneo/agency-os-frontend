@@ -1959,7 +1959,7 @@ export function CrmBoard({ workspace, basePath = "/crm" }: { workspace?: string;
   };
 
   return (
-    <div className="max-w-[1760px] mx-auto">
+    <div className="w-full">
       <div className="crm-ambient" aria-hidden />
       {/* one compact command bar: identity · search · view · sort · refresh */}
       <div className="flex items-center gap-2 mb-4 flex-wrap">
