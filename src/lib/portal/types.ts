@@ -12,7 +12,8 @@ export type ModuleKey =
   | "whatsapp"
   | "content"
   | "crm"
-  | "library";
+  | "library"
+  | "blocklist";
 
 export interface Workspace {
   slug: string;
@@ -153,6 +154,27 @@ export interface JourneyItem {
   title: string;
   detail: string;
   tags?: string[];
+}
+
+// ── Blocklist (do-not-contact) ──────────────────────────────────────────
+// One shared do-not-contact book per workspace. Buckets: current/past clients,
+// competitors, and unsubscribes. workspace_id null = a global entry (blocked for
+// every workspace). Matched on domain (company-level) or email (person-level).
+export type BlocklistReason = "client" | "competitor" | "unsubscribe";
+export type BlocklistSource = "manual" | "auto_unsubscribe";
+
+export interface BlocklistEntry {
+  id: string;
+  reason: BlocklistReason;
+  companyName: string;
+  domain: string;
+  email: string;
+  personName: string;
+  linkedinUrl: string;
+  note: string;
+  source: BlocklistSource;
+  global: boolean; // true when it applies to every workspace (workspace_id null)
+  createdAt: string;
 }
 
 // ── Dashboard ───────────────────────────────────────────────────────────

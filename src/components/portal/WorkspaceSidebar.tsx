@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import {
   LayoutDashboard, Target, Mail, MessageCircle,
   CalendarDays, KanbanSquare, Library, ChevronsUpDown, ArrowLeft, Check,
-  Settings, LogOut, PanelLeftClose, PanelLeftOpen,
+  Settings, LogOut, PanelLeftClose, PanelLeftOpen, ShieldBan,
 } from "lucide-react";
 import { cn, Linkedin } from "./ui";
 import type { Workspace } from "@/lib/portal/types";
@@ -35,7 +35,13 @@ function buildNav(w: Workspace | null, enabled: Set<string>): NavGroup[] {
       group: "Warm · pipeline",
       items: [{ key: "crm", label: "Live Deals", icon: KanbanSquare, badge: w && w.warmLeads > 0 ? String(w.warmLeads) : undefined }],
     },
-    { group: "Intelligence", items: [{ key: "library", label: "Intelligence Library", icon: Library }] },
+    {
+      group: "Intelligence",
+      items: [
+        { key: "library", label: "Intelligence Library", icon: Library },
+        { key: "blocklist", label: "Blocklist", icon: ShieldBan },
+      ],
+    },
   ];
   // Per-workspace visibility: keep only enabled modules, drop now-empty groups.
   return groups
