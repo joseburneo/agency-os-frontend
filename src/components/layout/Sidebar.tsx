@@ -2,19 +2,20 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Users, Megaphone, LayoutGrid } from "lucide-react";
+import { LayoutGrid } from "lucide-react";
 
 // A slim icon rail on desktop (hidden on mobile, where MobileNav's bottom bar takes over).
-// Agency-level nav: the platform home (all workspaces), the internal CRM, and the
-// campaign monitor. Per-workspace module nav lives in <WorkspaceSidebar/>.
+// Agency-level nav only. Inside a workspace (/w/<slug>) the <WorkspaceSidebar/>
+// owns the whole nav — including switcher, settings and sign out — so this rail
+// hides there to avoid a confusing double nav and wasted left space.
 const NAV = [
-  { href: "/", label: "Workspaces", icon: LayoutGrid, match: (p: string | null) => p === "/" || p?.startsWith("/w") },
-  { href: "/crm", label: "CRM", icon: Users, match: (p: string | null) => p?.startsWith("/crm") },
-  { href: "/campaigns", label: "Campaigns", icon: Megaphone, match: (p: string | null) => p?.startsWith("/campaigns") },
+  { href: "/", label: "Overview", icon: LayoutGrid, match: (p: string | null) => p === "/" },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
+  // One nav per context: the workspace sidebar takes over inside /w/<slug>.
+  if (pathname?.startsWith("/w/")) return null;
   return (
     <aside className="hidden md:flex w-[60px] h-screen border-r border-border bg-card flex-col items-center shrink-0 py-4">
       {/* logomark */}
@@ -47,10 +48,21 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* account */}
-      <div className="w-8 h-8 rounded-full bg-secondary border border-border grid place-items-center text-xs font-semibold text-[#FFD60A]">
-        JB
-      </div>
+      {/* account · sign out of the agency session */}
+      <form action="/api/logout" method="post">
+        <input type="hidden" name="scope" value="agency" />
+        <button
+          type="submit"
+          title="Sign out"
+          aria-label="Sign out"
+          className="group relative w-8 h-8 rounded-full bg-secondary border border-border grid place-items-center text-xs font-semibold text-[#FFD60A] hover:text-foreground hover:border-white/20 transition-colors"
+        >
+          JB
+          <span className="pointer-events-none absolute left-full ml-2 whitespace-nowrap rounded-md bg-popover border border-border px-2 py-1 text-xs text-foreground opacity-0 group-hover:opacity-100 transition-opacity z-50">
+            Sign out
+          </span>
+        </button>
+      </form>
     </aside>
   );
 }
