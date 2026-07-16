@@ -1965,7 +1965,7 @@ export function CrmBoard({ workspace, basePath = "/crm", live = true }: { worksp
   if (!live) {
     return (
       <div className="w-full">
-        <h1 className="text-xl font-bold neon tracking-tight mb-6">// {(workspace ?? "warm").toUpperCase().replace(/-/g, "_")}_PIPELINE</h1>
+        <h1 className="text-xl font-bold neon tracking-tight mb-6">// {(workspace ?? "warm").toUpperCase().replace(/-/g, "_")}_LIVE_DEALS</h1>
         <div className="rounded-2xl border border-border bg-card p-12 text-center">
           <div className="text-[15px] font-semibold text-foreground">No warm leads yet</div>
           <p className="mt-1.5 text-[13px] text-muted-foreground max-w-md mx-auto leading-relaxed">
@@ -1981,7 +1981,7 @@ export function CrmBoard({ workspace, basePath = "/crm", live = true }: { worksp
       <div className="crm-ambient" aria-hidden />
       {/* one compact command bar: identity · search · view · sort · refresh */}
       <div className="flex items-center gap-2 mb-4 flex-wrap">
-        <h1 className="text-xl font-bold neon tracking-tight mr-1 shrink-0">// LUXVANCE_CRM</h1>
+        <h1 className="text-xl font-bold neon tracking-tight mr-1 shrink-0">// {(workspace ?? "luxvance").toUpperCase().replace(/-/g, "_")}_LIVE_DEALS</h1>
         <div className="relative flex-1 min-w-[180px] max-w-md">
           <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, company, email…"

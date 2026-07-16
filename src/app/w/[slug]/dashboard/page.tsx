@@ -146,7 +146,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
               <div className="flex items-center justify-between">
                 <SectionLabel>Pipeline snapshot</SectionLabel>
                 <Link href={`/w/${slug}/crm`} className="inline-flex items-center gap-1 text-[11px] text-[#FFD60A] hover:gap-2 transition-all">
-                  Open Warm Leads <ArrowRight className="w-3 h-3" />
+                  Open Live Deals <ArrowRight className="w-3 h-3" />
                 </Link>
               </div>
               <div className="mt-4 flex flex-col gap-2.5">
