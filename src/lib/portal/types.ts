@@ -11,6 +11,8 @@ export type ModuleKey =
   | "linkedin"
   | "whatsapp"
   | "content"
+  | "linkedin-ads"
+  | "meta-ads"
   | "crm"
   | "library"
   | "blocklist"
