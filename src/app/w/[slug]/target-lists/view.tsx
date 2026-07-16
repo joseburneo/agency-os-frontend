@@ -24,8 +24,8 @@ export function TargetListsView({ ws, data }: { ws: Workspace; data: WorkspaceDa
     <div className="flex flex-col gap-6">
       <ModuleHeader
         icon={Target}
-        title="Target Lists"
-        desc="Your cold leads. Hyper-targeted lists that feed the cold outreach: email, LinkedIn and LinkedIn Ads audiences."
+        title="Targeted Cold Leads"
+        desc="Your hyper-targeted cold leads. The enriched lists that feed the cold outreach: email, LinkedIn and LinkedIn Ads audiences."
         meta={
           <span className="inline-flex items-center gap-2 text-[11px] text-muted-foreground">
             <span className="w-1.5 h-1.5 rounded-full" style={{ background: ws.accent, boxShadow: `0 0 6px ${ws.accent}` }} />

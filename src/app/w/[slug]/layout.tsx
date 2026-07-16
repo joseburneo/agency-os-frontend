@@ -19,7 +19,8 @@ export default async function WorkspaceLayout({
   const ws = all.find((w) => w.slug === slug) ?? getWorkspace(slug) ?? null;
   if (!ws) notFound();
 
-  const demo = (await portalMode(slug)) === "demo";
+  const mode = await portalMode(slug);
+  const demo = mode === "demo";
   // In demo the prospect can't hop to other workspaces; the switcher is hidden.
   const workspaces = demo ? [] : all.map((w) => ({ slug: w.slug, name: w.name, accent: w.accent }));
 
@@ -27,7 +28,7 @@ export default async function WorkspaceLayout({
     <div className="max-w-[1500px] mx-auto">
       {demo && <DemoBanner name={ws.name} />}
       <div className="flex gap-6 items-start">
-        <WorkspaceSidebar slug={slug} ws={ws} workspaces={workspaces} demo={demo} />
+        <WorkspaceSidebar slug={slug} ws={ws} workspaces={workspaces} demo={demo} mode={mode} />
         <div className="flex-1 min-w-0 pb-10">{children}</div>
       </div>
     </div>
