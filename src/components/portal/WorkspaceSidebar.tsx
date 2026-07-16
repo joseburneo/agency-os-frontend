@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   LayoutDashboard, Target, Mail, MessageCircle,
   CalendarDays, KanbanSquare, Library, ChevronsUpDown, ArrowLeft, Check,
-  Settings, LogOut,
+  Settings, LogOut, PanelLeftClose, PanelLeftOpen,
 } from "lucide-react";
 import { cn, Linkedin } from "./ui";
 import type { Workspace } from "@/lib/portal/types";
@@ -43,32 +43,74 @@ function buildNav(w: Workspace | null, enabled: Set<string>): NavGroup[] {
     .filter((g) => g.items.length > 0);
 }
 
+// Hover label shown only when the rail is collapsed to icons.
+function Tip({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="pointer-events-none absolute left-full ml-2 z-50 whitespace-nowrap rounded-md border border-border bg-popover px-2 py-1 text-xs text-foreground opacity-0 group-hover:opacity-100 transition-opacity">
+      {children}
+    </span>
+  );
+}
+
 export function WorkspaceSidebar({ slug, ws, workspaces, demo = false, mode = "client" }: { slug: string; ws: Workspace | null; workspaces: WsLite[]; demo?: boolean; mode?: "agency" | "client" | "demo" }) {
   const pathname = usePathname();
   const w = ws;
   const nav = buildNav(w, new Set(visibleModules(slug, demo)));
   const [open, setOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+
+  // Remember the collapsed state across navigations / sessions.
+  useEffect(() => {
+    if (localStorage.getItem("lxv_sidebar_collapsed") === "1") setCollapsed(true);
+  }, []);
+  const toggle = () =>
+    setCollapsed((c) => {
+      localStorage.setItem("lxv_sidebar_collapsed", c ? "0" : "1");
+      return !c;
+    });
+
   const initials = (w?.name || "?").split(" ").map((s) => s[0]).slice(0, 2).join("").toUpperCase();
 
   return (
-    <aside className="w-[236px] shrink-0 self-start sticky top-0 flex flex-col gap-4">
-      {/* Prospects in a demo can't leave their own workspace — no back link. */}
-      {!demo && (
-        <Link
-          href="/"
-          className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" /> All workspaces
-        </Link>
+    <aside
+      className={cn(
+        "shrink-0 self-start sticky top-0 flex flex-col gap-4 transition-[width] duration-200",
+        collapsed ? "w-16" : "w-[236px]"
       )}
+    >
+      {/* Top row: back to agency (expanded) + collapse toggle */}
+      <div className={cn("flex items-center", collapsed ? "justify-center" : "justify-between")}>
+        {!demo && !collapsed && (
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" /> All workspaces
+          </Link>
+        )}
+        <button
+          onClick={toggle}
+          title={collapsed ? "Expand" : "Collapse"}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          className="grid place-items-center w-7 h-7 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+        >
+          {collapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+        </button>
+      </div>
 
-      {/* Workspace chip. In demo it's a static badge (no switcher). */}
+      {/* Workspace chip. Collapsed → avatar only (click expands). */}
       <div className="relative">
         <button
-          onClick={() => !demo && setOpen((o) => !o)}
+          onClick={() => {
+            if (demo) return;
+            if (collapsed) toggle();
+            else setOpen((o) => !o);
+          }}
           disabled={demo}
+          title={collapsed ? w?.name ?? slug : undefined}
           className={cn(
-            "w-full flex items-center gap-3 rounded-xl border border-border bg-card px-3 py-2.5 text-left transition-colors",
+            "w-full flex items-center rounded-xl border border-border bg-card transition-colors",
+            collapsed ? "justify-center p-2" : "gap-3 px-3 py-2.5 text-left",
             !demo && "hover:border-white/20"
           )}
         >
@@ -78,34 +120,38 @@ export function WorkspaceSidebar({ slug, ws, workspaces, demo = false, mode = "c
           >
             {initials}
           </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-sm font-semibold text-foreground truncate">{w?.name ?? slug}</span>
-            <span className="block text-[11px] text-muted-foreground truncate">
-              {demo ? "preview" : `${w?.owner} · workspace`}
-            </span>
-          </span>
-          {!demo && <ChevronsUpDown className="w-4 h-4 text-muted-foreground shrink-0" />}
+          {!collapsed && (
+            <>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold text-foreground truncate">{w?.name ?? slug}</span>
+                <span className="block text-[11px] text-muted-foreground truncate">
+                  {demo ? "preview" : `${w?.owner} · workspace`}
+                </span>
+              </span>
+              {!demo && <ChevronsUpDown className="w-4 h-4 text-muted-foreground shrink-0" />}
+            </>
+          )}
         </button>
 
-        {open && !demo && (
+        {open && !demo && !collapsed && (
           <>
             <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
             <div className="absolute z-40 mt-1 w-full rounded-xl border border-border bg-popover shadow-xl overflow-hidden">
-              {workspaces.map((ws) => (
+              {workspaces.map((wsl) => (
                 <Link
-                  key={ws.slug}
-                  href={`/w/${ws.slug}/dashboard`}
+                  key={wsl.slug}
+                  href={`/w/${wsl.slug}/dashboard`}
                   onClick={() => setOpen(false)}
                   className="flex items-center gap-2.5 px-3 py-2.5 hover:bg-secondary transition-colors"
                 >
                   <span
                     className="grid place-items-center w-6 h-6 rounded-md text-[10px] font-bold shrink-0"
-                    style={{ background: `${ws.accent}1a`, color: ws.accent }}
+                    style={{ background: `${wsl.accent}1a`, color: wsl.accent }}
                   >
-                    {ws.name.split(" ").map((s) => s[0]).slice(0, 2).join("")}
+                    {wsl.name.split(" ").map((s) => s[0]).slice(0, 2).join("")}
                   </span>
-                  <span className="text-sm text-foreground flex-1 truncate">{ws.name}</span>
-                  {ws.slug === slug && <Check className="w-3.5 h-3.5 text-[#FFD60A]" />}
+                  <span className="text-sm text-foreground flex-1 truncate">{wsl.name}</span>
+                  {wsl.slug === slug && <Check className="w-3.5 h-3.5 text-[#FFD60A]" />}
                 </Link>
               ))}
             </div>
@@ -117,7 +163,9 @@ export function WorkspaceSidebar({ slug, ws, workspaces, demo = false, mode = "c
       <nav className="flex flex-col gap-4">
         {nav.map((grp) => (
           <div key={grp.group} className="flex flex-col gap-0.5">
-            <div className="px-2 pb-1 text-[10px] uppercase tracking-[0.18em] text-muted-foreground/70">{grp.group}</div>
+            {!collapsed && (
+              <div className="px-2 pb-1 text-[10px] uppercase tracking-[0.18em] text-muted-foreground/70">{grp.group}</div>
+            )}
             {grp.items.map(({ key, label, icon: Icon, badge }) => {
               const href = `/w/${slug}/${key}`;
               const active = pathname === href || pathname?.startsWith(href + "/");
@@ -125,16 +173,18 @@ export function WorkspaceSidebar({ slug, ws, workspaces, demo = false, mode = "c
                 <Link
                   key={key}
                   href={href}
+                  title={collapsed ? label : undefined}
                   className={cn(
-                    "group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors",
+                    "group relative flex items-center rounded-lg text-sm transition-colors",
+                    collapsed ? "justify-center py-2.5" : "gap-2.5 px-2.5 py-2",
                     active
                       ? "bg-[#FFD60A]/10 text-[#FFD60A]"
                       : "text-muted-foreground hover:bg-secondary hover:text-foreground"
                   )}
                 >
                   <Icon className="w-[17px] h-[17px] shrink-0" />
-                  <span className="flex-1 truncate">{label}</span>
-                  {badge && (
+                  {!collapsed && <span className="flex-1 truncate">{label}</span>}
+                  {!collapsed && badge && (
                     <span
                       className={cn(
                         "text-[10px] tabular-nums rounded-md px-1.5 py-0.5",
@@ -144,6 +194,10 @@ export function WorkspaceSidebar({ slug, ws, workspaces, demo = false, mode = "c
                       {badge}
                     </span>
                   )}
+                  {collapsed && badge && (
+                    <span className="absolute top-1.5 right-2 w-1.5 h-1.5 rounded-full bg-[#FFD60A]" />
+                  )}
+                  {collapsed && <Tip>{label}</Tip>}
                 </Link>
               );
             })}
@@ -156,36 +210,48 @@ export function WorkspaceSidebar({ slug, ws, workspaces, demo = false, mode = "c
         <div className="mt-auto flex flex-col gap-1 pt-4 border-t border-border">
           <Link
             href={`/w/${slug}/settings`}
+            title={collapsed ? "Settings" : undefined}
             className={cn(
-              "group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors",
+              "group relative flex items-center rounded-lg text-sm transition-colors",
+              collapsed ? "justify-center py-2.5" : "gap-2.5 px-2.5 py-2",
               pathname === `/w/${slug}/settings`
                 ? "bg-[#FFD60A]/10 text-[#FFD60A]"
                 : "text-muted-foreground hover:bg-secondary hover:text-foreground"
             )}
           >
             <Settings className="w-[17px] h-[17px] shrink-0" />
-            <span className="flex-1 truncate">Settings</span>
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground/60">
-              {mode === "agency" ? "agency" : "client"}
-            </span>
+            {!collapsed && <span className="flex-1 truncate">Settings</span>}
+            {!collapsed && (
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground/60">
+                {mode === "agency" ? "agency" : "client"}
+              </span>
+            )}
+            {collapsed && <Tip>Settings</Tip>}
           </Link>
           <form method="post" action="/api/logout">
             <input type="hidden" name="scope" value={mode === "agency" ? "agency" : slug} />
             <button
               type="submit"
-              className="w-full group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+              title={collapsed ? "Sign out" : undefined}
+              className={cn(
+                "group relative w-full flex items-center rounded-lg text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors",
+                collapsed ? "justify-center py-2.5" : "gap-2.5 px-2.5 py-2"
+              )}
             >
               <LogOut className="w-[17px] h-[17px] shrink-0" />
-              <span className="flex-1 truncate text-left">Sign out</span>
+              {!collapsed && <span className="flex-1 truncate text-left">Sign out</span>}
+              {collapsed && <Tip>Sign out</Tip>}
             </button>
           </form>
         </div>
       )}
 
-      <div className={cn("flex items-center gap-2 text-[11px] text-muted-foreground", demo ? "mt-auto pt-4" : "pt-1")}>
-        <span className="w-1.5 h-1.5 rounded-full bg-[#26D07C] shadow-[0_0_6px_#26D07C]" />
-        Living workspace · updates in real time
-      </div>
+      {!collapsed && (
+        <div className={cn("flex items-center gap-2 text-[11px] text-muted-foreground", demo ? "mt-auto pt-4" : "pt-1")}>
+          <span className="w-1.5 h-1.5 rounded-full bg-[#26D07C] shadow-[0_0_6px_#26D07C]" />
+          Living workspace · updates in real time
+        </div>
+      )}
     </aside>
   );
 }
