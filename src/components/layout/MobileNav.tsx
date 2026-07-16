@@ -8,7 +8,7 @@ import { Users, Megaphone } from "lucide-react";
 // shown only under md where the 256px sidebar would otherwise eat most of a phone screen.
 // Same two destinations as the sidebar; respects the iPhone home-indicator safe area.
 const NAV = [
-  { href: "/crm", label: "CRM", icon: Users, match: (p: string | null) => p?.startsWith("/crm") },
+  { href: "/w/luxvance/crm", label: "CRM", icon: Users, match: (p: string | null) => p?.includes("/crm") },
   { href: "/campaigns", label: "Campaigns", icon: Megaphone, match: (p: string | null) => p?.startsWith("/campaigns") },
 ];
 
