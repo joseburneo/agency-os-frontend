@@ -1,6 +1,6 @@
 import { getWorkspace } from "@/lib/portal/mock";
 import { assertModuleVisible, portalMode } from "@/lib/portal/access";
-import { loadIntelligence, loadTargetLists } from "@/lib/portal/data";
+import { loadIntelligence, loadWorkspace } from "@/lib/portal/data";
 import { IntelligenceView } from "./view";
 
 // Intelligence Library — the Octave-style client brain. One source of truth:
@@ -11,8 +11,7 @@ export default async function LibraryPage({ params }: { params: Promise<{ slug: 
   const { slug } = await params;
   await assertModuleVisible(slug, "library");
   const mode = await portalMode(slug);
-  const live = await loadTargetLists(slug);
-  const wsName = live?.ws?.name ?? getWorkspace(slug)?.name ?? slug;
-  const sections = await loadIntelligence(slug);
+  const [live, sections] = await Promise.all([loadWorkspace(slug), loadIntelligence(slug)]);
+  const wsName = live?.name ?? getWorkspace(slug)?.name ?? slug;
   return <IntelligenceView slug={slug} wsName={wsName} sections={sections} editable={mode !== "demo"} />;
 }

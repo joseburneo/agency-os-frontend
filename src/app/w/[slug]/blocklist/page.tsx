@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { getWorkspace } from "@/lib/portal/mock";
 import { assertModuleVisible } from "@/lib/portal/access";
-import { loadTargetLists, loadBlocklist } from "@/lib/portal/data";
+import { loadWorkspace, loadBlocklist } from "@/lib/portal/data";
 import { BlocklistView } from "./view";
 
 // Do-not-contact book for this workspace. Lives hand-in-hand with the
@@ -10,10 +10,8 @@ export default async function BlocklistPage({ params }: { params: Promise<{ slug
   const { slug } = await params;
   await assertModuleVisible(slug, "blocklist");
 
-  const live = await loadTargetLists(slug);
-  const ws = live?.ws ?? getWorkspace(slug);
+  const [live, entries] = await Promise.all([loadWorkspace(slug), loadBlocklist(slug)]);
+  const ws = live ?? getWorkspace(slug);
   if (!ws) notFound();
-
-  const entries = await loadBlocklist(slug);
   return <BlocklistView slug={slug} wsName={ws.name} entries={entries} />;
 }

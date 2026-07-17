@@ -18,7 +18,12 @@ export async function portalMode(slug: string): Promise<PortalMode> {
   if (jar.get(AGENCY_COOKIE)?.value === (await scopeToken(secret, "agency"))) return "agency";
   if (jar.get(wsCookie(slug))?.value === (await scopeToken(secret, `ws:${slug}`))) return "client";
   if (jar.get(demoCookie(slug))?.value === (await demoToken(secret, slug))) return "demo";
-  return "agency";
+  // No cookie matched: fall back to the LEAST privileged mode, never "agency".
+  // Pages are already gated by the proxy, but /api/* is excluded from its matcher,
+  // so the write routes (intelligence/save|delete|optimize, blocklist/add|remove)
+  // authorize on this return value alone — "agency" here let an anonymous request
+  // edit any workspace's library and blocklist.
+  return "demo";
 }
 
 // Guard a module page: 404 if this visitor's mode can't see it. A demo prospect

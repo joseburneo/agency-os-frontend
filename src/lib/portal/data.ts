@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { db } from "./server";
 import type {
   Workspace, WorkspaceData, TargetList, Lead, OutreachChannel, Kpi, JourneyItem,
@@ -52,12 +53,28 @@ function workspaceFromRow(row: Record<string, unknown>, coldLeads: number): Work
   };
 }
 
-// Target Lists module: the workspace, its 4 lists, and every lead (masked).
-export async function loadTargetLists(
-  slug: string
+// Columns every caller needs. The rendered email/LinkedIn bodies are deliberately
+// NOT here: they are ~1.7MB of the ~2MB this used to transfer, and only the Target
+// Lists table (which previews and sends them) ever reads them. Callers that just
+// count — the dashboard and the channel modules — pass withBodies:false and move
+// ~100KB instead.
+const LEAD_COLS =
+  "id,list_id,list_segment,full_name,role,company,sector,domain,email,linkedin_url,has_draft,phone,why_now,hr_lead_name,hr_lead_title";
+// Email 1 (previewed + sent from the table) and the VIP's prepared LinkedIn note.
+// Email 2/3 and linkedin2 are per-lead in the DB but nothing renders them yet;
+// they stay out so the table doesn't carry another megabyte for nothing.
+const LEAD_BODY_COLS = "email1_subject,email1_body,linkedin1";
+
+// Target Lists module: the workspace, its 4 lists, and every lead.
+// Addresses are masked by default; pass unmask for the owning client (they paid for
+// these leads and exported them in the old portal) — never for a demo prospect.
+export const loadTargetLists = cache(async function loadTargetLists(
+  slug: string,
+  opts: { unmask?: boolean; withBodies?: boolean } = {}
 ): Promise<{ ws: Workspace; lists: TargetList[]; leads: Lead[] } | null> {
   const sb = db();
   if (!sb) return null;
+  const withBodies = opts.withBodies !== false;
 
   const { data: wsRow } = await sb.from("workspaces").select("*").eq("slug", slug).maybeSingle();
   if (!wsRow) return null;
@@ -69,46 +86,76 @@ export async function loadTargetLists(
     .eq("workspace_id", wsId)
     .order("created_at", { ascending: true });
 
-  // PostgREST caps rows per request (server max-rows, ~1000), so page through all leads.
-  const leadRows: Record<string, unknown>[] = [];
+  // PostgREST caps rows per request (server max-rows, ~1000), so this pages through
+  // the leads. Round-trip latency dominates here, not bytes, so the pages go out at
+  // once: target_lists already carries lead_count, which tells us how many to expect.
+  // If those counts are stale we keep paging sequentially from where they ran out,
+  // so a wrong count can never silently truncate a client's list.
   const PAGE = 1000;
-  for (let from = 0; from < 20000; from += PAGE) {
+  const cols = withBodies ? `${LEAD_COLS},${LEAD_BODY_COLS}` : LEAD_COLS;
+  // `cols` is built at runtime, so supabase-js can't infer the row shape from the
+  // select literal — hence the cast to a plain record, which the mapper below reads.
+  const page = async (from: number): Promise<Record<string, unknown>[]> => {
     const { data } = await sb
       .from("target_list_leads")
-      .select(
-        "id,list_id,full_name,role,company,sector,domain,email,linkedin_url,has_draft,email1_subject,email1_body"
-      )
+      .select(cols)
       .eq("workspace_id", wsId)
       .range(from, from + PAGE - 1);
-    if (!data || data.length === 0) break;
-    leadRows.push(...(data as Record<string, unknown>[]));
-    if (data.length < PAGE) break;
+    return (data ?? []) as unknown as Record<string, unknown>[];
+  };
+
+  const expected = (listRows ?? []).reduce((n, r) => n + Number(r.lead_count ?? 0), 0);
+  const upfront = Math.max(1, Math.ceil(expected / PAGE));
+  const settled = await Promise.all(
+    Array.from({ length: upfront }, (_, i) => page(i * PAGE))
+  );
+
+  const leadRows: Record<string, unknown>[] = [];
+  let short = false;
+  for (const rows of settled) {
+    leadRows.push(...rows);
+    if (rows.length < PAGE) short = true;
+  }
+  for (let from = upfront * PAGE; !short && from < 50000; from += PAGE) {
+    const rows = await page(from);
+    leadRows.push(...rows);
+    if (rows.length < PAGE) break;
   }
 
   const leads: Lead[] = (leadRows ?? []).map((r) => {
     const email = (r.email as string | null) || "";
     const subject = String(r.email1_subject ?? "");
     const body = String(r.email1_body ?? "");
-    const mailto =
-      email && body
-        ? `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
-        : undefined;
+    // No precomputed mailto href. It embeds the whole body percent-encoded, so every
+    // email would cross the wire twice (once as text, once inside the link) — on a
+    // 1,113-lead list that was ~3MB of pure duplication. The client builds the link
+    // on click instead. `canSend` also carries the masking rule: only the owner, who
+    // has the real address in emailDisplay, ever gets a sendable link.
+    const canSend = Boolean(email && body && opts.unmask);
     return {
       id: String(r.id),
       listId: String(r.list_id),
+      segment: (r.list_segment as string | null) || undefined,
       name: String(r.full_name ?? ""),
       role: String(r.role ?? ""),
       company: String(r.company ?? ""),
       sector: String(r.sector ?? ""),
       domain: String(r.domain ?? ""),
-      emailMasked: maskEmail(email),
+      emailDisplay: opts.unmask ? email : maskEmail(email),
       linkedin: Boolean(r.linkedin_url),
       linkedinUrl: (r.linkedin_url as string | null) || undefined,
       hasEmail: Boolean(email),
       hasDraft: Boolean(r.has_draft ?? body),
       emailSubject: subject || undefined,
       emailBody: body || undefined,
-      mailto,
+      canSend,
+      // White-glove fields — the VIP tab works these by hand (phone, LinkedIn note,
+      // the dated signal). Masked for a demo prospect, same rule as the address.
+      phone: opts.unmask ? (r.phone as string | null) || undefined : undefined,
+      whyNow: (r.why_now as string | null) || undefined,
+      linkedinNote: (r.linkedin1 as string | null) || undefined,
+      hrLeadName: (r.hr_lead_name as string | null) || undefined,
+      hrLeadTitle: (r.hr_lead_title as string | null) || undefined,
     };
   });
 
@@ -121,20 +168,41 @@ export async function loadTargetLists(
   }));
 
   return { ws: workspaceFromRow(wsRow, leads.length), lists, leads };
-}
+});
+
+// Just the workspace + its cold-lead count, for pages that show a name and a badge
+// (roadmap, blocklist, library). They used to call loadTargetLists, which drags
+// every lead and every rendered email body — ~2MB and ~4s — to render a heading.
+// The count comes back as a header, so no lead rows cross the wire at all.
+export const loadWorkspace = cache(async function loadWorkspace(
+  slug: string
+): Promise<Workspace | null> {
+  const sb = db();
+  if (!sb) return null;
+
+  const { data: wsRow } = await sb.from("workspaces").select("*").eq("slug", slug).maybeSingle();
+  if (!wsRow) return null;
+
+  const { count } = await sb
+    .from("target_list_leads")
+    .select("id", { count: "exact", head: true })
+    .eq("workspace_id", wsRow.id as string);
+
+  return workspaceFromRow(wsRow as Record<string, unknown>, count ?? 0);
+});
 
 // ── Warm pipeline (CRM) ──────────────────────────────────────────────────────
 // Sourced from the same Render CRM API the internal cockpit uses, so the portal
 // and the cockpit always show identical numbers.
 //
-// engaged_prospects has NO per-client column yet, so today the table IS
-// Luxvance's own agency book. Until the reply engine tags each prospect with its
-// client workspace (add engaged_prospects.workspace_id, filter in crm_api.py),
-// only Luxvance's CRM is wired; a client like Arco stays honestly empty until its
-// first reply lands. When that column exists, drop this allowlist and the API
-// filters by the ?workspace param we already send.
+// The CRM is a product EVERY workspace has; the hot leads inside it belong to one
+// workspace only. That isolation is enforced server-side: crm_api.py resolves the
+// ?workspace slug to an id, filters engaged_prospects by it, and returns nothing
+// when the slug is unknown or missing. There is deliberately no allowlist here —
+// an allowlist would be a client-side gate on other clients' data, and the first
+// person to add a slug to it would leak Luxvance's book. A workspace with no
+// replies yet (Arco, until its first) simply comes back empty, which is the truth.
 const CRM_API = process.env.NEXT_PUBLIC_BACKEND_URL || "https://agency-os-api.onrender.com";
-const CRM_WORKSPACES = new Set(["luxvance"]);
 
 const STAGES: CrmStage[] = ["neutral", "mql", "sql", "discovery", "proposal_sent", "won", "lost"];
 const CATEGORIES: ReplyCategory[] = ["Positive/SQL", "MQL", "Neutral", "Negative"];
@@ -158,7 +226,7 @@ export async function loadCrm(
   slug: string
 ): Promise<{ cards: CrmCard[]; warm: number; meetings: number }> {
   const empty = { cards: [] as CrmCard[], warm: 0, meetings: 0 };
-  if (!CRM_WORKSPACES.has(slug)) return empty;
+  if (!slug) return empty; // never ask the API for "every workspace"
   try {
     const [pRes, sRes] = await Promise.all([
       fetch(`${CRM_API}/api/crm/prospects?workspace=${encodeURIComponent(slug)}`, { next: { revalidate: 60 } }),
@@ -313,7 +381,8 @@ export async function loadRoadmap(slug: string): Promise<RoadmapItem[]> {
 export async function loadPortal(
   slug: string
 ): Promise<{ ws: Workspace; data: WorkspaceData } | null> {
-  const tl = await loadTargetLists(slug);
+  // Counts only — the dashboard and the channel modules never render an email body.
+  const tl = await loadTargetLists(slug, { withBodies: false });
   if (!tl) return null;
   const { ws, lists, leads } = tl;
 
