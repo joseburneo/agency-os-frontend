@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Target, Download, Search, ExternalLink, Eye, X, Send, Copy, Check, Phone, MessageCircle, Star } from "lucide-react";
 import type { Workspace, WorkspaceData, Lead } from "@/lib/portal/types";
 import { ModuleHeader, Panel, Pill, CompanyMark, ChannelDots, cn } from "@/components/portal/ui";
@@ -49,8 +50,25 @@ function openMailto(l: Lead) {
   window.location.href = `mailto:${l.emailDisplay}?${q}`;
 }
 
+// Same rule as data.ts listKey — kept inline so this client bundle never pulls in
+// the server-only data module. Maps "List 2 · Has senior HR" -> "list-2-has-senior-hr".
+const listKey = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+
 export function TargetListsView({ ws, data }: { ws: Workspace; data: WorkspaceData }) {
-  const [activeList, setActiveList] = useState(data.lists[0]?.id ?? "");
+  const searchParams = useSearchParams();
+  // The sidebar deep-links each list via ?list=<key>; resolve it to a tab id.
+  const listIdFromParam = (key: string | null) =>
+    (key && data.lists.find((l) => listKey(l.name) === key)?.id) || data.lists[0]?.id || "";
+  const [activeList, setActiveList] = useState(() => listIdFromParam(searchParams.get("list")));
+
+  // Clicking a different list in the sidebar changes ?list= without remounting this
+  // component, so sync the selected tab when the param changes.
+  const paramList = searchParams.get("list");
+  useEffect(() => {
+    const id = listIdFromParam(paramList);
+    if (id) setActiveList(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paramList]);
   const [q, setQ] = useState("");
   const [preview, setPreview] = useState<Lead | null>(null);
   // Which copy button just fired ("<kind>-<leadId>") — flashes "✓ Copied" for 1.5s,
@@ -65,12 +83,19 @@ export function TargetListsView({ ws, data }: { ws: Workspace; data: WorkspaceDa
     () => data.leads.some((l) => l.listId === activeList && l.segment === "vip"),
     [data.leads, activeList]
   );
+  // The "Has senior HR" list names each company's HR lead so Paul can position as a
+  // partner. Show that person (name + title) as a column, the way the old portal did,
+  // in place of Sector (which is empty for this list). Detected from unfiltered rows.
+  const isHr = useMemo(
+    () => data.leads.some((l) => l.listId === activeList && l.segment === "hashr"),
+    [data.leads, activeList]
+  );
   const leads = useMemo(() => {
     const term = q.trim().toLowerCase();
     return data.leads
       .filter((l) => l.listId === activeList)
       .filter((l) =>
-        !term ? true : [l.name, l.company, l.sector, l.role].some((f) => f.toLowerCase().includes(term))
+        !term ? true : [l.name, l.company, l.sector, l.role, l.hrLeadName ?? ""].some((f) => f.toLowerCase().includes(term))
       )
       // Well-ordered: ready-to-send first, then have-email, then the rest.
       .sort((a, b) => Number(b.hasDraft) - Number(a.hasDraft) || Number(b.hasEmail) - Number(a.hasEmail));
@@ -98,12 +123,16 @@ export function TargetListsView({ ws, data }: { ws: Workspace; data: WorkspaceDa
     const csvEsc = (v: string) => `"${v.replace(/"/g, '""')}"`;
     const header = isVip
       ? ["Company", "Leader", "Role", "Why VIP", "Email", "LinkedIn", "LinkedIn note", "Phone"]
-      : ["Company", "Leader", "Role", "Sector", "Email", "LinkedIn"];
+      : isHr
+        ? ["Company", "Leader", "Role", "HR lead", "HR title", "Email", "LinkedIn"]
+        : ["Company", "Leader", "Role", "Sector", "Email", "LinkedIn"];
     const rows = leads.map((l) => {
       const base = [l.company, l.name, l.role];
       const rest = isVip
         ? [l.whyNow ?? "", l.hasEmail ? l.emailDisplay : "", l.linkedinUrl ?? "", l.linkedinNote ?? "", l.phone ?? ""]
-        : [l.sector, l.hasEmail ? l.emailDisplay : "", l.linkedinUrl ?? ""];
+        : isHr
+          ? [l.hrLeadName ?? "", l.hrLeadTitle ?? "", l.hasEmail ? l.emailDisplay : "", l.linkedinUrl ?? ""]
+          : [l.sector, l.hasEmail ? l.emailDisplay : "", l.linkedinUrl ?? ""];
       return [...base, ...rest].map(csvEsc).join(",");
     });
     const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
@@ -243,6 +272,8 @@ export function TargetListsView({ ws, data }: { ws: Workspace; data: WorkspaceDa
                 <th className="text-left font-medium px-4 py-3">Role</th>
                 {isVip ? (
                   <th className="text-left font-medium px-4 py-3">Why VIP</th>
+                ) : isHr ? (
+                  <th className="text-left font-medium px-4 py-3">HR lead</th>
                 ) : (
                   <th className="text-left font-medium px-4 py-3">Sector</th>
                 )}
@@ -276,6 +307,19 @@ export function TargetListsView({ ws, data }: { ws: Workspace; data: WorkspaceDa
                         </span>
                       ) : (
                         <span>—</span>
+                      )}
+                    </td>
+                  ) : isHr ? (
+                    <td className="px-4 py-3">
+                      {l.hrLeadName ? (
+                        <>
+                          <div className="text-foreground">{l.hrLeadName}</div>
+                          {l.hrLeadTitle && (
+                            <div className="text-[11px] text-muted-foreground">{l.hrLeadTitle}</div>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-muted-foreground">— (CEO-direct)</span>
                       )}
                     </td>
                   ) : (

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useState, useEffect } from "react";
 import {
   LayoutDashboard, Target, Mail, MessageCircle,
@@ -13,9 +13,23 @@ import { cn, Linkedin } from "./ui";
 import type { Workspace } from "@/lib/portal/types";
 import { visibleModules } from "@/lib/portal/modules";
 
-type NavItem = { key: string; label: string; icon: React.ComponentType<{ className?: string }>; badge?: string };
+type NavItem = {
+  key: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  badge?: string;
+  href?: string; // explicit href (e.g. a list deep-link with ?list=); default is /w/{slug}/{key}
+  indent?: boolean; // a sub-item under its parent (the individual lists)
+};
 type NavGroup = { group: string; items: NavItem[] };
 type WsLite = { slug: string; name: string; accent: string };
+type ListLite = { key: string; name: string; count: number };
+
+// "List 1 · No in-house HR" -> "No in-house HR"; "VIP" -> "VIP". The section header
+// already says these are lists, so the "List N ·" prefix is noise in the menu.
+function shortListLabel(name: string): string {
+  return name.replace(/^list\s*\d+\s*[·:\-]\s*/i, "").trim() || name;
+}
 
 // Counts come live from the parent layout; hide a badge at 0 so an empty
 // workspace (e.g. Luxvance before its leads land) reads clean, not "0".
@@ -24,7 +38,18 @@ type WsLite = { slug: string; name: string; accent: string };
 // the funnel sections follow: Targeted lists → Cold outreach → Ads → CRM, with the
 // Blocklist as a standalone guard at the bottom. A group with group:"" renders its
 // items without a section header.
-function buildNav(w: Workspace | null, enabled: Set<string>): NavGroup[] {
+function buildNav(w: Workspace | null, enabled: Set<string>, slug: string, lists: ListLite[]): NavGroup[] {
+  // Each target list is its own menu item under the "Targeted lists" header, so Paul
+  // reaches List 1 / List 2 / List 3 / VIP in one click. They deep-link into the one
+  // target-lists page via ?list=<key>, which the table reads to preselect the tab.
+  const listItems: NavItem[] = lists.map((l) => ({
+    key: `list-${l.key}`,
+    label: shortListLabel(l.name),
+    icon: Target,
+    href: `/w/${slug}/target-lists?list=${l.key}`,
+    indent: true,
+    badge: l.count > 0 ? l.count.toLocaleString() : undefined,
+  }));
   const groups: NavGroup[] = [
     {
       group: "",
@@ -38,6 +63,7 @@ function buildNav(w: Workspace | null, enabled: Set<string>): NavGroup[] {
       group: "Targeted lists",
       items: [
         { key: "target-lists", label: "Targeted Cold Leads", icon: Target, badge: w && w.coldLeads > 0 ? w.coldLeads.toLocaleString() : undefined },
+        ...listItems,
       ],
     },
     {
@@ -67,8 +93,10 @@ function buildNav(w: Workspace | null, enabled: Set<string>): NavGroup[] {
     },
   ];
   // Per-workspace visibility: keep only enabled modules, drop now-empty groups.
+  // The list sub-items (list-*) ride on the target-lists module being enabled.
+  const ok = (key: string) => (key.startsWith("list-") ? enabled.has("target-lists") : enabled.has(key));
   return groups
-    .map((g) => ({ ...g, items: g.items.filter((it) => enabled.has(it.key)) }))
+    .map((g) => ({ ...g, items: g.items.filter((it) => ok(it.key)) }))
     .filter((g) => g.items.length > 0);
 }
 
@@ -81,10 +109,12 @@ function Tip({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function WorkspaceSidebar({ slug, ws, workspaces, demo = false, mode = "client" }: { slug: string; ws: Workspace | null; workspaces: WsLite[]; demo?: boolean; mode?: "agency" | "client" | "demo" }) {
+export function WorkspaceSidebar({ slug, ws, workspaces, lists = [], demo = false, mode = "client" }: { slug: string; ws: Workspace | null; workspaces: WsLite[]; lists?: ListLite[]; demo?: boolean; mode?: "agency" | "client" | "demo" }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const currentList = searchParams.get("list");
   const w = ws;
-  const nav = buildNav(w, new Set(visibleModules(slug, demo)));
+  const nav = buildNav(w, new Set(visibleModules(slug, demo)), slug, lists);
   const [open, setOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -189,9 +219,24 @@ export function WorkspaceSidebar({ slug, ws, workspaces, demo = false, mode = "c
           {!isCollapsed && grp.group && (
             <div className="px-2 pb-1 text-[10px] uppercase tracking-[0.18em] text-muted-foreground/70">{grp.group}</div>
           )}
-          {grp.items.map(({ key, label, icon: Icon, badge }) => {
-            const href = `/w/${slug}/${key}`;
-            const active = pathname === href || pathname?.startsWith(href + "/");
+          {grp.items.map(({ key, label, icon: Icon, badge, href: explicitHref, indent }) => {
+            // Collapsed rail shows icons only; the list sub-items fold into their parent.
+            if (isCollapsed && indent) return null;
+            const href = explicitHref ?? `/w/${slug}/${key}`;
+            const onTargetLists = pathname === `/w/${slug}/target-lists`;
+            const listItemKey = key.startsWith("list-") ? key.slice("list-".length) : null;
+            let active: boolean;
+            if (listItemKey) {
+              // A list sub-item is active only when we're on target-lists AND its key
+              // is the selected one (the first list is the default when none is set).
+              active = onTargetLists && (currentList === listItemKey || (!currentList && grp.items.findIndex((i) => i.key === key) === 1));
+            } else if (key === "target-lists") {
+              // The parent stays lit whenever we're on the page, so the section reads
+              // as one place; the specific sub-item shows which list.
+              active = onTargetLists;
+            } else {
+              active = pathname === href || (pathname?.startsWith(href + "/") ?? false);
+            }
             return (
               <Link
                 key={key}
@@ -201,12 +246,17 @@ export function WorkspaceSidebar({ slug, ws, workspaces, demo = false, mode = "c
                 className={cn(
                   "group relative flex items-center rounded-lg text-sm transition-colors",
                   isCollapsed ? "justify-center py-2.5" : "gap-2.5 px-2.5 py-2",
+                  !isCollapsed && indent && "ml-3.5 pl-2 border-l border-border",
                   active
                     ? "bg-[#FFD60A]/10 text-[#FFD60A]"
                     : "text-muted-foreground hover:bg-secondary hover:text-foreground"
                 )}
               >
-                <Icon className="w-[17px] h-[17px] shrink-0" />
+                {indent ? (
+                  <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", active ? "bg-[#FFD60A]" : "bg-muted-foreground/40")} />
+                ) : (
+                  <Icon className="w-[17px] h-[17px] shrink-0" />
+                )}
                 {!isCollapsed && <span className="flex-1 truncate">{label}</span>}
                 {!isCollapsed && badge && (
                   <span

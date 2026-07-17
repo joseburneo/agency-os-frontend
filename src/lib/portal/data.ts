@@ -191,6 +191,36 @@ export const loadWorkspace = cache(async function loadWorkspace(
   return workspaceFromRow(wsRow as Record<string, unknown>, count ?? 0);
 });
 
+// Stable, readable deep-link key for a list, derived from its name. Used by the
+// sidebar (to build ?list=<key> links) and the Target Lists view (to preselect the
+// tab). The list's DB id is NOT stable — the loader deletes and recreates the rows
+// on every reload — so we key on the name, which does not change.
+export function listKey(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+}
+
+// Just the workspace's lists (id, name, count, key), no leads. The sidebar lists
+// each one as its own menu item; this reads 4 tiny rows instead of loadTargetLists'
+// ~1MB. Ordered as created (List 1, 2, 3, then VIP).
+export const loadListsMeta = cache(async function loadListsMeta(
+  slug: string
+): Promise<{ key: string; name: string; count: number }[]> {
+  const sb = db();
+  if (!sb) return [];
+  const { data: wsRow } = await sb.from("workspaces").select("id").eq("slug", slug).maybeSingle();
+  if (!wsRow) return [];
+  const { data: rows } = await sb
+    .from("target_lists")
+    .select("name, lead_count")
+    .eq("workspace_id", wsRow.id as string)
+    .order("created_at", { ascending: true });
+  return (rows ?? []).map((r) => ({
+    key: listKey(String(r.name ?? "")),
+    name: String(r.name ?? ""),
+    count: Number(r.lead_count ?? 0),
+  }));
+});
+
 // ── Warm pipeline (CRM) ──────────────────────────────────────────────────────
 // Sourced from the same Render CRM API the internal cockpit uses, so the portal
 // and the cockpit always show identical numbers.
