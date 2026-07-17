@@ -9,6 +9,7 @@ export type ModuleKey =
   | "target-lists"
   | "email"
   | "linkedin"
+  | "cadence"
   | "whatsapp"
   | "content"
   | "linkedin-ads"
@@ -47,12 +48,13 @@ export type OutreachChannel = "email" | "linkedin" | "whatsapp" | "call" | "ads"
 export interface Lead {
   id: string;
   listId: string;
+  segment?: string; // nohr | hashr | direct | vip — drives the VIP tab's extra columns
   name: string;
   role: string;
   company: string;
   sector: string;
   domain: string; // for the favicon
-  emailMasked: string; // masked for display
+  emailDisplay: string; // the owning client sees the real address; a demo prospect sees it masked
   linkedin: boolean;
   linkedinUrl?: string; // real profile URL (owner view) for the "View" link
   hasEmail: boolean;
@@ -62,7 +64,17 @@ export interface Lead {
   // recipient (the owner sends to their own leads).
   emailSubject?: string;
   emailBody?: string;
-  mailto?: string;
+  // True when this viewer may send: owner only, address + rendered body on file. The
+  // mailto link is built in the browser from emailDisplay/emailSubject/emailBody —
+  // never precomputed, or every body ships a second time percent-encoded.
+  canSend?: boolean;
+  // White-glove fields, used by the VIP tab: Paul emails, connects on LinkedIn with
+  // the prepared note, then calls. Withheld from a demo prospect, like the address.
+  phone?: string;
+  whyNow?: string; // the dated signal that earned the VIP slot
+  linkedinNote?: string; // prepared connection message, copy-to-clipboard
+  hrLeadName?: string;
+  hrLeadTitle?: string;
 }
 
 // ── Email + LinkedIn campaigns ──────────────────────────────────────────

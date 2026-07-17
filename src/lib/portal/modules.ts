@@ -4,11 +4,16 @@ import type { ModuleKey } from "./types";
 // sidebar can import it directly. Default = every module (Luxvance runs the full
 // stack). Overrides trim a client's portal to its actual engagement.
 
+// "cadence" — Sequence & Schedule: the full multi-channel journey (every email
+// and LinkedIn touch with its copy) plus sending windows and daily limits.
+export const CADENCE_MODULE: ModuleKey = "cadence";
+
 export const ALL_MODULES: ModuleKey[] = [
   "dashboard",
   "target-lists",
   "email",
   "linkedin",
+  CADENCE_MODULE,
   "whatsapp",
   "content",
   "linkedin-ads",
@@ -21,10 +26,10 @@ export const ALL_MODULES: ModuleKey[] = [
 
 const OVERRIDES: Record<string, ModuleKey[]> = {
   // Arco Irish — cold-outreach engagement: email + LinkedIn + CRM, plus its lead
-  // lists (the Build), intelligence library (the client brain), do-not-contact
-  // blocklist and the client-success roadmap. No WhatsApp, no content calendar,
-  // no ads / Meta.
-  "arco-irish": ["dashboard", "target-lists", "email", "linkedin", "crm", "library", "blocklist", "roadmap"],
+  // lists (the Build), the sequence & schedule (cadence), intelligence library
+  // (the client brain), do-not-contact blocklist and the client-success roadmap.
+  // No WhatsApp, no content calendar, no ads / Meta.
+  "arco-irish": ["dashboard", "target-lists", "email", "linkedin", CADENCE_MODULE, "crm", "library", "blocklist", "roadmap"],
 };
 
 export function enabledModules(slug: string): ModuleKey[] {
@@ -38,6 +43,8 @@ export function isModuleEnabled(slug: string, key: ModuleKey): boolean {
 // Demo (prospect preview) shows only the "feel the product" modules, read-mostly:
 // their real 50 leads (Target Lists), the exact outreach (Email + LinkedIn), and
 // the pipeline it fills (CRM). No Library/Journey, WhatsApp or Content in a demo.
+// Cadence stays out too: demo workspaces have no locked sequence yet, and an
+// empty "not configured" page would break the demo's feel.
 export const DEMO_MODULES: ModuleKey[] = ["dashboard", "target-lists", "email", "linkedin", "crm"];
 
 // What a given visitor sees: the workspace's own set, further trimmed to the

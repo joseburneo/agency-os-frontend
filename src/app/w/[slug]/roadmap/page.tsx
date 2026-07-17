@@ -1,6 +1,6 @@
 import { getWorkspace } from "@/lib/portal/mock";
 import { assertModuleVisible } from "@/lib/portal/access";
-import { loadTargetLists, loadRoadmap } from "@/lib/portal/data";
+import { loadWorkspace, loadRoadmap } from "@/lib/portal/data";
 import { RoadmapView } from "./view";
 
 // Client Success Roadmap: the delivery story. Everything Luxvance has shipped
@@ -10,8 +10,7 @@ export default async function RoadmapPage({ params }: { params: Promise<{ slug: 
   const { slug } = await params;
   await assertModuleVisible(slug, "roadmap");
 
-  const live = await loadTargetLists(slug);
-  const wsName = live?.ws?.name ?? getWorkspace(slug)?.name ?? slug;
-  const items = await loadRoadmap(slug);
+  const [live, items] = await Promise.all([loadWorkspace(slug), loadRoadmap(slug)]);
+  const wsName = live?.name ?? getWorkspace(slug)?.name ?? slug;
   return <RoadmapView wsName={wsName} items={items} />;
 }

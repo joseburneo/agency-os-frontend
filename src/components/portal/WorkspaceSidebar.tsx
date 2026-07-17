@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import {
   LayoutDashboard, Target, Mail, MessageCircle,
-  CalendarDays, KanbanSquare, Library, ChevronsUpDown, ArrowLeft, Check,
+  CalendarDays, CalendarClock, KanbanSquare, Library, ChevronsUpDown, ArrowLeft, Check,
   Settings, LogOut, PanelLeftClose, PanelLeftOpen, ShieldBan, Route, Menu, X,
   Megaphone, Flame,
 } from "lucide-react";
@@ -45,6 +45,7 @@ function buildNav(w: Workspace | null, enabled: Set<string>): NavGroup[] {
       items: [
         { key: "email", label: "Email Campaigns", icon: Mail },
         { key: "linkedin", label: "LinkedIn Campaigns", icon: Linkedin },
+        { key: "cadence", label: "Sequence & Schedule", icon: CalendarClock },
         { key: "whatsapp", label: "WhatsApp & Phone", icon: MessageCircle },
         { key: "content", label: "Content Calendar", icon: CalendarDays },
       ],
