@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutGrid } from "lucide-react";
+import { LayoutGrid, BookOpen } from "lucide-react";
 
 // A slim icon rail on desktop (hidden on mobile, where MobileNav's bottom bar takes over).
 // Agency-level nav only. Inside a workspace (/w/<slug>) the <WorkspaceSidebar/>
@@ -10,6 +10,7 @@ import { LayoutGrid } from "lucide-react";
 // hides there to avoid a confusing double nav and wasted left space.
 const NAV = [
   { href: "/", label: "Overview", icon: LayoutGrid, match: (p: string | null) => p === "/" },
+  { href: "/handbook", label: "Handbook", icon: BookOpen, match: (p: string | null) => Boolean(p?.startsWith("/handbook")) },
 ];
 
 export function Sidebar() {

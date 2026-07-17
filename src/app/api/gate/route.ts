@@ -29,9 +29,18 @@ export async function POST(request: NextRequest) {
   const secret = process.env.PORTAL_ACCESS_TOKEN;
   const agencyPw = process.env.PORTAL_AGENCY_PASSWORD;
   const wsKeys = parseWsKeys(process.env.PORTAL_WS_KEYS);
+  // Per-person agency keys ("jose:pw,ben:pw2") so each teammate has their OWN
+  // agency password, revocable individually, without sharing Jose's. Any match
+  // unlocks the same agency scope as PORTAL_AGENCY_PASSWORD.
+  const agencyKeys = parseWsKeys(process.env.PORTAL_AGENCY_KEYS);
 
-  // 1) Agency key — unlocks everything, from any gate.
-  if (secret && agencyPw && password === agencyPw) {
+  // 1) Agency key — unlocks everything, from any gate. Jose's password OR any
+  //    named teammate key (e.g. Ben's).
+  const isAgencyPw = Boolean(
+    secret && password &&
+      (password === agencyPw || Object.values(agencyKeys).includes(password))
+  );
+  if (secret && isAgencyPw) {
     const res = NextResponse.redirect(new URL(next, request.url), { status: 303 });
     res.cookies.set(AGENCY_COOKIE, await scopeToken(secret, "agency"), COOKIE_OPTS);
     return res;

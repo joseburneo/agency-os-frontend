@@ -27,3 +27,15 @@ export async function assertModuleVisible(slug: string, key: ModuleKey): Promise
   const mode = await portalMode(slug);
   if (!isModuleVisible(slug, key, mode === "demo")) notFound();
 }
+
+// True only for the agency session (Jose / the team). Used to gate the internal
+// Handbook and any other agency-only surface. Route handlers must call this
+// themselves — the proxy already gates non-/w pages, but /api/* is excluded from
+// the proxy matcher, so an API route serving agency content re-checks here.
+// When the gate is off (no secret, local dev) everyone is agency.
+export async function isAgency(): Promise<boolean> {
+  const secret = process.env.PORTAL_ACCESS_TOKEN;
+  if (!secret) return true;
+  const jar = await cookies();
+  return jar.get(AGENCY_COOKIE)?.value === (await scopeToken(secret, "agency"));
+}
