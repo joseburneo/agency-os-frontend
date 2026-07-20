@@ -5,7 +5,9 @@ import {
   X, Link2, MessageCircle, Phone, ExternalLink, Copy, Check,
   Search, RefreshCw, CalendarClock, Sparkles, Send, PenLine, Loader2,
   Flame, LayoutGrid, List, Bot, ChevronRight, Zap, Mail, Magnet,
+  PhoneCall, PhoneOff, Mic, MicOff, Smartphone, AlertTriangle,
 } from "lucide-react";
+import { useSoftphone, fmtDuration, type CallMode } from "./useSoftphone";
 
 const API = process.env.NEXT_PUBLIC_BACKEND_URL || "https://agency-os-api.onrender.com";
 
@@ -628,7 +630,7 @@ function useComposer(d: Detail, onSent: () => void) {
   const canSendEmail = chan === "email" && d.can_send_email;
   const gmailLive = d.live_channel === "gmail";
   const draftLabel = chan === "email" ? "Draft with AI" : chan === "linkedin" ? "Draft LinkedIn" : chan === "whatsapp" ? "Draft WhatsApp" : "Talking points";
-  return { d, chan, setChan, text, setDraft, gen, send, logTouch, askCopilot, drafting, sending, sent, setSent, co, setCo, coBusy, coLog, canSendEmail, gmailLive, draftLabel, threadKey };
+  return { d, chan, setChan, text, setDraft, gen, send, logTouch, refresh: onSent, askCopilot, drafting, sending, sent, setSent, co, setCo, coBusy, coLog, canSendEmail, gmailLive, draftLabel, threadKey };
 }
 type ComposerCtl = ReturnType<typeof useComposer>;
 
@@ -687,6 +689,108 @@ function Copilot({ c }: { c: ComposerCtl }) {
   );
 }
 
+// ── the phone, inside the card ───────────────────────────────────────
+// Everything else in the Call tab is preparation (talking points); this is the
+// part that actually dials. It writes the call to prospect_calls server-side, so
+// a call made here counts as a touch and the board stops asking for one.
+const OUTCOMES = ["connected", "voicemail", "gatekeeper", "wrong-number", "not-interested", "booked"] as const;
+
+function CallPanel({ d, onTouched }: { d: Detail; onTouched: () => void }) {
+  const ph = useSoftphone();
+  const [mode, setMode] = useState<CallMode>("browser");
+  const [logged, setLogged] = useState<string | null>(null);
+  const busy = ph.state === "connecting" || ph.state === "ringing" || ph.state === "live";
+
+  // One touch per finished call, not per state change.
+  const notified = useRef(false);
+  useEffect(() => {
+    if (busy) notified.current = false;
+    if (ph.state === "ended" && !notified.current) { notified.current = true; onTouched(); }
+  }, [ph.state, busy, onTouched]);
+
+  if (!d.phone) {
+    return (
+      <div className="rounded-lg border border-border bg-background px-3 py-2.5 text-[12px] text-muted-foreground">
+        No number on file for {d.name.split(" ")[0] || "them"}. Use <span className="text-foreground">Shop via Clay</span> in the left column first, then come back here to dial.
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-[#26D07C]/25 bg-[#26D07C]/[0.05] px-3 py-2.5 space-y-2">
+      <div className="flex items-center gap-2 flex-wrap">
+        {!busy ? (
+          <button
+            onClick={() => { setLogged(null); ph.call(d.phone, d.id, mode); }}
+            className="neon-btn inline-flex items-center gap-2 rounded-lg bg-[#26D07C] px-4 py-2 text-sm font-semibold text-[#0A0E1A] hover:bg-[#3ce08e] transition-colors">
+            <PhoneCall className="w-4 h-4" /> Call {d.phone}
+          </button>
+        ) : (
+          <>
+            <span className="inline-flex items-center gap-2 rounded-lg bg-[#26D07C]/12 px-3 py-2 text-sm text-[#26D07C]">
+              {ph.state === "live"
+                ? <><span className="w-2 h-2 rounded-full bg-[#26D07C] animate-pulse" /> Live · <span className="tabular-nums">{fmtDuration(ph.seconds)}</span></>
+                : <><Loader2 className="w-4 h-4 animate-spin" /> {ph.state === "ringing" ? "Ringing…" : "Connecting…"}</>}
+            </span>
+            {mode === "browser" && ph.state === "live" && (
+              <button onClick={ph.toggleMute}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
+                {ph.muted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />} {ph.muted ? "Unmute" : "Mute"}
+              </button>
+            )}
+            <button onClick={ph.hangup}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[#ff5a5a] px-3 py-2 text-sm font-semibold text-[#0A0E1A] hover:bg-[#ff7676] transition-colors">
+              <PhoneOff className="w-4 h-4" /> Hang up
+            </button>
+          </>
+        )}
+
+        {!busy && (
+          <button
+            onClick={() => setMode((m) => (m === "browser" ? "dialout" : "browser"))}
+            title="Dial-out rings your own mobile first, then connects the prospect. Use it on networks that block VoIP."
+            className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs transition-colors ${
+              mode === "dialout"
+                ? "border-[#FFD60A]/40 text-[#FFD60A] bg-[#FFD60A]/8"
+                : "border-border text-muted-foreground hover:text-foreground hover:bg-secondary"}`}>
+            <Smartphone className="w-3.5 h-3.5" /> {mode === "dialout" ? "Ring my mobile first" : "From the browser"}
+          </button>
+        )}
+      </div>
+
+      {/* what the prospect sees, and the recording state, never hidden */}
+      <div className="text-[11px] text-muted-foreground flex items-center gap-2 flex-wrap">
+        {ph.callerId && <span>They see <span className="text-foreground tabular-nums">{ph.callerId}</span></span>}
+        {ph.recording && <span className="text-[#FFD60A]">· recording on, the notice plays first</span>}
+        {mode === "dialout" && <span>· we ring your mobile, then bridge them</span>}
+      </div>
+
+      {ph.error && (
+        <div className="flex items-start gap-2 text-[12px] text-[#ff8a8a]">
+          <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" /> {ph.error}
+        </div>
+      )}
+
+      {/* right after hanging up: the one thing Twilio cannot know */}
+      {ph.state === "ended" && ph.callSid && (
+        logged ? (
+          <div className="flex items-center gap-2 text-[12px] text-[#26D07C]"><Check className="w-3.5 h-3.5" /> Logged as {logged}.</div>
+        ) : (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[11px] text-muted-foreground mr-1">How did it go?</span>
+            {OUTCOMES.map((o) => (
+              <button key={o} onClick={() => { ph.logOutcome(o); setLogged(o); }}
+                className="rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
+                {o.replace("-", " ")}
+              </button>
+            ))}
+          </div>
+        )
+      )}
+    </div>
+  );
+}
+
 function Composer({ c }: { c: ComposerCtl }) {
   const { d, chan, setChan, text, setDraft, gen, send, logTouch, drafting, sending, sent, setSent, canSendEmail, gmailLive, draftLabel } = c;
   // Compact by default so an empty composer never steals the conversation's space; it opens
@@ -717,9 +821,14 @@ function Composer({ c }: { c: ComposerCtl }) {
         <span className="text-[11px] text-muted-foreground">
           {chan === "email"
             ? (canSendEmail ? "Sends on-thread via Instantly" : gmailLive ? "Reply from Gmail" : "No thread — copy & send")
+            : chan === "call" ? "Dials from here, logged automatically"
             : "Copy & send by hand"}
         </span>
       </div>
+
+      {/* the dialer sits above the notes: on the Call tab the phone is the action,
+          the talking points below it are the preparation */}
+      {chan === "call" && <CallPanel d={d} onTouched={c.refresh} />}
 
       {!expanded ? (
         <button type="button" onClick={() => setOpen(true)}
@@ -770,8 +879,8 @@ function Composer({ c }: { c: ComposerCtl }) {
               className="neon-btn inline-flex items-center gap-2 rounded-lg bg-[#FFD60A] px-4 py-2 text-sm font-semibold text-[#0A0E1A] hover:bg-[#ffdf3a] disabled:opacity-40 transition-colors">
               {sending ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending…</> : <><Send className="w-4 h-4" /> Send via Instantly</>}
             </button>
-          ) : chan !== "email" && text.trim() ? (
-            <a href={chan === "whatsapp" && d.phone ? (d.wa_link || `https://wa.me/${d.phone.replace(/[^\d]/g, "")}`) : chan === "linkedin" ? (d.linkedin_url || linkedinSearchUrl(d.name, d.company)) : "#"}
+          ) : chan !== "email" && chan !== "call" && text.trim() ? (
+            <a href={chan === "whatsapp" && d.phone ? (d.wa_link || `https://wa.me/${d.phone.replace(/[^\d]/g, "")}`) : (d.linkedin_url || linkedinSearchUrl(d.name, d.company))}
               target="_blank" rel="noreferrer"
               onClick={() => { navigator.clipboard.writeText(text); logTouch(chan); }}
               className="inline-flex items-center gap-2 rounded-lg bg-[#FFD60A] px-4 py-2 text-sm font-semibold text-[#0A0E1A] hover:bg-[#ffdf3a] transition-colors">
