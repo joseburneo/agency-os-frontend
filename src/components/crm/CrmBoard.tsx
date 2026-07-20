@@ -1037,6 +1037,58 @@ function BuildCard({ d, onChanged }: { d: Detail; onChanged: () => void }) {
 function ContactActions({ d, onChanged }: { d: Detail; onChanged: () => void }) {
   const [finding, setFinding] = useState(false);
   const [findNote, setFindNote] = useState<string | null>(null);
+  // Extraction is a guess: a signature can hand us our own number or a switchboard,
+  // and a wrong number is worse than none. So the number is always editable.
+  const [editing, setEditing] = useState(false);
+  const [draftPhone, setDraftPhone] = useState("");
+  const [savingPhone, setSavingPhone] = useState(false);
+  const [phoneErr, setPhoneErr] = useState<string | null>(null);
+
+  const savePhone = (value: string) => {
+    setSavingPhone(true); setPhoneErr(null);
+    fetch(`${API}/api/crm/prospect/${d.id}/phone`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone: value }),
+    })
+      .then(async (r) => {
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) { setPhoneErr(j.detail || "Could not save the number."); return; }
+        setEditing(false); onChanged();
+      })
+      .catch(() => setPhoneErr("Could not save the number."))
+      .finally(() => setSavingPhone(false));
+  };
+
+  const phoneEditor = (
+    <div className="space-y-2">
+      <input
+        value={draftPhone} onChange={(e) => setDraftPhone(e.target.value)} autoFocus
+        placeholder="+353 86 796 1664"
+        onKeyDown={(e) => { if (e.key === "Enter") savePhone(draftPhone); if (e.key === "Escape") setEditing(false); }}
+        className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground tabular-nums focus:outline-none focus:ring-1 focus:ring-[#FFD60A]/50"
+      />
+      <div className="flex items-center gap-2">
+        <button onClick={() => savePhone(draftPhone)} disabled={savingPhone}
+          className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#FFD60A] px-3 py-2 text-sm font-semibold text-[#0A0E1A] hover:bg-[#ffdf3a] disabled:opacity-40 transition-colors">
+          {savingPhone ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Save
+        </button>
+        <button onClick={() => { setEditing(false); setPhoneErr(null); }}
+          className="rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
+          Cancel
+        </button>
+        {d.phone && (
+          <button onClick={() => savePhone("")} title="Remove this number"
+            className="rounded-lg border border-border px-3 py-2 text-sm text-[#ff8a8a] hover:bg-secondary transition-colors">
+            Clear
+          </button>
+        )}
+      </div>
+      <div className="text-[11px] text-muted-foreground">
+        Any format works. We store it in international format so the dialer can use it.
+      </div>
+      {phoneErr && <div className="text-[11px] text-[#ff8a8a]">{phoneErr}</div>}
+    </div>
+  );
 
   // The email-thread scan runs automatically server-side when the record opens, so
   // there is no "find in thread" button. The only button is Clay (paid, optional).
@@ -1077,10 +1129,14 @@ function ContactActions({ d, onChanged }: { d: Detail; onChanged: () => void }) 
         <div className="flex items-center gap-2 text-sm font-medium text-foreground mb-2">
           <Phone className="w-4 h-4 text-[#f0b45f]" /> Phone · WhatsApp · Call
         </div>
-        {d.phone ? (
+        {editing ? phoneEditor : d.phone ? (
           <div className="space-y-2">
             <div className="flex items-center gap-2 bg-background border border-border rounded-lg px-3 py-2">
               <span className="flex-1 text-sm text-foreground tabular-nums">{d.phone}</span>
+              <button onClick={() => { setDraftPhone(d.phone); setEditing(true); }} title="Edit or remove this number"
+                className="text-muted-foreground hover:text-[#FFD60A] transition-colors">
+                <PenLine className="w-3.5 h-3.5" />
+              </button>
               <CopyBtn value={d.phone} label="Copy to call" />
             </div>
             <div className="flex items-center gap-2">
@@ -1096,7 +1152,11 @@ function ContactActions({ d, onChanged }: { d: Detail; onChanged: () => void }) 
           </div>
         ) : (
           <div className="space-y-2">
-            <div className="text-xs text-muted-foreground">No number in the email thread. Shop for it with Clay (paid).</div>
+            <div className="text-xs text-muted-foreground">No number in the email thread. Type it yourself, or shop for it with Clay (paid).</div>
+            <button onClick={() => { setDraftPhone(""); setEditing(true); }}
+              className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-foreground hover:bg-secondary transition-colors">
+              <PenLine className="w-4 h-4" /> Add a number
+            </button>
             <button onClick={shopClay} disabled={finding}
               className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-[#f0b45f]/40 bg-[#f0b45f]/10 px-3 py-2 text-sm text-[#f0b45f] hover:bg-[#f0b45f]/15 disabled:opacity-40 transition-colors">
               {finding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />} Shop via Clay
