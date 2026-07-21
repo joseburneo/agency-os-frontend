@@ -2,7 +2,8 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { LayoutDashboard, ArrowRight, Mail, MessageCircle, Phone, KanbanSquare } from "lucide-react";
 import { getWorkspace, getWorkspaceData } from "@/lib/portal/mock";
-import { loadPortal } from "@/lib/portal/data";
+import { loadPortal, loadMagnetBrief } from "@/lib/portal/data";
+import { MagnetOverview } from "@/components/portal/MagnetOverview";
 import { enabledModules } from "@/lib/portal/modules";
 import { SectionLabel, StatTile, ModuleHeader, ChannelDots, Panel, Pill, Linkedin } from "@/components/portal/ui";
 import type { CrmStage, OutreachChannel } from "@/lib/portal/types";
@@ -22,6 +23,18 @@ const ACT_ICON: Record<OutreachChannel | "crm", React.ComponentType<{ className?
 
 export default async function DashboardPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
+
+  // A magnet gets a page, not a dashboard. KPI tiles reading "0 meetings booked"
+  // say nothing to someone who has never used the product; what a prospect wants
+  // is what we found out about their business and who we decided their buyers
+  // are. Built from the research stored when the magnet was made.
+  const magnet = await loadMagnetBrief(slug);
+  if (magnet) {
+    return (
+      <MagnetOverview slug={slug} name={magnet.name} owner={magnet.owner} brief={magnet.brief} />
+    );
+  }
+
   const live = await loadPortal(slug);
   const ws = live?.ws ?? getWorkspace(slug);
   const data = live?.data ?? getWorkspaceData(slug);

@@ -471,6 +471,22 @@ export const loadWorkspaceKind = cache(async function loadWorkspaceKind(slug: st
   return (data?.kind as string) || "client";
 });
 
+// The research behind a magnet, stored when it was built. Shape mirrors
+// lead_magnet.generate_brief: personal_note, company_summary, executive_summary,
+// primary_audience {...}, secondary_audiences[], outreach_angle, talking_points[].
+export const loadMagnetBrief = cache(async function loadMagnetBrief(slug: string) {
+  const sb = db();
+  if (!sb) return null;
+  const { data } = await sb.from("workspaces").select("brief_json,name,owner_name")
+    .eq("slug", slug).maybeSingle();
+  if (!data?.brief_json) return null;
+  return {
+    brief: data.brief_json as Record<string, unknown>,
+    name: String(data.name ?? ""),
+    owner: String(data.owner_name ?? ""),
+  };
+});
+
 export async function loadWorkspaces(): Promise<Workspace[] | null> {
   const sb = db();
   if (!sb) return null;
