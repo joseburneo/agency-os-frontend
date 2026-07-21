@@ -184,6 +184,35 @@ export function TargetListsView({
         }
       />
 
+      {/* The ask. It sits above the list because the list is what earns it: they
+          have just seen 50 correctly-targeted people with the outreach already
+          written, and the one thing missing is the addresses. Shown only when the
+          list ships without them, so a paying client never sees a sales banner. */}
+      {!canExport && (
+        <Panel>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-[15px] font-semibold text-foreground">
+                Want to optimise this list?
+              </div>
+              <p className="mt-1 text-[13px] text-muted-foreground max-w-2xl leading-relaxed">
+                Fifteen minutes to refine your ideal customer profile and confirm these
+                are the right people. We rebuild the list from what you tell us and hand
+                it over with the email addresses, ready to send.
+              </p>
+            </div>
+            <a
+              href="https://www.luxvance.com/book"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 inline-flex items-center justify-center gap-2 rounded-lg bg-[#26D07C] px-4 py-2.5 text-[13px] font-semibold text-[#0A0E1A] hover:bg-[#3ad98c] transition-colors"
+            >
+              Book the 15 minutes <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          </div>
+        </Panel>
+      )}
+
       {/* List tabs */}
       <div className="flex flex-wrap gap-2">
         {data.lists.map((l) => {
@@ -339,25 +368,39 @@ export function TargetListsView({
                   ) : (
                     <td className="px-4 py-3 text-muted-foreground">{l.sector}</td>
                   )}
+                  {/* Two links, not one: the person to connect with, and the company
+                      to check. A magnet ships no addresses, so these are the evidence
+                      that the targeting is real and the people exist. */}
                   <td className="px-4 py-3">
-                    {l.linkedin ? (
-                      l.linkedinUrl ? (
+                    <div className="flex items-center gap-3">
+                      {l.linkedin && l.linkedinUrl ? (
                         <a
                           href={l.linkedinUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="inline-flex items-center gap-1 text-[13px] text-blue-300 hover:text-blue-200"
                         >
-                          View <ExternalLink className="w-3 h-3" />
+                          Connect <ExternalLink className="w-3 h-3" />
                         </a>
-                      ) : (
+                      ) : l.linkedin ? (
                         <span className="inline-flex items-center gap-1 text-[13px] text-blue-300">
-                          View <ExternalLink className="w-3 h-3" />
+                          Connect <ExternalLink className="w-3 h-3" />
                         </span>
-                      )
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                      {l.linkedinCompany && (
+                        <a
+                          href={l.linkedinCompany}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={`${l.company} on LinkedIn`}
+                          className="inline-flex items-center gap-1 text-[13px] text-muted-foreground hover:text-blue-200"
+                        >
+                          Company <ExternalLink className="w-3 h-3" />
+                        </a>
+                      )}
+                    </div>
                   </td>
                   {isVip && (
                     <td className="px-4 py-3">
