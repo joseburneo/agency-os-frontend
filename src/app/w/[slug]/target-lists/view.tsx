@@ -41,25 +41,27 @@ function truncate(s: string, n = 120) {
   return s.length > n ? s.slice(0, n).trimEnd() + "…" : s;
 }
 
-// Built here, in the browser, on click — never server-side. A precomputed mailto href
-// carries the whole body percent-encoded, so a 1,113-lead list would ship every email
-// twice. `canSend` needs a real address plus a drafted body.
+// Built here, in the browser, on click — never server-side. A precomputed link carries
+// the whole body percent-encoded, so a 1,113-lead list would ship every email twice.
+// `canSend` needs a real address plus a drafted body.
 //
-// Hand the mailto to the OS via a synthetic anchor click, NOT window.location.href.
-// location.href unloads the workspace: the mail client opens but the tab navigates
-// away from the list, so after each VIP you had to reopen the page and find your place
-// (Paul, 2026-07-21). A `target="_blank"` anchor click hands off to the mail app and
-// leaves the workspace exactly where it was.
-function openMailto(l: Lead) {
+// Opens Gmail's web compose in a NEW TAB, not a mailto:. Two reasons, both from Paul
+// (2026-07-21): (1) he works from Gmail in the browser, and a plain mailto: only opens
+// Gmail if he has registered it as his OS mail handler — otherwise it opens an empty
+// desktop app or nothing. The compose URL always opens Gmail, prefilled. (2) The old
+// window.location.href unloaded the workspace, so after each VIP he lost his place.
+// A new tab leaves the list exactly where it was.
+//
+// Body is PLAIN TEXT: Gmail's compose URL does not render HTML, and Paul's copy is
+// plain text anyway (signature in-copy). Gmail opens in the account he is signed into.
+function openCompose(l: Lead) {
   if (!l.canSend) return;
-  const q = `subject=${encodeURIComponent(l.emailSubject ?? "")}&body=${encodeURIComponent(l.emailBody ?? "")}`;
-  const a = document.createElement("a");
-  a.href = `mailto:${l.emailDisplay}?${q}`;
-  a.target = "_blank";
-  a.rel = "noopener";
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
+  const url =
+    "https://mail.google.com/mail/?view=cm&fs=1" +
+    `&to=${encodeURIComponent(l.emailDisplay)}` +
+    `&su=${encodeURIComponent(l.emailSubject ?? "")}` +
+    `&body=${encodeURIComponent(l.emailBody ?? "")}`;
+  window.open(url, "_blank", "noopener,noreferrer");
 }
 
 // Same rule as data.ts listKey — kept inline so this client bundle never pulls in
@@ -496,7 +498,7 @@ export function TargetListsView({
                       {l.canSend ? (
                         <button
                           type="button"
-                          onClick={() => openMailto(l)}
+                          onClick={() => openCompose(l)}
                           className="inline-flex items-center gap-1.5 rounded-md border border-[#FFD60A]/25 bg-[#FFD60A]/10 px-2.5 py-1.5 text-[12px] font-medium text-[#FFD60A] hover:bg-[#FFD60A]/15 transition-colors"
                           title={`Opens your mail app to ${l.hasEmail ? l.emailDisplay : "the lead"}, ready to send`}
                         >
@@ -600,7 +602,7 @@ export function TargetListsView({
               {preview.canSend && (
                 <button
                   type="button"
-                  onClick={() => openMailto(preview)}
+                  onClick={() => openCompose(preview)}
                   className="inline-flex items-center gap-2 rounded-lg border border-[#FFD60A]/30 bg-[#FFD60A]/10 px-4 py-2 text-[13px] font-semibold text-[#FFD60A] hover:bg-[#FFD60A]/15 transition-colors"
                 >
                   <Send className="w-4 h-4" /> Send through my email
