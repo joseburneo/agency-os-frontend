@@ -47,13 +47,23 @@ export function isModuleEnabled(slug: string, key: ModuleKey): boolean {
 // empty "not configured" page would break the demo's feel.
 export const DEMO_MODULES: ModuleKey[] = ["dashboard", "target-lists", "email", "linkedin", "crm"];
 
+// A MAGNET is not a portal, it is a two-page piece of sales material: the page
+// that explains what we found about their business, and their fifty leads with
+// the outreach written. Everything else in the app has nothing in it for a
+// prospect, and a sidebar of empty modules reads as an unfinished product
+// rather than a generous gift.
+export const MAGNET_MODULES: ModuleKey[] = ["dashboard", "target-lists"];
+
 // What a given visitor sees: the workspace's own set, further trimmed to the
 // demo set when this is a prospect preview.
-export function visibleModules(slug: string, demo: boolean): ModuleKey[] {
+export function visibleModules(slug: string, demo: boolean, kind?: string): ModuleKey[] {
+  // A magnet is trimmed for everyone who opens it, agency included: what Jose
+  // reviews before sending has to be what the prospect will actually see.
+  if (kind === "magnet") return MAGNET_MODULES;
   const base = enabledModules(slug);
   return demo ? base.filter((m) => DEMO_MODULES.includes(m)) : base;
 }
 
-export function isModuleVisible(slug: string, key: ModuleKey, demo: boolean): boolean {
-  return visibleModules(slug, demo).includes(key);
+export function isModuleVisible(slug: string, key: ModuleKey, demo: boolean, kind?: string): boolean {
+  return visibleModules(slug, demo, kind).includes(key);
 }

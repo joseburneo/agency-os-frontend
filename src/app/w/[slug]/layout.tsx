@@ -4,6 +4,7 @@ import { DemoBanner } from "@/components/portal/DemoBanner";
 import { getWorkspace, WORKSPACES } from "@/lib/portal/mock";
 import { loadWorkspaces, loadListsMeta } from "@/lib/portal/data";
 import { portalMode } from "@/lib/portal/access";
+import { loadWorkspaceKind } from "@/lib/portal/data";
 
 export default async function WorkspaceLayout({
   children,
@@ -20,6 +21,7 @@ export default async function WorkspaceLayout({
   if (!ws) notFound();
 
   const mode = await portalMode(slug);
+  const kind = await loadWorkspaceKind(slug);
   const demo = mode === "demo";
   // In demo the prospect can't hop to other workspaces; the switcher is hidden.
   const workspaces = demo ? [] : all.map((w) => ({ slug: w.slug, name: w.name, accent: w.accent }));
@@ -31,7 +33,7 @@ export default async function WorkspaceLayout({
       {demo && <DemoBanner name={ws.name} />}
       {/* Mobile: column (sticky top bar above content). Desktop: original row. */}
       <div className="flex flex-col lg:flex-row lg:gap-6 lg:items-start">
-        <WorkspaceSidebar slug={slug} ws={ws} workspaces={workspaces} lists={lists} demo={demo} mode={mode} />
+        <WorkspaceSidebar slug={slug} ws={ws} workspaces={workspaces} lists={lists} demo={demo} mode={mode} kind={kind} />
         <div className="flex-1 w-full min-w-0 overflow-x-hidden pt-4 lg:pt-0 pb-10">{children}</div>
       </div>
     </div>
