@@ -22,7 +22,7 @@ type NavItem = {
   indent?: boolean; // a sub-item under its parent (the individual lists)
 };
 type NavGroup = { group: string; items: NavItem[] };
-type WsLite = { slug: string; name: string; accent: string };
+type WsLite = { slug: string; name: string; accent: string; kind?: string };
 type ListLite = { key: string; name: string; count: number };
 
 // "List 1 · No in-house HR" -> "No in-house HR"; "VIP" -> "VIP". The section header
@@ -188,23 +188,49 @@ export function WorkspaceSidebar({ slug, ws, workspaces, lists = [], demo = fals
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
           <div className="absolute z-40 mt-1 w-full rounded-xl border border-border bg-popover shadow-xl overflow-hidden">
-            {workspaces.map((wsl) => (
-              <Link
-                key={wsl.slug}
-                href={`/w/${wsl.slug}/dashboard`}
-                onClick={() => setOpen(false)}
-                className="flex items-center gap-2.5 px-3 py-2.5 hover:bg-secondary transition-colors"
-              >
-                <span
-                  className="grid place-items-center w-6 h-6 rounded-md text-[10px] font-bold shrink-0"
-                  style={{ background: `${wsl.accent}1a`, color: wsl.accent }}
+            {/* Two lists, never one. A client is an account we run; a magnet is
+                sales material built for a single prospect, and there will be far
+                more of the second. Mixed together, the accounts that matter get
+                lost among the demos. */}
+            {(() => {
+              const clients = workspaces.filter((w) => w.kind !== "magnet");
+              const magnets = workspaces.filter((w) => w.kind === "magnet");
+              const row = (wsl: WsLite) => (
+                <Link
+                  key={wsl.slug}
+                  href={`/w/${wsl.slug}/dashboard`}
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-2.5 px-3 py-2.5 hover:bg-secondary transition-colors"
                 >
-                  {wsl.name.split(" ").map((s) => s[0]).slice(0, 2).join("")}
-                </span>
-                <span className="text-sm text-foreground flex-1 truncate">{wsl.name}</span>
-                {wsl.slug === slug && <Check className="w-3.5 h-3.5 text-[#FFD60A]" />}
-              </Link>
-            ))}
+                  <span
+                    className="grid place-items-center w-6 h-6 rounded-md text-[10px] font-bold shrink-0"
+                    style={{ background: `${wsl.accent}1a`, color: wsl.accent }}
+                  >
+                    {wsl.name.split(" ").map((s) => s[0]).slice(0, 2).join("")}
+                  </span>
+                  <span className="text-sm text-foreground flex-1 truncate">{wsl.name}</span>
+                  {wsl.slug === slug && <Check className="w-3.5 h-3.5 text-[#FFD60A]" />}
+                </Link>
+              );
+              const heading = (t: string, n: number) => (
+                <div className="flex items-center gap-2 px-3 pt-2.5 pb-1">
+                  <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70 font-semibold">{t}</span>
+                  <span className="text-[10px] text-muted-foreground/50 tabular-nums">{n}</span>
+                </div>
+              );
+              return (
+                <div className="max-h-[70vh] overflow-y-auto">
+                  {clients.length > 0 && heading("Clients", clients.length)}
+                  {clients.map(row)}
+                  {magnets.length > 0 && (
+                    <div className="border-t border-border mt-1">
+                      {heading("Demo accounts", magnets.length)}
+                      {magnets.map(row)}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </>
       )}

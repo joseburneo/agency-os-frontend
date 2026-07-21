@@ -20,6 +20,9 @@ export type ModuleKey =
   | "roadmap";
 
 export interface Workspace {
+  // 'client' pays us; 'magnet' is sales material built for one prospect. They
+  // live in the same table but must never be browsed in the same list.
+  kind?: "client" | "magnet";
   slug: string;
   name: string;
   owner: string; // primary client contact

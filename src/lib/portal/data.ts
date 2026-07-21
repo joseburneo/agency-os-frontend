@@ -43,6 +43,7 @@ export function maskEmail(email: string | null | undefined): string {
 
 function workspaceFromRow(row: Record<string, unknown>, coldLeads: number): Workspace {
   return {
+    kind: (row.kind as string) === "magnet" ? "magnet" : "client",
     slug: String(row.slug),
     name: String(row.name ?? row.slug),
     owner: String(row.owner_name ?? ""),
@@ -477,9 +478,6 @@ export async function loadWorkspaces(): Promise<Workspace[] | null> {
   const { data: rows } = await sb
     .from("workspaces")
     .select("*")
-    // Magnets are sales material, not clients. Fifty of them would drown the two
-    // workspaces that matter here.
-    .neq("kind", "magnet")
     .order("is_agency", { ascending: false })
     .order("name", { ascending: true });
   if (!rows) return null;

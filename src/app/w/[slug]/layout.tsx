@@ -24,7 +24,7 @@ export default async function WorkspaceLayout({
   const kind = await loadWorkspaceKind(slug);
   const demo = mode === "demo";
   // In demo the prospect can't hop to other workspaces; the switcher is hidden.
-  const workspaces = demo ? [] : all.map((w) => ({ slug: w.slug, name: w.name, accent: w.accent }));
+  const workspaces = demo ? [] : all.map((w) => ({ slug: w.slug, name: w.name, accent: w.accent, kind: w.kind ?? "client" }));
   // The sidebar lists each target list as its own menu item (4 tiny rows).
   const lists = await loadListsMeta(slug);
 
