@@ -1213,7 +1213,40 @@ function IntelPanel({ d }: { d: Detail }) {
   const facts = FACT_ROWS.map(([k, l]) => [l, factStr(f[k])] as [string, string]).filter(([, v]) => v);
   const research = RESEARCH_ROWS.map(([k, l]) => [l, (d.research?.[k as keyof typeof d.research] || "")] as [string, string]).filter(([, v]) => v);
   const ffCount = research.length;
-  if (!facts.length && !ffCount && !d.call_notes) return null;
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+
+  // Empty used to render nothing at all, so half the card was blank with no clue
+  // why. The dossier is only built automatically when a reply arrives, and that
+  // path is off, so every prospect who replied before it existed had an empty
+  // panel and no way to fill it. Now the panel says so and offers the button.
+  if (!facts.length && !ffCount && !d.call_notes) {
+    return (
+      <div className="rounded-xl border border-border bg-card p-4 space-y-2">
+        <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+          <Bot className="w-4 h-4" /> Intelligence
+        </div>
+        <p className="text-[12px] text-muted-foreground leading-relaxed">
+          No research on this prospect yet. It reads their site, their LinkedIn and
+          the thread, then distils why they fit and what to lead with.
+        </p>
+        <button
+          onClick={() => {
+            setBusy(true); setNote(null);
+            fetch(`${API}/api/crm/prospect/${d.id}/research`, { method: "POST" })
+              .then((r) => { if (!r.ok) throw new Error(); setNote("Researching. It lands on the card in a couple of minutes."); })
+              .catch(() => setNote("Could not start it."))
+              .finally(() => setBusy(false));
+          }}
+          disabled={busy}
+          className="inline-flex items-center gap-2 rounded-lg border border-[#FFD60A]/40 bg-[#FFD60A]/10 px-3 py-2 text-[12.5px] text-[#FFD60A] hover:bg-[#FFD60A]/15 disabled:opacity-40 transition-colors"
+        >
+          {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Bot className="w-3.5 h-3.5" />} Research this prospect
+        </button>
+        {note && <div className="text-[11px] text-muted-foreground">{note}</div>}
+      </div>
+    );
+  }
   return (
     <div className="rounded-xl border border-[#FFD60A]/20 bg-card p-4 space-y-3">
       <div className="flex items-center gap-2 text-sm font-semibold text-[#FFD60A]">
@@ -1277,6 +1310,15 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
   const [tools, setTools] = useState(false);
   // Which pane the Build tools open on: fresh build vs refine-with-context.
   const [optimizeMode, setOptimizeMode] = useState(false);
+  // Their website, from the address we already have. A free-mail domain is the
+  // person's mailbox, not their company, so it links nowhere.
+  const siteUrl = (() => {
+    const dom = (d.email.split("@")[1] || "").toLowerCase();
+    const free = ["gmail.com","googlemail.com","outlook.com","hotmail.com","live.com",
+      "yahoo.com","yahoo.co.uk","icloud.com","me.com","aol.com","gmx.com",
+      "protonmail.com","proton.me","mail.com","yandex.com","zoho.com"];
+    return dom && !free.includes(dom) ? `https://${dom}` : "";
+  })();
   const [confirmBuild, setConfirmBuild] = useState(false);
   const [starting, setStarting] = useState(false);
   const [buildErr, setBuildErr] = useState<string | null>(null);
@@ -1373,6 +1415,51 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
         </div>
       </div>
 
+      {/* WHO THEY ARE — first, because it is what you check before doing anything
+          else on the card: the right person, the right company, and the three
+          handles you copy into a call, a CRM or a search. Reaching them lives
+          further down; this is for reading and copying. */}
+      <div>
+        <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70 font-semibold mb-2">Contact</div>
+        <div className="rounded-lg border border-border bg-card px-3 py-2.5 space-y-1.5">
+          <div className="text-[13.5px] font-semibold text-foreground leading-tight">{d.name || "—"}</div>
+          <div className="text-[12px] text-muted-foreground leading-snug">
+            {[d.job_title, d.company].filter(Boolean).join(" · ") || "—"}
+            {d.country ? <span className="text-muted-foreground/60"> · {d.country}</span> : null}
+          </div>
+          <div className="pt-1 space-y-1">
+            {d.email && (
+              <div className="flex items-center gap-1 text-[12px]">
+                <span className="truncate text-foreground/90" title={d.email}>{d.email}</span>
+                <span className="ml-auto shrink-0"><CopyBtn value={d.email} /></span>
+              </div>
+            )}
+            {d.phone && (
+              <div className="flex items-center gap-1 text-[12px]">
+                <span className="truncate text-foreground/90 tabular-nums">{d.phone}</span>
+                <span className="ml-auto shrink-0"><CopyBtn value={d.phone} /></span>
+              </div>
+            )}
+            {d.linkedin_url && (
+              <div className="flex items-center gap-1 text-[12px]">
+                <a href={d.linkedin_url} target="_blank" rel="noreferrer"
+                  className="truncate text-blue-300 hover:text-blue-200">LinkedIn profile</a>
+                <ExternalLink className="w-3 h-3 text-blue-300/70 shrink-0" />
+                <span className="ml-auto shrink-0"><CopyBtn value={d.linkedin_url} /></span>
+              </div>
+            )}
+            {siteUrl && (
+              <div className="flex items-center gap-1 text-[12px]">
+                <a href={siteUrl} target="_blank" rel="noreferrer"
+                  className="truncate text-blue-300 hover:text-blue-200">{siteUrl.replace(/^https?:\/\//, "")}</a>
+                <ExternalLink className="w-3 h-3 text-blue-300/70 shrink-0" />
+                <span className="ml-auto shrink-0"><CopyBtn value={siteUrl} /></span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
       <div>
         <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70 font-semibold mb-2">Deal</div>
         <dl className="space-y-2 text-[12.5px]">
@@ -1446,16 +1533,26 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
           replier deserves one. Optimize reopens the same build with extra context. */}
       <div>
         <div className="flex items-center gap-2 mb-2">
-          <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70 font-semibold">Build · the lead magnet</span>
+          <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70 font-semibold"><span className="text-[13px] mr-1 align-middle">🧲</span> Build · the lead magnet</span>
           {tools && (
             <button onClick={() => setTools(false)} className="ml-auto text-[11px] text-muted-foreground hover:text-[#FFD60A]">Hide</button>
           )}
         </div>
         {build ? (
-          <div className="flex items-center gap-2 text-[12px] mb-2">
-            <span style={{ color: build.c }}>● {build.t}</span>
-            {d.build_slug && <span className="text-muted-foreground/70 truncate">/{d.build_slug}</span>}
-            {d.build_url && <a href={d.build_url} target="_blank" rel="noreferrer" className="ml-auto text-[#FFD60A] hover:underline shrink-0">Open</a>}
+          <div className="mb-2 space-y-1.5">
+            <div className="flex items-center gap-2 text-[12px]">
+              <span style={{ color: build.c }}>● {build.t}</span>
+              {d.build_url && <a href={d.build_url} target="_blank" rel="noreferrer" className="ml-auto text-[#FFD60A] hover:underline shrink-0">Open</a>}
+            </div>
+            {/* The whole link, readable. It is what gets pasted into the reply, so
+                hiding it behind a truncated slug meant opening the Build to read
+                the address off the browser bar. */}
+            {d.build_url && (
+              <div className="flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1">
+                <span className="text-[11px] text-muted-foreground break-all leading-snug">{d.build_url}</span>
+                <span className="ml-auto shrink-0"><CopyBtn value={d.build_url} /></span>
+              </div>
+            )}
           </div>
         ) : (
           <div className="text-[12px] text-muted-foreground mb-2">No Build yet.</div>
