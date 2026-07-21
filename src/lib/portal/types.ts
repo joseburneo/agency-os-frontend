@@ -73,6 +73,7 @@ export interface Lead {
   phone?: string;
   whyNow?: string; // the dated signal that earned the VIP slot
   linkedinNote?: string; // prepared connection message, copy-to-clipboard
+  whatsappNote?: string; // prepared opener, prefilled into the wa.me link
   hrLeadName?: string;
   hrLeadTitle?: string;
 }

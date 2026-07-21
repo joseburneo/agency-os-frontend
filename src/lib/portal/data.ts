@@ -63,7 +63,7 @@ const LEAD_COLS =
 // Email 1 (previewed + sent from the table) and the VIP's prepared LinkedIn note.
 // Email 2/3 and linkedin2 are per-lead in the DB but nothing renders them yet;
 // they stay out so the table doesn't carry another megabyte for nothing.
-const LEAD_BODY_COLS = "email1_subject,email1_body,linkedin1";
+const LEAD_BODY_COLS = "email1_subject,email1_body,linkedin1,whatsapp1";
 
 // Target Lists module: the workspace, its 4 lists, and every lead.
 // Addresses are masked by default; pass unmask for the owning client (they paid for
@@ -154,6 +154,9 @@ export const loadTargetLists = cache(async function loadTargetLists(
       phone: opts.unmask ? (r.phone as string | null) || undefined : undefined,
       whyNow: (r.why_now as string | null) || undefined,
       linkedinNote: (r.linkedin1 as string | null) || undefined,
+      // Prefilled into wa.me on click. Masked with the phone: without a number
+      // the opener is useless, and a demo prospect gets neither.
+      whatsappNote: opts.unmask ? (r.whatsapp1 as string | null) || undefined : undefined,
       hrLeadName: (r.hr_lead_name as string | null) || undefined,
       hrLeadTitle: (r.hr_lead_title as string | null) || undefined,
     };
