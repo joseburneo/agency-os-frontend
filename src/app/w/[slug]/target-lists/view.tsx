@@ -44,10 +44,22 @@ function truncate(s: string, n = 120) {
 // Built here, in the browser, on click — never server-side. A precomputed mailto href
 // carries the whole body percent-encoded, so a 1,113-lead list would ship every email
 // twice. `canSend` needs a real address plus a drafted body.
+//
+// Hand the mailto to the OS via a synthetic anchor click, NOT window.location.href.
+// location.href unloads the workspace: the mail client opens but the tab navigates
+// away from the list, so after each VIP you had to reopen the page and find your place
+// (Paul, 2026-07-21). A `target="_blank"` anchor click hands off to the mail app and
+// leaves the workspace exactly where it was.
 function openMailto(l: Lead) {
   if (!l.canSend) return;
   const q = `subject=${encodeURIComponent(l.emailSubject ?? "")}&body=${encodeURIComponent(l.emailBody ?? "")}`;
-  window.location.href = `mailto:${l.emailDisplay}?${q}`;
+  const a = document.createElement("a");
+  a.href = `mailto:${l.emailDisplay}?${q}`;
+  a.target = "_blank";
+  a.rel = "noopener";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
 }
 
 // Same rule as data.ts listKey — kept inline so this client bundle never pulls in
