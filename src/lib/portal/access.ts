@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
+import { loadWorkspaceKind } from "./data";
 import { AGENCY_COOKIE, wsCookie, demoCookie, scopeToken, demoToken } from "./gate";
 import { isModuleVisible } from "./modules";
 import type { ModuleKey } from "./types";
@@ -29,8 +30,8 @@ export async function portalMode(slug: string): Promise<PortalMode> {
 // Guard a module page: 404 if this visitor's mode can't see it. A demo prospect
 // hitting /w/<slug>/library (or any non-demo module) by URL gets notFound().
 export async function assertModuleVisible(slug: string, key: ModuleKey): Promise<void> {
-  const mode = await portalMode(slug);
-  if (!isModuleVisible(slug, key, mode === "demo")) notFound();
+  const [mode, kind] = await Promise.all([portalMode(slug), loadWorkspaceKind(slug)]);
+  if (!isModuleVisible(slug, key, mode === "demo", kind)) notFound();
 }
 
 // True only for the agency session (Jose / the team). Used to gate the internal

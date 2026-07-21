@@ -461,6 +461,15 @@ export async function loadPortal(
 // / pipeline figures come from the CRM loader once that module is wired to a
 // live source, so they read 0 today rather than mock numbers. Returns null when
 // the DB is absent so the agency page falls back to the mock roster.
+// 'client' | 'magnet'. Cached per request: the sidebar, the layout and every
+// module guard ask for it while rendering one page.
+export const loadWorkspaceKind = cache(async function loadWorkspaceKind(slug: string): Promise<string> {
+  const sb = db();
+  if (!sb) return "client";
+  const { data } = await sb.from("workspaces").select("kind").eq("slug", slug).maybeSingle();
+  return (data?.kind as string) || "client";
+});
+
 export async function loadWorkspaces(): Promise<Workspace[] | null> {
   const sb = db();
   if (!sb) return null;
@@ -468,6 +477,9 @@ export async function loadWorkspaces(): Promise<Workspace[] | null> {
   const { data: rows } = await sb
     .from("workspaces")
     .select("*")
+    // Magnets are sales material, not clients. Fifty of them would drown the two
+    // workspaces that matter here.
+    .neq("kind", "magnet")
     .order("is_agency", { ascending: false })
     .order("name", { ascending: true });
   if (!rows) return null;

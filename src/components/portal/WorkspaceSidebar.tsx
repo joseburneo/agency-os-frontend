@@ -109,12 +109,12 @@ function Tip({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function WorkspaceSidebar({ slug, ws, workspaces, lists = [], demo = false, mode = "client" }: { slug: string; ws: Workspace | null; workspaces: WsLite[]; lists?: ListLite[]; demo?: boolean; mode?: "agency" | "client" | "demo" }) {
+export function WorkspaceSidebar({ slug, ws, workspaces, lists = [], demo = false, mode = "client", kind = "client" }: { slug: string; ws: Workspace | null; workspaces: WsLite[]; lists?: ListLite[]; demo?: boolean; mode?: "agency" | "client" | "demo"; kind?: string }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const currentList = searchParams.get("list");
   const w = ws;
-  const nav = buildNav(w, new Set(visibleModules(slug, demo)), slug, lists);
+  const nav = buildNav(w, new Set(visibleModules(slug, demo, kind)), slug, lists);
   const [open, setOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
