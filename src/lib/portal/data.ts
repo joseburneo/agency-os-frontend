@@ -20,8 +20,12 @@ const JOURNEY_SEED: Record<string, JourneyItem[]> = {
 };
 
 // Workspace-scoped reads from Supabase. Every function returns null when the DB
-// client is absent (no service key) so callers fall back to mock data. Emails
-// are masked HERE (server side) — the raw address never reaches the client UI.
+// client is absent (no service key) so callers fall back to mock data.
+//
+// Addresses are NOT masked any more, for anyone. The 50 real verified emails are
+// the whole value of a magnet, and a masked list demos nothing. maskEmail below
+// is kept for a caller that opts in, but no page does today. What a demo
+// prospect cannot do is export the file — that gate lives in the target-lists page.
 
 const CHANNELS: OutreachChannel[] = ["email", "linkedin", "whatsapp", "call", "ads"];
 function toChannels(v: unknown): OutreachChannel[] {

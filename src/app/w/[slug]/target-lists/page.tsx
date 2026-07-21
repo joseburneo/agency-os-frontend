@@ -10,18 +10,21 @@ export default async function TargetListsPage({ params }: { params: Promise<{ sl
   const mode = await portalMode(slug);
 
   // Prefer live Supabase (service key present); fall back to mock otherwise.
-  // The owning client and the agency read the real addresses; a demo prospect never does.
-  const live = await loadTargetLists(slug, { unmask: mode !== "demo" });
+  // Everyone reads the real addresses, including a magnet prospect on a demo link:
+  // the list IS the lead magnet, and a masked list demos nothing. What a demo
+  // prospect cannot do is walk off with the file — see canExport below.
+  const live = await loadTargetLists(slug, { unmask: true });
+  const canExport = mode !== "demo";
   if (live) {
     const base = getWorkspaceData(slug); // other modules' mock slices, unused here
     const data = { ...(base ?? EMPTY_DATA), lists: live.lists, leads: live.leads };
-    return <TargetListsView ws={live.ws} data={data} />;
+    return <TargetListsView ws={live.ws} data={data} canExport={canExport} />;
   }
 
   const ws = getWorkspace(slug);
   const data = getWorkspaceData(slug);
   if (!ws || !data) notFound();
-  return <TargetListsView ws={ws} data={data} />;
+  return <TargetListsView ws={ws} data={data} canExport={canExport} />;
 }
 
 const EMPTY_DATA = {

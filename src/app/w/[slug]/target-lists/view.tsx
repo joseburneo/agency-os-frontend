@@ -43,7 +43,7 @@ function truncate(s: string, n = 120) {
 
 // Built here, in the browser, on click — never server-side. A precomputed mailto href
 // carries the whole body percent-encoded, so a 1,113-lead list would ship every email
-// twice. `canSend` is only true for the owner, whose emailDisplay is the real address.
+// twice. `canSend` needs a real address plus a drafted body.
 function openMailto(l: Lead) {
   if (!l.canSend) return;
   const q = `subject=${encodeURIComponent(l.emailSubject ?? "")}&body=${encodeURIComponent(l.emailBody ?? "")}`;
@@ -54,7 +54,18 @@ function openMailto(l: Lead) {
 // the server-only data module. Maps "List 2 · Has senior HR" -> "list-2-has-senior-hr".
 const listKey = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
-export function TargetListsView({ ws, data }: { ws: Workspace; data: WorkspaceData }) {
+export function TargetListsView({
+  ws,
+  data,
+  canExport = true,
+}: {
+  ws: Workspace;
+  data: WorkspaceData;
+  // A magnet prospect (demo link) sees every real address and can send from the
+  // workspace, but cannot download the list as a file. Seeing the value is the
+  // magnet; taking the file home would be the whole product.
+  canExport?: boolean;
+}) {
   const searchParams = useSearchParams();
   // The sidebar deep-links each list via ?list=<key>; resolve it to a tab id.
   const listIdFromParam = (key: string | null) =>
@@ -117,9 +128,10 @@ export function TargetListsView({ ws, data }: { ws: Workspace; data: WorkspaceDa
   };
 
   // Client-side CSV of the rows currently on screen (active list + search filter),
-  // with the columns the table shows. emailDisplay is the real address for the
-  // owning client and stays masked for a demo prospect — the masking rule holds.
+  // with the columns the table shows. Addresses are real for everyone now, so the
+  // export itself is the thing we withhold from a demo prospect.
   const downloadCsv = () => {
+    if (!canExport) return;
     const csvEsc = (v: string) => `"${v.replace(/"/g, '""')}"`;
     const header = isVip
       ? ["Company", "Leader", "Role", "Why VIP", "Email", "LinkedIn", "LinkedIn note", "Phone"]
@@ -160,13 +172,15 @@ export function TargetListsView({ ws, data }: { ws: Workspace; data: WorkspaceDa
           </span>
         }
         actions={
-          <button
-            onClick={downloadCsv}
-            title={`Download the ${leads.length} leads currently shown (CSV, opens in Excel)`}
-            className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-[13px] text-foreground hover:border-white/20 transition-colors"
-          >
-            <Download className="w-4 h-4" /> Download Excel
-          </button>
+          canExport ? (
+            <button
+              onClick={downloadCsv}
+              title={`Download the ${leads.length} leads currently shown (CSV, opens in Excel)`}
+              className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-[13px] text-foreground hover:border-white/20 transition-colors"
+            >
+              <Download className="w-4 h-4" /> Download Excel
+            </button>
+          ) : null
         }
       />
 
@@ -378,7 +392,12 @@ export function TargetListsView({ ws, data }: { ws: Workspace; data: WorkspaceDa
                       {l.phone ? (
                         <div className="flex items-center gap-1.5 whitespace-nowrap">
                           <a
-                            href={`https://wa.me/${l.phone.replace(/\D/g, "")}`}
+                            href={
+                              `https://wa.me/${l.phone.replace(/\D/g, "")}` +
+                              // Prefill the prepared opener when we have one, so the
+                              // chat opens written rather than blank.
+                              (l.whatsappNote ? `?text=${encodeURIComponent(l.whatsappNote)}` : "")
+                            }
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1.5 rounded-md border border-[#26D07C]/25 bg-[#26D07C]/10 px-2.5 py-1.5 text-[12px] font-medium text-[#26D07C] hover:bg-[#26D07C]/15 transition-colors"
