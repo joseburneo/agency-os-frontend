@@ -998,7 +998,11 @@ function BuildCard({ d, onChanged, autoOptimize = false }: { d: Detail; onChange
           <div className="text-[11px] text-muted-foreground break-all">{d.build_url}</div>
           {optimize && (
             <div className="space-y-2 border-t border-border pt-3">
-              <div className="text-xs text-muted-foreground">Rebuild keeps the conversation context. Add anything you want changed.</div>
+              <div className="text-xs text-muted-foreground">
+                Rebuild keeps the conversation context. Add anything you want changed,
+                then press the button below. Sourcing and copy take about a minute, and
+                the result replaces what is there now.
+              </div>
               <textarea value={instr} onChange={(e) => setInstr(e.target.value)} rows={3}
                 placeholder="e.g. focus on Series A fintech in the UK, drop agencies…"
                 className="w-full bg-background border border-border rounded-lg p-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-[#FFD60A]/50 resize-y" />
@@ -1273,6 +1277,47 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
   const [tools, setTools] = useState(false);
   // Which pane the Build tools open on: fresh build vs refine-with-context.
   const [optimizeMode, setOptimizeMode] = useState(false);
+  const [confirmBuild, setConfirmBuild] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [buildErr, setBuildErr] = useState<string | null>(null);
+  const building = starting || d.build_status === "building";
+
+  // Fire the build from the rail, then watch for the link to change. Polling
+  // lives here rather than in the panel below so the rail keeps showing progress
+  // whether or not that panel is open.
+  const startBuild = () => {
+    setConfirmBuild(false);
+    setStarting(true);
+    setBuildErr(null);
+    const before = d.build_url;
+    fetch(`${API}/api/crm/prospect/${d.id}/build`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ instructions: "", force: true }),
+    })
+      .then((r) => {
+        if (!r.ok) throw new Error();
+        const timer = setInterval(async () => {
+          const j = await loadDetail(d.id, true);
+          if (!j) return;
+          if (j.build_url !== before || j.build_status === "error") {
+            clearInterval(timer);
+            setStarting(false);
+            if (j.build_status === "error") {
+              setBuildErr("The build failed. Check the Render logs, then try again.");
+            }
+            both();
+          }
+        }, 8000);
+        // A build that has not landed in five minutes is not coming back on its
+        // own; stop pretending it is still running.
+        setTimeout(() => { clearInterval(timer); setStarting(false); }, 300000);
+      })
+      .catch(() => {
+        setStarting(false);
+        setBuildErr("Could not start it. Try again.");
+      });
+  };
   const [fuOpen, setFuOpen] = useState(false);
   const [fuChan, setFuChan] = useState(d.next?.next_channel || "email");
   const [fuDate, setFuDate] = useState(d.next?.next_touch_at ? d.next.next_touch_at.slice(0, 10) : "");
@@ -1414,18 +1459,41 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
         ) : (
           <div className="text-[12px] text-muted-foreground mb-2">No Build yet.</div>
         )}
-        <div className="flex items-center gap-1.5">
-          <button onClick={() => { setOptimizeMode(false); setTools(true); }}
-            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#FFD60A] px-3 py-2 text-[12.5px] font-semibold text-[#0A0E1A] hover:bg-[#ffdf3a] transition-colors">
-            <Sparkles className="w-3.5 h-3.5" /> {d.build_url ? "Rebuild" : "Create the Build"}
-          </button>
-          {d.build_url && (
-            <button onClick={() => { setOptimizeMode(true); setTools(true); }}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-[12.5px] text-foreground hover:border-[#FFD60A]/40 transition-colors">
-              <Sparkles className="w-3.5 h-3.5" /> Optimize
+        {/* Every click changes something HERE, under the cursor. The previous
+            version only expanded a panel further down the rail, so from where you
+            clicked nothing moved and the button read as dead. It still takes two
+            clicks, because a build spends money and replaces what is there, but the
+            first click turns into the confirmation instead of scrolling you away. */}
+        {building ? (
+          <div className="flex items-center gap-2 rounded-lg border border-[#FFD60A]/30 bg-[#FFD60A]/[0.06] px-3 py-2 text-[12.5px] text-[#FFD60A]">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            Building… sourcing the list and writing the copy, about a minute.
+          </div>
+        ) : confirmBuild ? (
+          <div className="flex items-center gap-1.5">
+            <button onClick={startBuild}
+              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#26D07C] px-3 py-2 text-[12.5px] font-semibold text-[#0A0E1A] hover:bg-[#3ad98c] transition-colors">
+              <Sparkles className="w-3.5 h-3.5" /> {d.build_url ? "Yes, rebuild it" : "Yes, build it"}
             </button>
-          )}
-        </div>
+            <button onClick={() => setConfirmBuild(false)}
+              className="rounded-lg border border-border px-3 py-2 text-[12.5px] text-muted-foreground hover:text-foreground transition-colors">
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5">
+            <button onClick={() => setConfirmBuild(true)}
+              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#FFD60A] px-3 py-2 text-[12.5px] font-semibold text-[#0A0E1A] hover:bg-[#ffdf3a] transition-colors">
+              <Sparkles className="w-3.5 h-3.5" /> {d.build_url ? "Rebuild it" : "Create the Build"}
+            </button>
+            <button onClick={() => { setOptimizeMode(true); setTools(true); }}
+              title="Say what to change before rebuilding"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-[12.5px] text-foreground hover:border-[#FFD60A]/40 transition-colors">
+              Optimize
+            </button>
+          </div>
+        )}
+        {buildErr && <div className="mt-1.5 text-[11px] text-[#ef4444]">{buildErr}</div>}
         {tools && <div className="mt-3"><BuildCard d={d} onChanged={both} autoOptimize={optimizeMode} /></div>}
       </div>
 
