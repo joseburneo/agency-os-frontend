@@ -57,6 +57,7 @@ export interface Lead {
   emailDisplay: string; // the owning client sees the real address; a demo prospect sees it masked
   linkedin: boolean;
   linkedinUrl?: string; // real profile URL (owner view) for the "View" link
+  linkedinCompany?: string; // the company's LinkedIn page
   hasEmail: boolean;
   hasDraft: boolean;
   // Draft/Preview payload — present in the owner (client) view so Paul can read
