@@ -1000,8 +1000,8 @@ function BuildCard({ d, onChanged, autoOptimize = false }: { d: Detail; onChange
             <div className="space-y-2 border-t border-border pt-3">
               <div className="text-xs text-muted-foreground">
                 Rebuild keeps the conversation context. Add anything you want changed,
-                then press the button below. Sourcing and copy take about a minute, and
-                the result replaces what is there now.
+                then press the button below. It takes two to four minutes, and the result
+                replaces what is there now.
               </div>
               <textarea value={instr} onChange={(e) => setInstr(e.target.value)} rows={3}
                 placeholder="e.g. focus on Series A fintech in the UK, drop agencies…"
@@ -1309,9 +1309,10 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
             both();
           }
         }, 8000);
-        // A build that has not landed in five minutes is not coming back on its
-        // own; stop pretending it is still running.
-        setTimeout(() => { clearInterval(timer); setStarting(false); }, 300000);
+        // Measured: a real build is two to four minutes (research, a Clay search
+        // the agent may retry, a fit pass and fifty pieces of copy). Ten minutes
+        // is the point where it is genuinely not coming back.
+        setTimeout(() => { clearInterval(timer); setStarting(false); }, 600000);
       })
       .catch(() => {
         setStarting(false);
@@ -1467,7 +1468,7 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
         {building ? (
           <div className="flex items-center gap-2 rounded-lg border border-[#FFD60A]/30 bg-[#FFD60A]/[0.06] px-3 py-2 text-[12.5px] text-[#FFD60A]">
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            Building… sourcing the list and writing the copy, about a minute.
+            Building… researching, sourcing in Clay and writing the copy. Two to four minutes.
           </div>
         ) : confirmBuild ? (
           <div className="flex items-center gap-1.5">
