@@ -53,14 +53,30 @@ function truncate(s: string, n = 120) {
 // A new tab leaves the list exactly where it was.
 //
 // Body is PLAIN TEXT: Gmail's compose URL does not render HTML, and Paul's copy is
-// plain text anyway (signature in-copy). Gmail opens in the account he is signed into.
+// plain text anyway. Gmail opens in the account he is signed into.
+//
+// Strip the in-copy signature for the Gmail compose. Gmail auto-appends Paul's own
+// signature (name, title, contact, logo), so leaving ours in the body gives a double
+// signature with "Kind regards" stuck to his real one (Paul, 2026-07-21). We keep the
+// sign-off line and let Gmail's signature close the email. The P.S. moves ABOVE the
+// sign-off so it doesn't dangle under the signature. The automated Instantly emails are
+// untouched — the burner inboxes have no signature, so they keep the in-copy one.
+function composeBodyForGmail(full: string): string {
+  const SIGNOFF = "Kind regards,";
+  const i = full.indexOf(SIGNOFF);
+  if (i === -1) return full; // unknown shape: send as-is
+  const before = full.slice(0, i).replace(/\s+$/, "");
+  const ps = full.slice(i).match(/\n\n(P\.S\.[\s\S]*?)\s*$/);
+  return `${before}${ps ? `\n\n${ps[1].trim()}` : ""}\n\n${SIGNOFF}`;
+}
+
 function openCompose(l: Lead) {
   if (!l.canSend) return;
   const url =
     "https://mail.google.com/mail/?view=cm&fs=1" +
     `&to=${encodeURIComponent(l.emailDisplay)}` +
     `&su=${encodeURIComponent(l.emailSubject ?? "")}` +
-    `&body=${encodeURIComponent(l.emailBody ?? "")}`;
+    `&body=${encodeURIComponent(composeBodyForGmail(l.emailBody ?? ""))}`;
   window.open(url, "_blank", "noopener,noreferrer");
 }
 
