@@ -998,7 +998,11 @@ function BuildCard({ d, onChanged, autoOptimize = false }: { d: Detail; onChange
           <div className="text-[11px] text-muted-foreground break-all">{d.build_url}</div>
           {optimize && (
             <div className="space-y-2 border-t border-border pt-3">
-              <div className="text-xs text-muted-foreground">Rebuild keeps the conversation context. Add anything you want changed.</div>
+              <div className="text-xs text-muted-foreground">
+                Rebuild keeps the conversation context. Add anything you want changed,
+                then press the button below. Sourcing and copy take about a minute, and
+                the result replaces what is there now.
+              </div>
               <textarea value={instr} onChange={(e) => setInstr(e.target.value)} rows={3}
                 placeholder="e.g. focus on Series A fintech in the UK, drop agencies…"
                 className="w-full bg-background border border-border rounded-lg p-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-[#FFD60A]/50 resize-y" />
@@ -1354,16 +1358,20 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
         ) : (
           <div className="text-[12px] text-muted-foreground mb-2">No Build yet.</div>
         )}
+        {/* Both buttons open the panel below, where the actual build runs. They do
+            NOT fire a build on click: sourcing and copy cost money and take about a
+            minute, so the last click belongs next to the context box, not here.
+            Rebuild opens straight onto that box so the action is one click away. */}
         <div className="flex items-center gap-1.5">
-          <button onClick={() => { setOptimizeMode(false); setTools(true); }}
+          <button onClick={() => { setOptimizeMode(Boolean(d.build_url)); setTools(true); }}
             className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#FFD60A] px-3 py-2 text-[12.5px] font-semibold text-[#0A0E1A] hover:bg-[#ffdf3a] transition-colors">
-            <Sparkles className="w-3.5 h-3.5" /> {d.build_url ? "Rebuild" : "Create the Build"}
+            <Sparkles className="w-3.5 h-3.5" /> {d.build_url ? "Rebuild it" : "Create the Build"}
           </button>
           {d.build_url && (
-            <button onClick={() => { setOptimizeMode(true); setTools(true); }}
+            <a href={d.build_url} target="_blank" rel="noreferrer"
               className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-[12.5px] text-foreground hover:border-[#FFD60A]/40 transition-colors">
-              <Sparkles className="w-3.5 h-3.5" /> Optimize
-            </button>
+              Open <ExternalLink className="w-3.5 h-3.5" />
+            </a>
           )}
         </div>
         {tools && <div className="mt-3"><BuildCard d={d} onChanged={both} autoOptimize={optimizeMode} /></div>}
