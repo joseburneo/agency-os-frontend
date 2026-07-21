@@ -919,13 +919,15 @@ function Composer({ c }: { c: ComposerCtl }) {
 }
 
 // ── build card: the Build IS the lead magnet ─────────────────────────
-function BuildCard({ d, onChanged }: { d: Detail; onChanged: () => void }) {
+function BuildCard({ d, onChanged, autoOptimize = false }: { d: Detail; onChanged: () => void; autoOptimize?: boolean }) {
   const id = d.id;
   const [building, setBuilding] = useState(d.build_status === "building");
   const [err, setErr] = useState<string | null>(null);
   const [instr, setInstr] = useState("");        // optional extra context for the Build
   const [showInstr, setShowInstr] = useState(false);
-  const [optimize, setOptimize] = useState(false);
+  // Opened straight from the sidebar's Optimize button, so the refine box is
+  // already waiting instead of costing another click.
+  const [optimize, setOptimize] = useState(autoOptimize);
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
 
@@ -1269,6 +1271,8 @@ function Row({ k, v }: { k: string; v: ReactNode }) {
 // collapsible so the rail stays clean by default.
 function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f?: boolean) => void }) {
   const [tools, setTools] = useState(false);
+  // Which pane the Build tools open on: fresh build vs refine-with-context.
+  const [optimizeMode, setOptimizeMode] = useState(false);
   const [fuOpen, setFuOpen] = useState(false);
   const [fuChan, setFuChan] = useState(d.next?.next_channel || "email");
   const [fuDate, setFuDate] = useState(d.next?.next_touch_at ? d.next.next_touch_at.slice(0, 10) : "");
@@ -1390,6 +1394,41 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
         )}
       </div>
 
+      {/* BUILD — the lead magnet. Sits high in the card because deciding who gets
+          one is a first-class call Jose makes per prospect, not an afterthought.
+          Creation is deliberately MANUAL: a magnet costs real money and not every
+          replier deserves one. Optimize reopens the same build with extra context. */}
+      <div>
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70 font-semibold">Build · the lead magnet</span>
+          {tools && (
+            <button onClick={() => setTools(false)} className="ml-auto text-[11px] text-muted-foreground hover:text-[#FFD60A]">Hide</button>
+          )}
+        </div>
+        {build ? (
+          <div className="flex items-center gap-2 text-[12px] mb-2">
+            <span style={{ color: build.c }}>● {build.t}</span>
+            {d.build_slug && <span className="text-muted-foreground/70 truncate">/{d.build_slug}</span>}
+            {d.build_url && <a href={d.build_url} target="_blank" rel="noreferrer" className="ml-auto text-[#FFD60A] hover:underline shrink-0">Open</a>}
+          </div>
+        ) : (
+          <div className="text-[12px] text-muted-foreground mb-2">No Build yet.</div>
+        )}
+        <div className="flex items-center gap-1.5">
+          <button onClick={() => { setOptimizeMode(false); setTools(true); }}
+            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#FFD60A] px-3 py-2 text-[12.5px] font-semibold text-[#0A0E1A] hover:bg-[#ffdf3a] transition-colors">
+            <Sparkles className="w-3.5 h-3.5" /> {d.build_url ? "Rebuild" : "Create the Build"}
+          </button>
+          {d.build_url && (
+            <button onClick={() => { setOptimizeMode(true); setTools(true); }}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-[12.5px] text-foreground hover:border-[#FFD60A]/40 transition-colors">
+              <Sparkles className="w-3.5 h-3.5" /> Optimize
+            </button>
+          )}
+        </div>
+        {tools && <div className="mt-3"><BuildCard d={d} onChanged={both} autoOptimize={optimizeMode} /></div>}
+      </div>
+
       {/* NOTES — call outcomes / next-step context that must survive a re-open */}
       <div>
         <div className="flex items-center gap-2 mb-2">
@@ -1414,26 +1453,6 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
       <div>
         <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70 font-semibold mb-2">Reach them</div>
         <ContactActions d={d} onChanged={() => reload(true)} />
-      </div>
-
-      {/* BUILD — compact status + open; generate/optimize behind a toggle */}
-      <div>
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70 font-semibold">Build</span>
-          <button onClick={() => setTools((v) => !v)} className="ml-auto text-[11px] text-muted-foreground hover:text-[#FFD60A]">
-            {tools ? "Hide" : d.build_url ? "Manage" : "Generate"}
-          </button>
-        </div>
-        {build ? (
-          <div className="flex items-center gap-2 text-[12px]">
-            <span style={{ color: build.c }}>● {build.t}</span>
-            {d.build_slug && <span className="text-muted-foreground/70 truncate">/{d.build_slug}</span>}
-            {d.build_url && <a href={d.build_url} target="_blank" rel="noreferrer" className="ml-auto text-[#FFD60A] hover:underline shrink-0">Open</a>}
-          </div>
-        ) : (
-          <div className="text-[12px] text-muted-foreground">No Build yet.</div>
-        )}
-        {tools && <div className="mt-3"><BuildCard d={d} onChanged={both} /></div>}
       </div>
 
       {/* QUICK ACTIONS */}

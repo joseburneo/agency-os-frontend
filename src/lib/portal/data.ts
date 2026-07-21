@@ -20,8 +20,12 @@ const JOURNEY_SEED: Record<string, JourneyItem[]> = {
 };
 
 // Workspace-scoped reads from Supabase. Every function returns null when the DB
-// client is absent (no service key) so callers fall back to mock data. Emails
-// are masked HERE (server side) — the raw address never reaches the client UI.
+// client is absent (no service key) so callers fall back to mock data.
+//
+// Addresses are NOT masked any more, for anyone. The 50 real verified emails are
+// the whole value of a magnet, and a masked list demos nothing. maskEmail below
+// is kept for a caller that opts in, but no page does today. What a demo
+// prospect cannot do is export the file — that gate lives in the target-lists page.
 
 const CHANNELS: OutreachChannel[] = ["email", "linkedin", "whatsapp", "call", "ads"];
 function toChannels(v: unknown): OutreachChannel[] {
@@ -63,7 +67,7 @@ const LEAD_COLS =
 // Email 1 (previewed + sent from the table) and the VIP's prepared LinkedIn note.
 // Email 2/3 and linkedin2 are per-lead in the DB but nothing renders them yet;
 // they stay out so the table doesn't carry another megabyte for nothing.
-const LEAD_BODY_COLS = "email1_subject,email1_body,linkedin1";
+const LEAD_BODY_COLS = "email1_subject,email1_body,linkedin1,whatsapp1";
 
 // Target Lists module: the workspace, its 4 lists, and every lead.
 // Addresses are masked by default; pass unmask for the owning client (they paid for
@@ -154,6 +158,9 @@ export const loadTargetLists = cache(async function loadTargetLists(
       phone: opts.unmask ? (r.phone as string | null) || undefined : undefined,
       whyNow: (r.why_now as string | null) || undefined,
       linkedinNote: (r.linkedin1 as string | null) || undefined,
+      // Prefilled into wa.me on click. Masked with the phone: without a number
+      // the opener is useless, and a demo prospect gets neither.
+      whatsappNote: opts.unmask ? (r.whatsapp1 as string | null) || undefined : undefined,
       hrLeadName: (r.hr_lead_name as string | null) || undefined,
       hrLeadTitle: (r.hr_lead_title as string | null) || undefined,
     };
