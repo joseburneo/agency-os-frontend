@@ -57,12 +57,12 @@ function truncate(s: string, n = 120) {
 //
 // Strip the in-copy signature for the Gmail compose. Gmail auto-appends Paul's own
 // signature (name, title, contact, logo), so leaving ours in the body gives a double
-// signature with "Kind regards" stuck to his real one (Paul, 2026-07-21). We keep the
+// signature with the sign-off stuck to his real one (Paul, 2026-07-21). We keep the
 // sign-off line and let Gmail's signature close the email. The P.S. moves ABOVE the
 // sign-off so it doesn't dangle under the signature. The automated Instantly emails are
 // untouched — the burner inboxes have no signature, so they keep the in-copy one.
 function composeBodyForGmail(full: string): string {
-  const SIGNOFF = "Kind regards,";
+  const SIGNOFF = "Thanks,";
   const i = full.indexOf(SIGNOFF);
   if (i === -1) return full; // unknown shape: send as-is
   const before = full.slice(0, i).replace(/\s+$/, "");
@@ -70,13 +70,23 @@ function composeBodyForGmail(full: string): string {
   return `${before}${ps ? `\n\n${ps[1].trim()}` : ""}\n\n${SIGNOFF}`;
 }
 
-function openCompose(l: Lead) {
+// The three touches share one thread. Email 1 carries the subject; the follow-ups
+// go out as "Re: <subject>" so they read as replies when Paul sends them by hand.
+function bodyForStep(l: Lead, step: number): string {
+  return step === 2 ? l.emailBody2 ?? "" : step === 3 ? l.emailBody3 ?? "" : l.emailBody ?? "";
+}
+function subjectForStep(l: Lead, step: number): string {
+  const s = l.emailSubject ?? "";
+  return step === 1 || !s ? s : `Re: ${s}`;
+}
+
+function openCompose(l: Lead, step = 1) {
   if (!l.canSend) return;
   const url =
     "https://mail.google.com/mail/?view=cm&fs=1" +
     `&to=${encodeURIComponent(l.emailDisplay)}` +
-    `&su=${encodeURIComponent(l.emailSubject ?? "")}` +
-    `&body=${encodeURIComponent(composeBodyForGmail(l.emailBody ?? ""))}`;
+    `&su=${encodeURIComponent(subjectForStep(l, step))}` +
+    `&body=${encodeURIComponent(composeBodyForGmail(bodyForStep(l, step)))}`;
   window.open(url, "_blank", "noopener,noreferrer");
 }
 
@@ -112,6 +122,12 @@ export function TargetListsView({
   }, [paramList]);
   const [q, setQ] = useState("");
   const [preview, setPreview] = useState<Lead | null>(null);
+  // Which touch the drawer is showing: 1 = Email 1, 2 = Email 2, 3 = Email 3.
+  const [previewStep, setPreviewStep] = useState(1);
+  const openPreview = (l: Lead) => {
+    setPreview(l);
+    setPreviewStep(1);
+  };
   // Which copy button just fired ("<kind>-<leadId>") — flashes "✓ Copied" for 1.5s,
   // exactly like the old portal's copyMsg().
   const [copied, setCopied] = useState<string | null>(null);
@@ -527,7 +543,7 @@ export function TargetListsView({
                       )}
                       {l.emailBody ? (
                         <button
-                          onClick={() => setPreview(l)}
+                          onClick={() => openPreview(l)}
                           className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1.5 text-[12px] font-medium text-foreground hover:border-white/20 transition-colors"
                         >
                           <Eye className="w-3.5 h-3.5" /> Preview
@@ -592,10 +608,35 @@ export function TargetListsView({
                   {preview.hasEmail ? preview.emailDisplay : "no email yet"}
                 </div>
               </div>
-              {preview.emailSubject && (
+              {/* One thread, three touches. Tabs switch the touch; Email 1 leads,
+                  the follow-ups only appear once they exist on the lead. */}
+              {(preview.emailBody2 || preview.emailBody3) && (
+                <div className="flex items-center gap-1.5">
+                  {[1, 2, 3].map((n) => {
+                    const has = n === 1 ? Boolean(preview.emailBody) : n === 2 ? Boolean(preview.emailBody2) : Boolean(preview.emailBody3);
+                    if (!has) return null;
+                    const active = previewStep === n;
+                    return (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setPreviewStep(n)}
+                        className={`rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors ${
+                          active
+                            ? "border border-[#FFD60A]/30 bg-[#FFD60A]/10 text-[#FFD60A]"
+                            : "border border-border bg-card text-muted-foreground hover:text-foreground hover:border-white/20"
+                        }`}
+                      >
+                        Email {n}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              {subjectForStep(preview, previewStep) && (
                 <div>
                   <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground mb-1">Subject</div>
-                  <div className="text-sm font-medium text-foreground">{preview.emailSubject}</div>
+                  <div className="text-sm font-medium text-foreground">{subjectForStep(preview, previewStep)}</div>
                 </div>
               )}
               <div>
@@ -606,22 +647,22 @@ export function TargetListsView({
                   </div>
                 </div>
                 <div className="rounded-lg border border-border bg-input p-4 text-[13px] leading-relaxed text-foreground whitespace-pre-wrap">
-                  {renderPersonalized(preview.emailBody ?? "", preview.name.split(" ")[0] ?? "", preview.company)}
+                  {renderPersonalized(bodyForStep(preview, previewStep), preview.name.split(" ")[0] ?? "", preview.company)}
                 </div>
               </div>
             </div>
 
             <div className="p-5 border-t border-border flex items-center justify-between gap-3">
               <span className="text-[11px] text-muted-foreground">
-                Email 1 · opens in your mail app, from you, signature and all.
+                Email {previewStep} · opens in your mail app, from you, signature and all.
               </span>
               {preview.canSend && (
                 <button
                   type="button"
-                  onClick={() => openCompose(preview)}
+                  onClick={() => openCompose(preview, previewStep)}
                   className="inline-flex items-center gap-2 rounded-lg border border-[#FFD60A]/30 bg-[#FFD60A]/10 px-4 py-2 text-[13px] font-semibold text-[#FFD60A] hover:bg-[#FFD60A]/15 transition-colors"
                 >
-                  <Send className="w-4 h-4" /> Send through my email
+                  <Send className="w-4 h-4" /> Send Email {previewStep}
                 </button>
               )}
             </div>

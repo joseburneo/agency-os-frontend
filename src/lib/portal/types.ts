@@ -68,6 +68,10 @@ export interface Lead {
   // recipient (the owner sends to their own leads).
   emailSubject?: string;
   emailBody?: string;
+  // Follow-ups (Email 2 / Email 3) in the same thread. Present for the owner so the
+  // Preview drawer shows all three touches and Paul can send any of them by hand.
+  emailBody2?: string;
+  emailBody3?: string;
   // True when this viewer may send: owner only, address + rendered body on file. The
   // mailto link is built in the browser from emailDisplay/emailSubject/emailBody —
   // never precomputed, or every body ships a second time percent-encoded.

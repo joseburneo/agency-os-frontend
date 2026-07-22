@@ -70,7 +70,7 @@ const LEAD_COLS =
 // Email 1 (previewed + sent from the table) and the VIP's prepared LinkedIn note.
 // Email 2/3 and linkedin2 are per-lead in the DB but nothing renders them yet;
 // they stay out so the table doesn't carry another megabyte for nothing.
-const LEAD_BODY_COLS = "email1_subject,email1_body,linkedin1,whatsapp1";
+const LEAD_BODY_COLS = "email1_subject,email1_body,email2_body,email3_body,linkedin1,whatsapp1";
 
 // Target Lists module: the workspace, its 4 lists, and every lead.
 // Addresses are masked by default; pass unmask for the owning client (they paid for
@@ -158,6 +158,8 @@ export const loadTargetLists = cache(async function loadTargetLists(
       hasDraft: Boolean(r.has_draft ?? body),
       emailSubject: subject || undefined,
       emailBody: body || undefined,
+      emailBody2: String(r.email2_body ?? "") || undefined,
+      emailBody3: String(r.email3_body ?? "") || undefined,
       canSend,
       // White-glove fields — the VIP tab works these by hand (phone, LinkedIn note,
       // the dated signal). Masked for a demo prospect, same rule as the address.

@@ -38,53 +38,64 @@ export type CadenceContent = {
 
 // ── Arco Irish — message templates (exact copy from the old portal) ─────────
 
+// Grant-led copy, locked with Paul on the 2026-07-22 launch review call (call +
+// email confirmation). Universal message — it no longer varies by HR status; the
+// only per-lead part is the P.S. 'why now' signal. Sign-off is "Thanks,". Keep this
+// byte-identical to build_saas_portal.py (render_e1 / E2 / E3).
+const SIGN = `Paul Herrick
+Managing Partner
+Arco Irish Executive Search
++353 (087) 0937606
+pherrick@arcoirish.com
+www.arcoirish.com`;
+
 const E1 = `Hi [First name],
 
 I hope you are well.
 
-Like many business leaders, I assume you are currently integrating Agentic AI into your business operations. You are probably realising that the most important competitive advantage for [Company] won't be Generative AI. It will, in fact, be your leadership team.
+After 25 years as a Global Head of Talent and Chief People Officer for both blue-chip and scaling businesses, I founded Arco Irish Executive Search to help CEOs make leadership appointments with confidence. I also advise Enterprise Ireland on People and Management. Did you know that Enterprise Ireland offers a Key Hires Grant of €150k for fast-scaling Irish businesses?
 
-As AI reshapes how businesses operate, the organisations that outperform won't simply adopt the best technology. They will have leaders with the judgement to make better decisions, embrace change, and bring their people with them. Right now, few decisions matter more than senior leadership appointments to your team.
+To be eligible for the grant the candidate must bring new skills to the leadership team. I have a track record of helping organisations make this Key hire. With agentic AI increasingly on the agenda, leaders now more than ever require technical know-how, the judgement to make better decisions, the ability to embrace change, and the gravitas to bring their people with them.
 
-After 25 years as a Global Head of Talent, VP HR and Chief People Officer for global businesses, I founded Arco Irish Executive Search to help [CEOs / Founders] make those decisions with confidence. We combine executive search, business psychology and rigorous leadership assessment to identify leaders with the capability, motivation and cultural fit to accelerate growth and lead transformation.
+We combine executive search, business psychology, and rigorous assessment to find leaders with the capability and cultural fit to lead transformation and accelerate growth. Getting these hires wrong causes severe disruption; getting them right is critical for scaling businesses like [Company].
 
-Having partnered with CEOs of global organisations and scaling businesses throughout my career, I understand that leadership appointments must align with business strategy. This alignment is critical at a time of rapid and systemic change.
-
-If strengthening your leadership team is on your agenda this year, I would welcome the opportunity to discuss how we can help [Company] build the leadership needed for the challenges ahead.
+If strengthening your leadership team is on your agenda, I would welcome a conversation about how we can support your goals.
 
 Would you be open to a 20-minute conversation?
 
-Kind regards,
-Paul Herrick
-Managing Partner, Arco Irish Executive Search
+P.S. [Personalised 'why now' line for this company]
 
-P.S. [Personalised 'why now' line for this company]`;
+Thanks,
+
+${SIGN}`;
 
 const E2 = `Hi [First name],
 
-A quick thought on my last note.
+A brief follow-up to my last email.
 
-What usually goes wrong with a senior hire isn't the CV. It's fit: how someone makes decisions under pressure, how they lead people through change, and whether they match how [Company] actually works.
+The difference between an appointment that accelerates a business and one that sets it back is rarely decided by the CV. It comes down to judgement under pressure, the character to carry people through change, and a genuine fit with how [Company] works.
 
-That is the part we measure. Alongside the search itself, we use business psychology and structured leadership assessment, so you choose on evidence, not on a good interview.
+That is what we measure. Alongside the search, and for the appointments that truly matter, I can put a shortlist through the leading psychometric assessments, so fit is tested rather than guessed. As Greg Hayden, CEO of Ethos Engineering, put it after our first Director-level review, "Paul's expertise transformed how we attract and develop talent."
 
-If it's useful, I'm happy to show how that works.
+I would be glad to show you how it would apply to a role you are weighing.
 
-Would 20 minutes suit you in the coming days?
+Would you be open to a short conversation in the coming days?
 
-Kind regards,
-Paul Herrick`;
+Thanks,
+
+${SIGN}`;
 
 const E3 = `Hi [First name],
 
-I don't want to crowd your inbox, so this is my last note for now.
+I will leave it here for now, so as not to take up more of your time.
 
-If strengthening the leadership team moves up the agenda at [Company], I would welcome the conversation. You can reach me here any time.
+Should strengthening the leadership team move up the agenda at [Company], I would welcome the conversation; and where the timing fits, I can point you to the Enterprise Ireland Key Hires Grant, which is designed for precisely this kind of appointment.
 
-Wishing you and the team continued success.
+My door is open whenever it suits you. I wish you and the team continued success.
 
-Kind regards,
-Paul Herrick`;
+Thanks,
+
+${SIGN}`;
 
 const LN1 = `Hi [First name], I work with Irish CEOs and founders on getting their most senior hires right, through executive search and real leadership assessment. Would be glad to connect.`;
 
