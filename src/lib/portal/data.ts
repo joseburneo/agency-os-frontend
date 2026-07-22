@@ -14,8 +14,10 @@ const JOURNEY_SEED: Record<string, JourneyItem[]> = {
     { id: "aj1", date: "2026-06-25", kind: "call", title: "Onboarding & discovery call", detail: "Captured Paul's voice, ICP and assets: boutique executive search, sells to CEO/founder (not HR), British English, punchy-not-formal.", tags: ["voice", "ICP"] },
     { id: "aj2", date: "2026-07-01", kind: "milestone", title: "Retainer starts", detail: "Build & Operate plan begins. Arco Irish is the first Apex pilot.", tags: ["commercial"] },
     { id: "aj3", date: "2026-07-03", kind: "decision", title: "ICP & blocklist locked", detail: "Confirmed 30–300 employees, no in-house HR proxy. Do-not-contact list locked (6 clients + anchors + 26 competitors).", tags: ["targeting"] },
-    { id: "aj4", date: "2026-07-14", kind: "build", title: "Campaign built · list live", detail: "1,113 verified leads sourced across 4 lists (No-HR, Has-HR, Company Direct, VIP). Copy drafted, intelligence library live.", tags: ["build", "leads"] },
+    { id: "aj4", date: "2026-07-14", kind: "build", title: "Campaign built · list live", detail: "1,064 qualified leads across 4 lists (No-HR, Has-HR, Company Direct, VIP). Copy drafted, intelligence library live.", tags: ["build", "leads"] },
     { id: "aj5", date: "2026-07-15", kind: "decision", title: "Review call — copy in Paul's voice", detail: "Reverted to Paul's single canonical version (no randomisation), added his phone to the signature, removed Zartis, agreed LinkedIn content 2x/month. CRM in build.", tags: ["copy", "voice"] },
+    { id: "aj6", date: "2026-07-17", kind: "build", title: "Client workspace live", detail: "Paul's own workspace went live: the lists, the sequence, the intelligence library, the blocklist and this journey, all in one place.", tags: ["platform"] },
+    { id: "aj7", date: "2026-07-22", kind: "decision", title: "Launch review — grant-led copy", detail: "Agreed a shorter message led by the Enterprise Ireland Key Hires Grant, a two-step follow-up in Paul's own words, low-volume sending and LinkedIn in parallel.", tags: ["copy", "launch"] },
   ],
 };
 
@@ -410,10 +412,11 @@ const ROADMAP_SEED: Record<string, RoadmapItem[]> = {
     { id: "r4", date: "2026-07-14", status: "done", kind: "build", title: "Campaign built · list live", detail: "1,064 qualified leads across 4 target lists. Copy drafted and the intelligence library went live.", tags: ["build", "leads"] },
     { id: "r5", date: "2026-07-15", status: "done", kind: "decision", title: "Review call — copy in Paul's voice", detail: "Locked Paul's single canonical version (no randomisation), added his phone to the signature and agreed LinkedIn content twice a month.", tags: ["copy", "voice"] },
     { id: "r6", date: "2026-07-17", status: "done", kind: "build", title: "Client workspace live", detail: "Arco's own workspace: target lists, the Live Deals CRM, the intelligence library, the blocklist and this roadmap, all in one place.", tags: ["platform"] },
-    { id: "r7", date: "2026-07-22", status: "in_progress", kind: "build", title: "Ready to send", detail: "The two main lists are built across your nine warm inboxes, and every change you asked for is in. We lock the final copy together, then the first emails go out this week.", tags: ["launch"] },
-    { id: "r8", date: "", status: "planned", kind: "launch", title: "Campaign go-live", detail: "Approve the final copy, then start sending at low volume, Tuesday to Thursday, with a three-day follow-up. Target 5% reply rate.", tags: ["launch"] },
-    { id: "r9", date: "", status: "planned", kind: "milestone", title: "LinkedIn content · twice a month", detail: "Repurpose Paul's older posts into a steady organic presence, plus a short trust-building video down the line.", tags: ["content"] },
-    { id: "r10", date: "2026-08-08", status: "planned", kind: "milestone", title: "August cover — Apex pilot", detail: "While Paul is away (8–16 Aug), Apex drafts replies, pre-books from the calendar and alerts Paul on WhatsApp within seconds.", tags: ["apex"] },
+    { id: "r7", date: "2026-07-22", status: "done", kind: "call", title: "Launch review call", detail: "Agreed a shorter message led by the Enterprise Ireland Key Hires Grant, with a two-step follow-up drawn from your own words. Confirmed low-volume sending and LinkedIn to the same names in parallel.", tags: ["copy", "launch"] },
+    { id: "r8", date: "2026-07-22", status: "in_progress", kind: "build", title: "Ready to send", detail: "The sequence and lists are built across your nine warm inboxes, and every change you asked for is in. We apply the final grant-led copy, then the first emails go out.", tags: ["launch"] },
+    { id: "r9", date: "", status: "planned", kind: "launch", title: "Campaign go-live", detail: "Start sending at low volume, up to about 30 a day, Tuesday to Thursday, email and LinkedIn to the same names, with a three-day follow-up. Target 5% reply rate.", tags: ["launch"] },
+    { id: "r10", date: "", status: "planned", kind: "milestone", title: "LinkedIn — connect and content", detail: "Connect with the leaders we have no email for, and turn Paul's older posts into a steady organic presence twice a month, plus a short trust-building video down the line.", tags: ["content"] },
+    { id: "r11", date: "2026-08-08", status: "planned", kind: "milestone", title: "August cover — Apex pilot", detail: "While Paul is away (8–16 Aug), Apex drafts replies, pre-books from the calendar and alerts Paul on WhatsApp within seconds.", tags: ["apex"] },
   ],
 };
 
