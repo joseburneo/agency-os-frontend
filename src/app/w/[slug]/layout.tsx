@@ -23,8 +23,13 @@ export default async function WorkspaceLayout({
   const mode = await portalMode(slug);
   const kind = await loadWorkspaceKind(slug);
   const demo = mode === "demo";
-  // In demo the prospect can't hop to other workspaces; the switcher is hidden.
-  const workspaces = demo ? [] : all.map((w) => ({ slug: w.slug, name: w.name, accent: w.accent, kind: w.kind ?? "client" }));
+  // ONLY the agency gets the roster. A client must never learn who the other
+  // clients are: the switcher used to be hidden from demo alone, so a paying
+  // client was served every workspace name in their page payload.
+  const workspaces =
+    mode === "agency"
+      ? all.map((w) => ({ slug: w.slug, name: w.name, accent: w.accent, kind: w.kind ?? "client" }))
+      : [];
   // The sidebar lists each target list as its own menu item (4 tiny rows).
   const lists = await loadListsMeta(slug);
 

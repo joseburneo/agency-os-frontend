@@ -3,9 +3,9 @@ import type { NextRequest } from "next/server";
 import { db } from "@/lib/portal/server";
 import { portalMode } from "@/lib/portal/access";
 
-// Add one do-not-contact entry to a workspace's blocklist. Agency or the client
-// who owns the workspace may write; a demo prospect never can. Needs at least a
-// company name, a domain, or an email to be a real match target.
+// Add one do-not-contact entry to the blocklist of the CLIENT who owns this
+// workspace. Agency or that client may write; a demo prospect never can. Needs at
+// least a company name, a domain, or an email to be a real match target.
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const slug = String(body?.slug ?? "").trim();
@@ -17,10 +17,17 @@ export async function POST(request: NextRequest) {
   const sb = db();
   if (!sb) return NextResponse.json({ error: "no database" }, { status: 503 });
 
-  const { data: wsRow } = await sb.from("workspaces").select("id").eq("slug", slug).maybeSingle();
+  const { data: wsRow } = await sb
+    .from("workspaces")
+    .select("client_id")
+    .eq("slug", slug)
+    .maybeSingle();
   if (!wsRow) return NextResponse.json({ error: "unknown workspace" }, { status: 404 });
+  if (!wsRow.client_id) {
+    return NextResponse.json({ error: "workspace has no client" }, { status: 409 });
+  }
 
-  const reason = ["client", "competitor", "unsubscribe"].includes(String(body?.reason))
+  const reason =["client", "competitor", "unsubscribe"].includes(String(body?.reason))
     ? String(body.reason)
     : "competitor";
   const companyName = String(body?.companyName ?? "").trim();
@@ -35,7 +42,7 @@ export async function POST(request: NextRequest) {
   }
 
   const { error } = await sb.from("blocklist").insert({
-    workspace_id: wsRow.id,
+    client_id: wsRow.client_id,
     reason,
     company_name: companyName || null,
     domain: domain || null,

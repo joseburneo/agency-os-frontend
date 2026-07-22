@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ShieldBan, Building2, Swords, MailX, Plus, Trash2, Globe, Loader2, Check,
+  ShieldBan, Building2, Swords, MailX, Plus, Trash2, Loader2, Check,
 } from "lucide-react";
 import { ModuleHeader, SectionLabel, StatTile, Panel, Pill, cn } from "@/components/portal/ui";
 import type { BlocklistEntry, BlocklistReason } from "@/lib/portal/types";
@@ -182,23 +182,20 @@ export function BlocklistView({ slug, wsName, entries }: { slug: string; wsName:
                           <span className="text-[13px] font-medium text-foreground truncate">
                             {e.companyName || e.domain || e.email}
                           </span>
-                          {e.global && <Pill tone="muted"><Globe className="w-2.5 h-2.5" /> global</Pill>}
                           {e.source === "auto_unsubscribe" && <Pill tone="muted">auto</Pill>}
                         </div>
                         <div className="text-[11px] text-muted-foreground truncate">
                           {[e.domain, e.email, e.personName, e.note].filter(Boolean).join(" · ")}
                         </div>
                       </div>
-                      {!e.global && (
-                        <button
-                          onClick={() => remove(e.id)}
-                          disabled={busyId === e.id}
-                          title="Remove"
-                          className="grid place-items-center w-7 h-7 rounded-lg text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-red-400 hover:bg-red-500/10 transition disabled:opacity-100"
-                        >
-                          {busyId === e.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                        </button>
-                      )}
+                      <button
+                        onClick={() => remove(e.id)}
+                        disabled={busyId === e.id}
+                        title="Remove"
+                        className="grid place-items-center w-7 h-7 rounded-lg text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-red-400 hover:bg-red-500/10 transition disabled:opacity-100"
+                      >
+                        {busyId === e.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                      </button>
                     </div>
                   ))}
                 </div>

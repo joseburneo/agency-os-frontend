@@ -30,6 +30,13 @@ const OVERRIDES: Record<string, ModuleKey[]> = {
   // (the client brain), do-not-contact blocklist and the client-success roadmap.
   // No WhatsApp, no content calendar, no ads / Meta.
   "arco-irish": ["dashboard", "target-lists", "email", "linkedin", CADENCE_MODULE, "crm", "library", "blocklist", "roadmap"],
+
+  // Kcal and Connect Resources — email-led outbound. Same shape as Arco but without
+  // LinkedIn: both ran on email only, and an empty LinkedIn tab reads as a broken
+  // product rather than a channel they have not switched on. Add "linkedin" back the
+  // day either one starts a LinkedIn sequence.
+  "kcal": ["dashboard", "target-lists", "email", CADENCE_MODULE, "crm", "library", "blocklist", "roadmap"],
+  "connect-resources": ["dashboard", "target-lists", "email", CADENCE_MODULE, "crm", "library", "blocklist", "roadmap"],
 };
 
 export function enabledModules(slug: string): ModuleKey[] {

@@ -325,17 +325,24 @@ function toReason(v: unknown): BlocklistReason {
   return BL_REASONS.includes(s as BlocklistReason) ? (s as BlocklistReason) : "competitor";
 }
 
+// Scoped to the ONE client that owns the workspace. Never widen this: a block list
+// belongs to a single client, and showing another client's suppressions here would
+// both leak who they work with and wrongly suppress legitimate leads.
 export async function loadBlocklist(slug: string): Promise<BlocklistEntry[]> {
   const sb = db();
   if (!sb) return [];
-  const { data: wsRow } = await sb.from("workspaces").select("id").eq("slug", slug).maybeSingle();
-  if (!wsRow) return [];
-  const wsId = wsRow.id as string;
+  const { data: wsRow } = await sb
+    .from("workspaces")
+    .select("client_id")
+    .eq("slug", slug)
+    .maybeSingle();
+  const clientId = wsRow?.client_id as string | undefined;
+  if (!clientId) return [];
 
   const { data, error } = await sb
     .from("blocklist")
     .select("*")
-    .or(`workspace_id.eq.${wsId},workspace_id.is.null`)
+    .eq("client_id", clientId)
     .order("reason", { ascending: true })
     .order("company_name", { ascending: true });
   if (error || !data) return [];
@@ -350,7 +357,6 @@ export async function loadBlocklist(slug: string): Promise<BlocklistEntry[]> {
     linkedinUrl: String(r.linkedin_url ?? ""),
     note: String(r.note ?? ""),
     source: (String(r.source ?? "manual") as BlocklistSource),
-    global: r.workspace_id == null,
     createdAt: String(r.created_at ?? ""),
   }));
 }

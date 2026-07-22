@@ -146,6 +146,11 @@ export function WorkspaceSidebar({ slug, ws, workspaces, lists = [], demo = fals
   const initials = (w?.name || "?").split(" ").map((s) => s[0]).slice(0, 2).join("").toUpperCase();
   const closeMobile = () => setMobileOpen(false);
 
+  // Hopping between workspaces, and the agency index behind "All workspaces", are
+  // AGENCY-only. A client sees their own workspace and nothing else — not the
+  // other clients' names, not a door to try. Gate on this, never on `!demo`.
+  const isAgency = mode === "agency";
+
   /* ---- Shared pieces (desktop aside + mobile drawer) ---------------- */
 
   // Workspace chip + switcher dropdown. `isCollapsed` is always false in the drawer.
@@ -153,16 +158,16 @@ export function WorkspaceSidebar({ slug, ws, workspaces, lists = [], demo = fals
     <div className="relative">
       <button
         onClick={() => {
-          if (demo) return;
+          if (!isAgency) return;
           if (isCollapsed) toggle();
           else setOpen((o) => !o);
         }}
-        disabled={demo}
+        disabled={!isAgency}
         title={isCollapsed ? w?.name ?? slug : undefined}
         className={cn(
           "w-full flex items-center rounded-xl border border-border bg-card transition-colors",
           isCollapsed ? "justify-center p-2" : "gap-3 px-3 py-2.5 text-left",
-          !demo && "hover:border-white/20"
+          isAgency && "hover:border-white/20"
         )}
       >
         <span
@@ -179,12 +184,12 @@ export function WorkspaceSidebar({ slug, ws, workspaces, lists = [], demo = fals
                 {demo ? "preview" : `${w?.owner} · workspace`}
               </span>
             </span>
-            {!demo && <ChevronsUpDown className="w-4 h-4 text-muted-foreground shrink-0" />}
+            {isAgency && <ChevronsUpDown className="w-4 h-4 text-muted-foreground shrink-0" />}
           </>
         )}
       </button>
 
-      {open && !demo && !isCollapsed && (
+      {open && isAgency && !isCollapsed && (
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
           <div className="absolute z-40 mt-1 w-full rounded-xl border border-border bg-popover shadow-xl overflow-hidden">
@@ -402,7 +407,7 @@ export function WorkspaceSidebar({ slug, ws, workspaces, lists = [], demo = fals
         )}
       >
         <div className="flex items-center justify-between">
-          {!demo ? (
+          {isAgency ? (
             <Link
               href="/"
               onClick={closeMobile}
@@ -436,7 +441,7 @@ export function WorkspaceSidebar({ slug, ws, workspaces, lists = [], demo = fals
       >
         {/* Top row: back to agency (expanded) + collapse toggle */}
         <div className={cn("flex items-center", collapsed ? "justify-center" : "justify-between")}>
-          {!demo && !collapsed && (
+          {isAgency && !collapsed && (
             <Link
               href="/"
               className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-muted-foreground hover:text-foreground transition-colors"
