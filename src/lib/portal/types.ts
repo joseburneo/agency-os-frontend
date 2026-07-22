@@ -223,9 +223,10 @@ export interface RoadmapItem {
 }
 
 // ── Blocklist (do-not-contact) ──────────────────────────────────────────
-// One shared do-not-contact book per workspace. Buckets: current/past clients,
-// competitors, and unsubscribes. workspace_id null = a global entry (blocked for
-// every workspace). Matched on domain (company-level) or email (person-level).
+// One do-not-contact book PER CLIENT. Buckets: current/past clients, competitors,
+// and unsubscribes. Matched on domain (company-level) or email (person-level).
+// There is no global tier: a suppression belongs to the one client it was made for.
+// Someone who unsubscribed from Global Food Ventures is not blocked for Luxvance.
 export type BlocklistReason = "client" | "competitor" | "unsubscribe";
 export type BlocklistSource = "manual" | "auto_unsubscribe";
 
@@ -239,7 +240,6 @@ export interface BlocklistEntry {
   linkedinUrl: string;
   note: string;
   source: BlocklistSource;
-  global: boolean; // true when it applies to every workspace (workspace_id null)
   createdAt: string;
 }
 
