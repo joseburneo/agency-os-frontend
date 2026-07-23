@@ -59,6 +59,8 @@ To be eligible for the grant the candidate must bring new skills to the leadersh
 
 We combine executive search, business psychology, and rigorous assessment to find leaders with the capability and cultural fit to lead transformation and accelerate growth. Getting these hires wrong causes severe disruption; getting them right is critical for scaling businesses like [Company].
 
+Where there is already a senior people leader, I prefer to work alongside them; I would be glad to include [Senior HR lead], your [HR title], so the appointment is a shared decision.
+
 If strengthening your leadership team is on your agenda, I would welcome a conversation about how we can support your goals.
 
 Would you be open to a 20-minute conversation?
@@ -147,7 +149,7 @@ const ARCO: CadenceContent = {
         body: E3,
       },
     ],
-    note: "This is a draft you can shape. Reply with how you'd write Email 2, Email 3 or the LinkedIn notes and we update it here. Gaps between steps are never less than 2 days.",
+    note: "This is a draft you can shape. The line naming a senior HR lead appears in Email 1 only for List 2 companies (where we have a genuine Head of HR / People / CHRO); open any List 2 contact's preview to see it in place. Reply with how you'd write Email 2, Email 3 or the LinkedIn notes and we update it here. Gaps between steps are never less than 2 days.",
   },
   schedule: {
     heading: { pre: "When we send, and ", accent: "how much", post: "." },
