@@ -44,9 +44,9 @@ create unique index if not exists blocklist_client_domain_uidx
   on public.blocklist (client_id, lower(domain))
   where domain is not null and email is null;
 
--- ── 4. After the frontend deploy that reads client_id ────────────────────────
--- Run these only once the deployed app no longer reads `workspace_id`, otherwise the
--- Arco portal's add-to-blocklist button starts failing.
---
---   alter table public.blocklist alter column client_id set not null;
---   alter table public.blocklist drop column workspace_id;
+-- ── 4. Kill the global tier — APPLIED 2026-07-22, after the frontend deploy ──
+-- Held back until the deployed app had stopped reading `workspace_id`, and until
+-- client_brain.is_blocked() (Render) stopped treating a null workspace_id as
+-- "blocked for everyone". With the column gone, no row can be global by accident.
+alter table public.blocklist alter column client_id set not null;
+alter table public.blocklist drop column workspace_id;
