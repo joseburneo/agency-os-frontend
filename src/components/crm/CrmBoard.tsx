@@ -548,6 +548,10 @@ function Conversation({ id, themName, fallback, refreshKey }: { id: number; them
 
 // ── reply composer: channel tabs + draft + send + copilot ────────────
 type DraftResp = { channel: string; step: number; goal: string; draft: string; can_send: boolean; gmail_live: boolean };
+// One way this reply can leave: on-thread via an alive Instantly account, or a
+// thread-resurrection send from the work mailbox (new email, In-Reply-To the stored
+// Message-ID, real history quoted) — that one survives any cancelled account.
+type SendOption = { via: "instantly" | "gmail"; eaccount: string; label: string; thread?: boolean };
 type Chan = "email" | "linkedin" | "whatsapp" | "call";
 type CoLog = { role: "you" | "copilot"; content: string };
 
@@ -562,6 +566,24 @@ function useComposer(d: Detail, onSent: () => void) {
   const [coBusy, setCoBusy] = useState(false);
   const [coLog, setCoLog] = useState<CoLog[]>([]);
   const [threadKey, setThreadKey] = useState(0);   // bump to force the thread to reload after a send
+  // Sender selector: which mailbox this reply leaves from. Options come from the
+  // backend (alive accounts in the client's workspace + the Gmail resurrection path).
+  const [sendOpts, setSendOpts] = useState<SendOption[]>([]);
+  const [fromKey, setFromKey] = useState("");
+  const [threadAcct, setThreadAcct] = useState<{ account: string; alive: boolean }>({ account: "", alive: true });
+  useEffect(() => {
+    setSendOpts([]); setFromKey("");
+    fetch(`${API}/api/crm/prospect/${id}/send-options`)
+      .then((r) => r.json())
+      .then((j) => {
+        const opts: SendOption[] = j.options || [];
+        setSendOpts(opts);
+        setThreadAcct({ account: j.thread_account || "", alive: !!j.thread_account_alive });
+        if (opts.length) setFromKey(`${opts[0].via}|${opts[0].eaccount}`);
+      })
+      .catch(() => {});
+  }, [id]);
+  const selectedOpt = sendOpts.find((o) => `${o.via}|${o.eaccount}` === fromKey) || null;
 
   const setDraft = (c: Chan, v: string) => setDrafts((p) => ({ ...p, [c]: v }));
   const text = drafts[chan];
@@ -594,7 +616,7 @@ function useComposer(d: Detail, onSent: () => void) {
     setSending(true);
     fetch(`${API}/api/crm/prospect/${id}/send`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, channel: "email" }),
+      body: JSON.stringify({ text, channel: "email", eaccount: selectedOpt?.eaccount, via: selectedOpt?.via }),
     })
       .then(async (r) => {
         if (r.ok) { setSent("ok"); setDraft(chan, ""); setThreadKey((k) => k + 1); onSent(); }
@@ -627,10 +649,10 @@ function useComposer(d: Detail, onSent: () => void) {
       .finally(() => setCoBusy(false));
   };
 
-  const canSendEmail = chan === "email" && d.can_send_email;
+  const canSendEmail = chan === "email" && (sendOpts.length > 0 || d.can_send_email);
   const gmailLive = d.live_channel === "gmail";
   const draftLabel = chan === "email" ? "Draft with AI" : chan === "linkedin" ? "Draft LinkedIn" : chan === "whatsapp" ? "Draft WhatsApp" : "Talking points";
-  return { d, chan, setChan, text, setDraft, gen, send, logTouch, refresh: onSent, askCopilot, drafting, sending, sent, setSent, co, setCo, coBusy, coLog, canSendEmail, gmailLive, draftLabel, threadKey };
+  return { d, chan, setChan, text, setDraft, gen, send, logTouch, refresh: onSent, askCopilot, drafting, sending, sent, setSent, co, setCo, coBusy, coLog, canSendEmail, gmailLive, draftLabel, threadKey, sendOpts, fromKey, setFromKey, selectedOpt, threadAcct };
 }
 type ComposerCtl = ReturnType<typeof useComposer>;
 
@@ -792,7 +814,7 @@ function CallPanel({ d, onTouched }: { d: Detail; onTouched: () => void }) {
 }
 
 function Composer({ c }: { c: ComposerCtl }) {
-  const { d, chan, setChan, text, setDraft, gen, send, logTouch, drafting, sending, sent, setSent, canSendEmail, gmailLive, draftLabel } = c;
+  const { d, chan, setChan, text, setDraft, gen, send, logTouch, drafting, sending, sent, setSent, canSendEmail, gmailLive, draftLabel, sendOpts, fromKey, setFromKey, selectedOpt, threadAcct } = c;
   // Compact by default so an empty composer never steals the conversation's space; it opens
   // on click or as soon as there's a draft (incl. one the copilot / Draft-with-AI wrote).
   const [open, setOpen] = useState(false);
@@ -869,15 +891,33 @@ function Composer({ c }: { c: ComposerCtl }) {
 
       {/* actions */}
       {sent === "ok" ? (
-        <div className="flex items-center gap-2 text-sm text-[#26D07C]"><Check className="w-4 h-4" /> Sent on-thread via Instantly. Cadence advanced.</div>
+        <div className="flex items-center gap-2 text-sm text-[#26D07C]"><Check className="w-4 h-4" /> Sent. Cadence advanced.</div>
       ) : sent === "touched" ? (
         <div className="flex items-center gap-2 text-sm text-[#26D07C]"><Check className="w-4 h-4" /> Logged as {CHANNEL_META[chan].label} touch. Ball's in their court now.</div>
       ) : (
+        <>
+        {chan === "email" && sendOpts.length > 0 && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[11px] text-muted-foreground shrink-0">Send from</span>
+            <select value={fromKey} onChange={(e) => setFromKey(e.target.value)}
+              className="rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs text-foreground max-w-full">
+              {sendOpts.map((o) => (
+                <option key={`${o.via}|${o.eaccount}`} value={`${o.via}|${o.eaccount}`}>{o.label}</option>
+              ))}
+            </select>
+            {threadAcct.account && !threadAcct.alive && (
+              <span className="text-[11px] text-[#FFD60A]">
+                Original mailbox ({threadAcct.account}) is gone — this sends as a continuation of the same thread.
+              </span>
+            )}
+          </div>
+        )}
         <div className="flex items-center gap-2 flex-wrap">
           {canSendEmail ? (
-            <button onClick={send} disabled={sending || !text.trim()}
+            <button onClick={send} disabled={sending || !text.trim() || (sendOpts.length > 0 && !selectedOpt)}
               className="neon-btn inline-flex items-center gap-2 rounded-lg bg-[#FFD60A] px-4 py-2 text-sm font-semibold text-[#0A0E1A] hover:bg-[#ffdf3a] disabled:opacity-40 transition-colors">
-              {sending ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending…</> : <><Send className="w-4 h-4" /> Send via Instantly</>}
+              {sending ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending…</>
+                : <><Send className="w-4 h-4" /> {selectedOpt?.via === "gmail" ? `Send from ${selectedOpt.eaccount}` : "Send via Instantly"}</>}
             </button>
           ) : chan !== "email" && chan !== "call" && text.trim() ? (
             <a href={chan === "whatsapp" && d.phone ? (d.wa_link || `https://wa.me/${d.phone.replace(/[^\d]/g, "")}`) : (d.linkedin_url || linkedinSearchUrl(d.name, d.company))}
@@ -910,6 +950,7 @@ function Composer({ c }: { c: ComposerCtl }) {
             </span>
           )}
         </div>
+        </>
       )}
       {sent?.startsWith("err:") && <div className="text-xs text-[#ef4444]">Send failed: {sent.slice(4)}</div>}
       </>
