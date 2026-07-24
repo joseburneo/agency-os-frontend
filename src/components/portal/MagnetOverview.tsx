@@ -19,14 +19,18 @@ const arr = (v: unknown): string[] =>
   Array.isArray(v) ? v.map((x) => (typeof x === "string" ? x.trim() : "")).filter(Boolean) : [];
 
 export function MagnetOverview({
-  slug, name, owner, brief, domain,
-}: { slug: string; name: string; owner: string; brief: Brief; domain?: string }) {
+  slug, name, owner, brief, domain, leadCount = 0,
+}: { slug: string; name: string; owner: string; brief: Brief; domain?: string; leadCount?: number }) {
   const pa = (brief.primary_audience ?? {}) as Record<string, unknown>;
   const secondary = Array.isArray(brief.secondary_audiences)
     ? (brief.secondary_audiences as Record<string, unknown>[])
     : [];
   const talking = arr(brief.talking_points);
   const firstName = owner.split(" ")[0] || "";
+  // A magnet can carry a step-by-step plan instead of (or beside) a list brief.
+  const steps = Array.isArray(brief.plan_steps)
+    ? (brief.plan_steps as Record<string, unknown>[]).filter((s) => str(s.title))
+    : [];
 
   const facts: [string, string][] = [
     ["Who", str(pa.label)],
@@ -53,7 +57,7 @@ export function MagnetOverview({
           </div>
         </div>
         <h1 className="mt-4 text-2xl sm:text-3xl font-semibold text-foreground leading-tight">
-          {firstName ? `${firstName}, here is what we found` : "Here is what we found"}
+          {str(brief.headline) || (firstName ? `${firstName}, here is what we found` : "Here is what we found")}
         </h1>
         {str(brief.personal_note) && (
           <p className="mt-3 text-[15px] leading-relaxed text-muted-foreground whitespace-pre-line">
@@ -120,6 +124,29 @@ export function MagnetOverview({
         </section>
       )}
 
+      {steps.length > 0 && (
+        <section>
+          <SectionLabel>{str(brief.plan_label) || "The plan, step by step"}</SectionLabel>
+          <div className="mt-2 flex flex-col gap-2">
+            {steps.map((s, i) => (
+              <Panel key={i} className="flex gap-4">
+                <span className="shrink-0 text-[15px] font-bold text-[#FFD60A] tabular-nums pt-0.5">
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                <div className="min-w-0">
+                  <div className="text-[14px] font-semibold text-foreground">{str(s.title)}</div>
+                  {str(s.body) && (
+                    <p className="mt-1 text-[13.5px] leading-relaxed text-muted-foreground whitespace-pre-line">
+                      {str(s.body)}
+                    </p>
+                  )}
+                </div>
+              </Panel>
+            ))}
+          </div>
+        </section>
+      )}
+
       {secondary.length > 0 && (
         <section>
           <SectionLabel>Worth testing next</SectionLabel>
@@ -136,6 +163,7 @@ export function MagnetOverview({
         </section>
       )}
 
+      {leadCount > 0 && (
       <section>
         <SectionLabel>Your list</SectionLabel>
         <Link
@@ -153,18 +181,22 @@ export function MagnetOverview({
           <ArrowRight className="w-4 h-4 text-[#FFD60A] ml-auto shrink-0" />
         </Link>
       </section>
+      )}
 
       {/* The ask. It closes the page because everything above earns it: they have
-          just read what we found and are about to see the people. */}
+          just read what we found and are about to see the people. Copy can be
+          overridden per magnet (cta_title / cta_body / cta_button) so a plan-style
+          magnet can ask for its own next step. */}
       <section>
         <Panel>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <div className="text-[15px] font-semibold text-foreground">Want to optimise this list?</div>
+              <div className="text-[15px] font-semibold text-foreground">
+                {str(brief.cta_title) || "Want to optimise this list?"}
+              </div>
               <p className="mt-1 text-[13px] text-muted-foreground leading-relaxed max-w-xl">
-                Fifteen minutes to refine your ideal customer profile and confirm these are
-                the right people. We rebuild it from what you tell us and hand it over with
-                the email addresses, ready to send.
+                {str(brief.cta_body) ||
+                  "Fifteen minutes to refine your ideal customer profile and confirm these are the right people. We rebuild it from what you tell us and hand it over with the email addresses, ready to send."}
               </p>
             </div>
             <a
@@ -173,7 +205,7 @@ export function MagnetOverview({
               rel="noopener noreferrer"
               className="shrink-0 inline-flex items-center justify-center gap-2 rounded-lg bg-[#26D07C] px-4 py-2.5 text-[13px] font-semibold text-[#0A0E1A] hover:bg-[#3ad98c] transition-colors"
             >
-              Book the 15 minutes <ExternalLink className="w-3.5 h-3.5" />
+              {str(brief.cta_button) || "Book the 15 minutes"} <ExternalLink className="w-3.5 h-3.5" />
             </a>
           </div>
         </Panel>
