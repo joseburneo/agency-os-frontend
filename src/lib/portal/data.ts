@@ -490,14 +490,21 @@ export const loadWorkspaceKind = cache(async function loadWorkspaceKind(slug: st
 export const loadMagnetBrief = cache(async function loadMagnetBrief(slug: string) {
   const sb = db();
   if (!sb) return null;
-  const { data } = await sb.from("workspaces").select("brief_json,name,owner_name,domain")
+  const { data } = await sb.from("workspaces").select("id,brief_json,name,owner_name,domain")
     .eq("slug", slug).maybeSingle();
   if (!data?.brief_json) return null;
+  // A magnet built as a plan (no list yet) hides the "Your list" section rather
+  // than linking to an empty Target Lists page.
+  const { count } = await sb
+    .from("target_list_leads")
+    .select("id", { count: "exact", head: true })
+    .eq("workspace_id", data.id as string);
   return {
     brief: data.brief_json as Record<string, unknown>,
     name: String(data.name ?? ""),
     owner: String(data.owner_name ?? ""),
     domain: (data.domain as string | null) || undefined,
+    leadCount: count ?? 0,
   };
 });
 
