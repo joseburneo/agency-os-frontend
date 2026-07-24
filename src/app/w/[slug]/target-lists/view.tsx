@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Target, Download, Search, ExternalLink, Eye, X, Send, Copy, Check, Phone, MessageCircle, Star } from "lucide-react";
+import { Target, Download, Search, ExternalLink, Eye, X, Send, Copy, Check, Phone, MessageCircle, Star, Lock } from "lucide-react";
 import type { Workspace, WorkspaceData, Lead } from "@/lib/portal/types";
 import { ModuleHeader, Panel, Pill, CompanyMark, ChannelDots, cn } from "@/components/portal/ui";
 
@@ -147,6 +147,18 @@ export function TargetListsView({
     () => data.leads.some((l) => l.listId === activeList && l.segment === "hashr"),
     [data.leads, activeList]
   );
+  // Clay's people-search carries no sector, so a magnet list would render a
+  // whole column of blanks — an awkward hole in the middle of the gift. The
+  // column only earns its place when the data exists. Unfiltered rows again,
+  // so a search never flips the layout.
+  const hasSector = useMemo(
+    () => data.leads.some((l) => l.listId === activeList && l.sector),
+    [data.leads, activeList]
+  );
+  // A magnet ships no addresses by design: the call is where the list is
+  // refined and the emails are handed over. Frame the empty address as that
+  // promise, never as something missing or broken.
+  const magnet = ws.kind === "magnet";
   const leads = useMemo(() => {
     const term = q.trim().toLowerCase();
     return data.leads
@@ -363,13 +375,13 @@ export function TargetListsView({
                   <th className="text-left font-medium px-4 py-3">Why VIP</th>
                 ) : isHr ? (
                   <th className="text-left font-medium px-4 py-3">HR lead</th>
-                ) : (
+                ) : hasSector ? (
                   <th className="text-left font-medium px-4 py-3">Sector</th>
-                )}
+                ) : null}
                 <th className="text-left font-medium px-4 py-3">LinkedIn</th>
                 {isVip && <th className="text-left font-medium px-4 py-3">Note</th>}
                 {isVip && <th className="text-left font-medium px-4 py-3">Phone</th>}
-                <th className="text-right font-medium px-4 py-3">Email</th>
+                <th className="text-right font-medium px-4 py-3">{magnet ? "Your outreach" : "Email"}</th>
               </tr>
             </thead>
             <tbody>
@@ -411,9 +423,9 @@ export function TargetListsView({
                         <span className="text-muted-foreground">— (CEO-direct)</span>
                       )}
                     </td>
-                  ) : (
+                  ) : hasSector ? (
                     <td className="px-4 py-3 text-muted-foreground">{l.sector}</td>
-                  )}
+                  ) : null}
                   {/* Two links, not one: the person to connect with, and the company
                       to check. A magnet ships no addresses, so these are the evidence
                       that the targeting is real and the people exist. */}
@@ -538,19 +550,34 @@ export function TargetListsView({
                         </button>
                       ) : l.hasEmail ? (
                         <span className="text-[11px] text-muted-foreground">draft pending</span>
+                      ) : magnet ? (
+                        <span
+                          className="inline-flex items-center gap-1 text-[11px] text-muted-foreground/70"
+                          title="Verified addresses are delivered with the refined list after your 15-minute call"
+                        >
+                          <Lock className="w-3 h-3" /> unlocks on the call
+                        </span>
                       ) : (
                         <span className="text-[11px] text-muted-foreground">no email yet</span>
                       )}
+                      {/* The written email is the product a magnet prospect judges us
+                          by, so it gets the accent treatment there, and a label that
+                          says what is inside — "Preview" undersold it. */}
                       {l.emailBody ? (
                         <button
                           onClick={() => openPreview(l)}
-                          className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1.5 text-[12px] font-medium text-foreground hover:border-white/20 transition-colors"
+                          className={cn(
+                            "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors",
+                            magnet
+                              ? "border border-[#FFD60A]/25 bg-[#FFD60A]/10 text-[#FFD60A] hover:bg-[#FFD60A]/15"
+                              : "border border-border bg-card text-foreground hover:border-white/20"
+                          )}
                         >
-                          <Eye className="w-3.5 h-3.5" /> Preview
+                          <Eye className="w-3.5 h-3.5" /> Email draft
                         </button>
                       ) : (
                         <span className="inline-flex items-center gap-1.5 rounded-md border border-border/50 px-2.5 py-1.5 text-[12px] text-muted-foreground/50">
-                          <Eye className="w-3.5 h-3.5" /> Preview
+                          <Eye className="w-3.5 h-3.5" /> Email draft
                         </span>
                       )}
                     </div>
@@ -605,7 +632,11 @@ export function TargetListsView({
               <div>
                 <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground mb-1">To</div>
                 <div className="text-sm font-mono text-foreground">
-                  {preview.hasEmail ? preview.emailDisplay : "no email yet"}
+                  {preview.hasEmail
+                    ? preview.emailDisplay
+                    : magnet
+                      ? "verified address · delivered after your call"
+                      : "no email yet"}
                 </div>
               </div>
               {/* One thread, three touches. Tabs switch the touch; Email 1 leads,
