@@ -54,11 +54,43 @@ export async function proxy(request: NextRequest) {
       res.cookies.set(demoCookie(slug), await demoToken(secret, slug), DEMO_COOKIE_OPTS);
       return res;
     }
+    // A magnet workspace is sales material, not a portal: the bare link Jose
+    // sends a prospect must open with no code. Only the first cookie-less hit
+    // pays the kind lookup; the demo cookie takes over from there. Client
+    // workspaces (kind !== "magnet") keep their gate untouched.
+    if (await isMagnetWorkspace(slug)) {
+      const res = NextResponse.next();
+      res.cookies.set(demoCookie(slug), await demoToken(secret, slug), DEMO_COOKIE_OPTS);
+      return res;
+    }
     return toGate(request, path, slug);
   }
 
   // Agency area, and no agency cookie → agency gate.
   return toGate(request, path, "agency");
+}
+
+// Edge-safe workspace-kind lookup, plain REST so no supabase-js in the proxy
+// bundle. Fail-closed: any miss, error or absent env answers false and the
+// visitor lands on the gate, exactly as before this check existed.
+async function isMagnetWorkspace(slug: string): Promise<boolean> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_SERVICE_KEY ||
+    process.env.SUPABASE_SECRET_KEY;
+  if (!url || !key) return false;
+  try {
+    const r = await fetch(
+      `${url}/rest/v1/workspaces?slug=eq.${encodeURIComponent(slug)}&select=kind`,
+      { headers: { apikey: key, Authorization: `Bearer ${key}` } }
+    );
+    if (!r.ok) return false;
+    const rows = (await r.json()) as { kind?: string }[];
+    return rows[0]?.kind === "magnet";
+  } catch {
+    return false;
+  }
 }
 
 function toGate(request: NextRequest, next: string, scope: string) {
