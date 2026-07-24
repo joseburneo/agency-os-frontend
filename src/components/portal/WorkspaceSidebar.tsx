@@ -10,6 +10,7 @@ import {
   Megaphone, Flame,
 } from "lucide-react";
 import { cn, Linkedin } from "./ui";
+import { CompanyMark } from "./CompanyMark";
 import type { Workspace } from "@/lib/portal/types";
 import { visibleModules } from "@/lib/portal/modules";
 
@@ -22,7 +23,7 @@ type NavItem = {
   indent?: boolean; // a sub-item under its parent (the individual lists)
 };
 type NavGroup = { group: string; items: NavItem[] };
-type WsLite = { slug: string; name: string; accent: string; kind?: string };
+type WsLite = { slug: string; name: string; accent: string; kind?: string; domain?: string };
 type ListLite = { key: string; name: string; count: number };
 
 // "List 1 · No in-house HR" -> "No in-house HR"; "VIP" -> "VIP". The section header
@@ -143,7 +144,6 @@ export function WorkspaceSidebar({ slug, ws, workspaces, lists = [], demo = fals
     return () => window.removeEventListener("keydown", onKey);
   }, [mobileOpen]);
 
-  const initials = (w?.name || "?").split(" ").map((s) => s[0]).slice(0, 2).join("").toUpperCase();
   const closeMobile = () => setMobileOpen(false);
 
   // Hopping between workspaces, and the agency index behind "All workspaces", are
@@ -170,12 +170,7 @@ export function WorkspaceSidebar({ slug, ws, workspaces, lists = [], demo = fals
           isAgency && "hover:border-white/20"
         )}
       >
-        <span
-          className="grid place-items-center w-9 h-9 rounded-lg text-xs font-bold shrink-0"
-          style={{ background: `${w?.accent ?? "#FFD60A"}1a`, color: w?.accent ?? "#FFD60A" }}
-        >
-          {initials}
-        </span>
+        <CompanyMark name={w?.name ?? slug} domain={w?.domain} size={36} />
         {!isCollapsed && (
           <>
             <span className="min-w-0 flex-1">
@@ -207,12 +202,7 @@ export function WorkspaceSidebar({ slug, ws, workspaces, lists = [], demo = fals
                   onClick={() => setOpen(false)}
                   className="flex items-center gap-2.5 px-3 py-2.5 hover:bg-secondary transition-colors"
                 >
-                  <span
-                    className="grid place-items-center w-6 h-6 rounded-md text-[10px] font-bold shrink-0"
-                    style={{ background: `${wsl.accent}1a`, color: wsl.accent }}
-                  >
-                    {wsl.name.split(" ").map((s) => s[0]).slice(0, 2).join("")}
-                  </span>
+                  <CompanyMark name={wsl.name} domain={wsl.domain} size={24} />
                   <span className="text-sm text-foreground flex-1 truncate">{wsl.name}</span>
                   {wsl.slug === slug && <Check className="w-3.5 h-3.5 text-[#FFD60A]" />}
                 </Link>
@@ -366,12 +356,7 @@ export function WorkspaceSidebar({ slug, ws, workspaces, lists = [], demo = fals
       {/* ---- Mobile top bar (below lg). Negative margins bleed over the
            scroll container's padding so the bar runs edge-to-edge. ---- */}
       <div className="lg:hidden sticky top-0 z-30 -mx-4 -mt-4 md:-mx-6 md:-mt-6 flex items-center gap-3 border-b border-border bg-background/95 backdrop-blur px-4 py-3">
-        <span
-          className="grid place-items-center w-8 h-8 rounded-lg text-xs font-bold shrink-0"
-          style={{ background: `${w?.accent ?? "#FFD60A"}1a`, color: w?.accent ?? "#FFD60A" }}
-        >
-          {initials}
-        </span>
+        <CompanyMark name={w?.name ?? slug} domain={w?.domain} size={32} />
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-semibold text-foreground truncate">{w?.name ?? slug}</span>
           <span className="block text-[10px] text-muted-foreground truncate">

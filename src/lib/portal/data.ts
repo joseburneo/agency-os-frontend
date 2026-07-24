@@ -48,6 +48,7 @@ function workspaceFromRow(row: Record<string, unknown>, coldLeads: number): Work
     kind: (row.kind as string) === "magnet" ? "magnet" : "client",
     slug: String(row.slug),
     name: String(row.name ?? row.slug),
+    domain: (row.domain as string | null) || undefined,
     owner: String(row.owner_name ?? ""),
     ownerRole: String(row.owner_role ?? ""),
     plan: String(row.plan ?? ""),
@@ -489,13 +490,14 @@ export const loadWorkspaceKind = cache(async function loadWorkspaceKind(slug: st
 export const loadMagnetBrief = cache(async function loadMagnetBrief(slug: string) {
   const sb = db();
   if (!sb) return null;
-  const { data } = await sb.from("workspaces").select("brief_json,name,owner_name")
+  const { data } = await sb.from("workspaces").select("brief_json,name,owner_name,domain")
     .eq("slug", slug).maybeSingle();
   if (!data?.brief_json) return null;
   return {
     brief: data.brief_json as Record<string, unknown>,
     name: String(data.name ?? ""),
     owner: String(data.owner_name ?? ""),
+    domain: (data.domain as string | null) || undefined,
   };
 });
 

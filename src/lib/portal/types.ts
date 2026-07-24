@@ -25,6 +25,9 @@ export interface Workspace {
   kind?: "client" | "magnet";
   slug: string;
   name: string;
+  // Company website domain (bare). Feeds the real-logo lookup in CompanyMark;
+  // absent → initials chip, so old rows degrade cleanly.
+  domain?: string;
   owner: string; // primary client contact
   ownerRole: string;
   plan: string;
