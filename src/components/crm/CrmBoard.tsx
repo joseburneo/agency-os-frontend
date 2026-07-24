@@ -598,19 +598,10 @@ function useComposer(d: Detail, onSent: () => void) {
       .finally(() => setDrafting(false));
   };
 
-  // Auto-draft on open when the ball is in our court: the reply we owe is the whole point of
-  // opening the card, so have a first draft waiting instead of a blank box. Fires once per
-  // prospect, only for email, only when there's nothing typed yet.
-  const autoDrafted = useRef(false);
-  useEffect(() => { autoDrafted.current = false; }, [id]);
-  useEffect(() => {
-    if (autoDrafted.current) return;
-    if (d.waiting_on === "us" && chan === "email" && d.can_send_email && !drafts.email.trim() && !drafting) {
-      autoDrafted.current = true;
-      gen();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [d.waiting_on, d.can_send_email, id]);
+  // No auto-draft on card open (Jose, 2026-07-24). It burned a model call on
+  // every card just browsing the board, and a draft nobody asked for sitting in
+  // the composer reads as the system being pushy. The draft is one click away:
+  // "Draft with AI" or a copilot chip, both of which now run the flagship path.
 
   const send = () => {
     setSending(true);
@@ -1291,7 +1282,7 @@ function IntelPanel({ d }: { d: Detail }) {
   return (
     <div className="rounded-xl border border-[#FFD60A]/20 bg-card p-4 space-y-3">
       <div className="flex items-center gap-2 text-sm font-semibold text-[#FFD60A]">
-        <Bot className="w-4 h-4" /> Intelligence · why they fit
+        <Bot className="w-4 h-4" /> Business Intelligence · why they fit
         {d.dossier_status && <span className="ml-auto text-[10px] font-normal text-muted-foreground uppercase">{ffCount}/6 sources</span>}
       </div>
       {/* call notes get top billing when we have them */}
