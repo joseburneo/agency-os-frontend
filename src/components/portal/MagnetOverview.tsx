@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, ExternalLink } from "lucide-react";
 import { Panel, SectionLabel } from "./ui";
+import { CompanyMark } from "./CompanyMark";
 
 // The page a prospect lands on. It replaces the KPI dashboard for a magnet,
 // because tiles reading "0 meetings booked" mean nothing to someone who has
@@ -18,8 +19,8 @@ const arr = (v: unknown): string[] =>
   Array.isArray(v) ? v.map((x) => (typeof x === "string" ? x.trim() : "")).filter(Boolean) : [];
 
 export function MagnetOverview({
-  slug, name, owner, brief,
-}: { slug: string; name: string; owner: string; brief: Brief }) {
+  slug, name, owner, brief, domain,
+}: { slug: string; name: string; owner: string; brief: Brief; domain?: string }) {
   const pa = (brief.primary_audience ?? {}) as Record<string, unknown>;
   const secondary = Array.isArray(brief.secondary_audiences)
     ? (brief.secondary_audiences as Record<string, unknown>[])
@@ -39,10 +40,19 @@ export function MagnetOverview({
   return (
     <div className="flex flex-col gap-8 max-w-3xl">
       <header>
-        <div className="text-[11px] uppercase tracking-[0.18em] text-[#FFD60A] font-semibold">
-          {str(brief.build_name) || "Your list"}
+        <div className="flex items-center gap-4">
+          {/* Their own logo at the top: the first signal this page was made for
+              THEM, not a template. Falls back to the monogram when the domain
+              has no fetchable logo, so the header never shows a broken image. */}
+          <CompanyMark name={name} domain={domain} size={48} />
+          <div className="min-w-0">
+            <div className="text-[11px] uppercase tracking-[0.18em] text-[#FFD60A] font-semibold">
+              {str(brief.build_name) || "Your list"}
+            </div>
+            <div className="text-[13px] text-muted-foreground truncate">{name}</div>
+          </div>
         </div>
-        <h1 className="mt-2 text-2xl sm:text-3xl font-semibold text-foreground leading-tight">
+        <h1 className="mt-4 text-2xl sm:text-3xl font-semibold text-foreground leading-tight">
           {firstName ? `${firstName}, here is what we found` : "Here is what we found"}
         </h1>
         {str(brief.personal_note) && (

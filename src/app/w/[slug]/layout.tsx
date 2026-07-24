@@ -28,7 +28,7 @@ export default async function WorkspaceLayout({
   // client was served every workspace name in their page payload.
   const workspaces =
     mode === "agency"
-      ? all.map((w) => ({ slug: w.slug, name: w.name, accent: w.accent, kind: w.kind ?? "client" }))
+      ? all.map((w) => ({ slug: w.slug, name: w.name, accent: w.accent, kind: w.kind ?? "client", domain: w.domain }))
       : [];
   // The sidebar lists each target list as its own menu item (4 tiny rows).
   const lists = await loadListsMeta(slug);
