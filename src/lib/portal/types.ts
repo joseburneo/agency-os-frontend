@@ -23,6 +23,9 @@ export interface Workspace {
   // 'client' pays us; 'magnet' is sales material built for one prospect. They
   // live in the same table but must never be browsed in the same list.
   kind?: "client" | "magnet";
+  // The agency's own workspace (Luxvance). Grouped apart from paying clients
+  // in the switcher — it is the operator, not an account.
+  isAgency?: boolean;
   slug: string;
   name: string;
   // Company website domain (bare). Feeds the real-logo lookup in CompanyMark;

@@ -46,6 +46,7 @@ export function maskEmail(email: string | null | undefined): string {
 function workspaceFromRow(row: Record<string, unknown>, coldLeads: number): Workspace {
   return {
     kind: (row.kind as string) === "magnet" ? "magnet" : "client",
+    isAgency: row.is_agency === true,
     slug: String(row.slug),
     name: String(row.name ?? row.slug),
     domain: (row.domain as string | null) || undefined,
