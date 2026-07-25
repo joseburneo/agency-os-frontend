@@ -379,6 +379,34 @@ function toIntelKind(v: unknown): IntelligenceKind {
   return INTEL_KINDS.includes(s as IntelligenceKind) ? (s as IntelligenceKind) : "overview";
 }
 
+// The Brain's operational fields — the exact values the Render engine injects
+// verbatim into every draft (client_brain.sender_identity). Columns on
+// `workspaces`, edited in the Brain module via /api/brain/ops.
+export type BrainOps = {
+  booking_link: string;
+  signature_html: string;
+  brain_language: string;
+  brain_rules: string;
+};
+
+export const loadBrainOps = cache(async function loadBrainOps(slug: string): Promise<BrainOps> {
+  const empty: BrainOps = { booking_link: "", signature_html: "", brain_language: "", brain_rules: "" };
+  const sb = db();
+  if (!sb) return empty;
+  const { data } = await sb
+    .from("workspaces")
+    .select("booking_link,signature_html,brain_language,brain_rules")
+    .eq("slug", slug)
+    .maybeSingle();
+  if (!data) return empty;
+  return {
+    booking_link: String(data.booking_link ?? ""),
+    signature_html: String(data.signature_html ?? ""),
+    brain_language: String(data.brain_language ?? ""),
+    brain_rules: String(data.brain_rules ?? ""),
+  };
+});
+
 export async function loadIntelligence(slug: string): Promise<IntelligenceSection[]> {
   const sb = db();
   if (!sb) return [];
