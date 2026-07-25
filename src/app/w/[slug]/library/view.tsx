@@ -3,6 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  Brain,
+  CalendarClock,
+  FileSignature,
+  Languages,
+  ShieldAlert,
   Library,
   Building2,
   User,
@@ -27,6 +32,7 @@ import {
   Check,
 } from "lucide-react";
 import type { IntelligenceSection, IntelligenceKind } from "@/lib/portal/types";
+import type { BrainOps } from "@/lib/portal/data";
 import { ModuleHeader, Panel, Pill, SectionLabel, StatTile, cn } from "@/components/portal/ui";
 
 // Group order + labels + icons — the reading order the agents (and the client)
@@ -122,11 +128,13 @@ export function IntelligenceView({
   slug,
   wsName,
   sections,
+  ops,
   editable,
 }: {
   slug: string;
   wsName: string;
   sections: IntelligenceSection[];
+  ops: BrainOps;
   editable: boolean;
 }) {
   const router = useRouter();
@@ -150,12 +158,15 @@ export function IntelligenceView({
   const [optErr, setOptErr] = useState<string | null>(null);
   const [suggestion, setSuggestion] = useState<{ title: string; body: string } | null>(null);
 
+  // Every knowledge area renders, filled or not (Octave-style): an empty area
+  // shown as an invitation gets filled; an empty area hidden stays empty forever.
   const groups = GROUPS.map((g) => ({
     ...g,
     items: sections
       .filter((s) => s.kind === g.kind)
       .sort((a, b) => a.sort - b.sort),
-  })).filter((g) => g.items.length > 0);
+  }));
+  const filledCount = groups.filter((g) => g.items.length > 0).length;
 
   // Most recent updatedAt across all sections — the freshness of the brain.
   const lastUpdated = sections.reduce<string>((acc, s) => {
@@ -478,9 +489,9 @@ export function IntelligenceView({
   return (
     <div className="flex flex-col gap-7">
       <ModuleHeader
-        icon={Library}
-        title="Intelligence Library"
-        desc={`The living brain behind ${wsName}. Everything we know about them — who they are, how they sell, how they sound. Every agent loads this before it writes a single word.`}
+        icon={Brain}
+        title={`${wsName} Brain`}
+        desc={`Everything the agent knows about ${wsName} — who they are, how they sell, how they sound, and the exact links and rules it uses. Every agent loads this before it writes a single word.`}
         actions={
           <div className="flex items-center gap-3 flex-wrap">
             <span className="inline-flex items-center gap-2 text-[11px] text-muted-foreground">
@@ -517,10 +528,37 @@ export function IntelligenceView({
         </p>
       </Panel>
 
+      <BrainOpsPanel slug={slug} ops={ops} editable={editable} />
+
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <StatTile label="Sections" value={String(sections.length)} sub="knowledge entries" />
-        <StatTile label="Areas covered" value={String(groups.length)} sub={`of ${GROUPS.length} knowledge areas`} />
+        <StatTile label="Areas covered" value={`${filledCount}/${GROUPS.length}`} sub="knowledge areas filled" />
         <StatTile label="Last updated" value={fmtDate(lastUpdated)} sub="most recent section" tone="good" />
+      </div>
+
+      {/* Area map — one chip per knowledge area, dimmed when empty. Jump nav +
+          completeness meter in one: the gaps are visible at a glance. */}
+      <div className="flex flex-wrap gap-1.5">
+        {groups.map((g) => {
+          const GIcon = g.icon;
+          const has = g.items.length > 0;
+          return (
+            <a
+              key={g.kind}
+              href={`#brain-${g.kind}`}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors",
+                has
+                  ? "border-[#FFD60A]/25 bg-[#FFD60A]/5 text-foreground hover:border-[#FFD60A]/50"
+                  : "border-border/60 text-muted-foreground/50 hover:text-muted-foreground"
+              )}
+            >
+              <GIcon className={cn("w-3 h-3", has ? "text-[#FFD60A]" : "")} />
+              {g.label}
+              <span className="tabular-nums opacity-70">{g.items.length}</span>
+            </a>
+          );
+        })}
       </div>
 
       {/* Add section — the composer for brand-new knowledge. */}
@@ -560,8 +598,36 @@ export function IntelligenceView({
         groups.map((g) => {
           const Icon = g.icon;
           const isPlaybook = g.kind === "playbook";
+          // An empty area is a visible invitation, not a hidden hole.
+          if (g.items.length === 0) {
+            return (
+              <div key={g.kind} id={`brain-${g.kind}`} className="flex flex-col gap-2 scroll-mt-24">
+                <div className="flex items-center gap-2 flex-wrap opacity-60">
+                  <SectionLabel>{g.label}</SectionLabel>
+                  <Icon className="w-3.5 h-3.5 text-muted-foreground" />
+                </div>
+                <div className="rounded-xl border border-dashed border-border/70 px-4 py-3 flex items-center gap-3">
+                  <p className="text-[12.5px] italic text-muted-foreground/60 flex-1">
+                    Nothing here yet — the agent works without it until someone adds what it should know.
+                  </p>
+                  {editable && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditMode(true);
+                        openEditor({ id: null, kind: g.kind, title: "", body: "" });
+                      }}
+                      className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-[11px] text-muted-foreground hover:text-[#FFD60A] hover:border-[#FFD60A]/40 transition-colors shrink-0"
+                    >
+                      <Plus className="w-3 h-3" /> Add
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          }
           return (
-            <div key={g.kind} className="flex flex-col gap-4">
+            <div key={g.kind} id={`brain-${g.kind}`} className="flex flex-col gap-4 scroll-mt-24">
               <div className="flex items-center gap-2 flex-wrap">
                 <SectionLabel>{g.label}</SectionLabel>
                 <Icon className="w-3.5 h-3.5 text-[#FFD60A]" />
@@ -702,5 +768,184 @@ export function IntelligenceView({
         })
       )}
     </div>
+  );
+}
+
+// ─── Brain operational fields ────────────────────────────────────────────────
+// The exact values the engine injects verbatim into every draft (they ride on
+// the workspace row, edited via /api/brain/ops): the client's own booking
+// link, the warm-reply signature (previewed here exactly as the prospect will
+// see it, on a white email background), the writing language, and hard rules.
+// Prose knowledge lives in the sections below; these are config, not prose.
+
+const OPS_FIELDS: {
+  key: keyof BrainOps;
+  label: string;
+  hint: string;
+  icon: React.ComponentType<{ className?: string }>;
+  multiline?: boolean;
+  isHtml?: boolean;
+}[] = [
+  { key: "booking_link", label: "Booking link", icon: CalendarClock,
+    hint: "This client's own calendar. Drafts offer this link — never another client's." },
+  { key: "signature_html", label: "Warm-reply signature", icon: FileSignature, multiline: true, isHtml: true,
+    hint: "Attached when replying to a prospect who answered. Cold emails stay plain text. Shown below exactly as it will render." },
+  { key: "brain_language", label: "Language & tone", icon: Languages,
+    hint: "How the agent writes for this client, e.g. \"British English, punchy\"." },
+  { key: "brain_rules", label: "Hard rules", icon: ShieldAlert, multiline: true,
+    hint: "Absolute guardrails the agent obeys above everything, e.g. \"never quote prices in writing\"." },
+];
+
+function SignaturePreview({ html }: { html: string }) {
+  // Sandboxed iframe on a white background: signatures are built for email,
+  // and the portal's dark theme would lie about how they will actually look.
+  const doc = `<!doctype html><html><body style="margin:0;padding:18px;background:#ffffff;">${html}</body></html>`;
+  return (
+    <iframe
+      sandbox=""
+      srcDoc={doc}
+      title="Signature preview"
+      className="w-full rounded-lg border border-border bg-white"
+      style={{ height: 250 }}
+    />
+  );
+}
+
+function BrainOpsPanel({ slug, ops, editable }: { slug: string; ops: BrainOps; editable: boolean }) {
+  const router = useRouter();
+  const [editing, setEditing] = useState<keyof BrainOps | null>(null);
+  const [draft, setDraftValue] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+
+  const startEdit = (key: keyof BrainOps) => {
+    setEditing(key);
+    setDraftValue(ops[key] || "");
+    setErr("");
+  };
+  const save = async () => {
+    if (!editing) return;
+    setSaving(true);
+    setErr("");
+    try {
+      const r = await fetch("/api/brain/ops", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug, [editing]: draft }),
+      });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        throw new Error(j.error || `save failed (${r.status})`);
+      }
+      setEditing(null);
+      router.refresh();
+    } catch (e) {
+      setErr(String(e instanceof Error ? e.message : e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Panel className="p-5 flex flex-col gap-5 border-[#FFD60A]/25">
+      <div className="flex items-center gap-2">
+        <span className="grid place-items-center w-8 h-8 rounded-lg bg-[#FFD60A]/10 text-[#FFD60A] border border-[#FFD60A]/20">
+          <Brain className="w-4 h-4" />
+        </span>
+        <div>
+          <div className="text-sm font-semibold text-foreground">Operational fields</div>
+          <div className="text-[11px] text-muted-foreground">
+            The exact values the agent uses verbatim — synced live with the database.
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-5">
+        {OPS_FIELDS.map((f) => {
+          const value = ops[f.key] || "";
+          const isEditing = editing === f.key;
+          const Icon = f.icon;
+          return (
+            <div key={f.key} className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <Icon className="w-3.5 h-3.5 text-[#FFD60A]" />
+                <SectionLabel>{f.label}</SectionLabel>
+                {editable && !isEditing && (
+                  <button
+                    type="button"
+                    onClick={() => startEdit(f.key)}
+                    className="ml-auto inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:border-white/20 transition-colors"
+                  >
+                    <Pencil className="w-3 h-3" /> Edit
+                  </button>
+                )}
+              </div>
+              <p className="text-[11px] text-muted-foreground/80 leading-relaxed">{f.hint}</p>
+
+              {isEditing ? (
+                <div className="flex flex-col gap-2">
+                  {f.multiline ? (
+                    <textarea
+                      value={draft}
+                      onChange={(e) => setDraftValue(e.target.value)}
+                      rows={f.isHtml ? 8 : 4}
+                      spellCheck={false}
+                      className="w-full rounded-lg border border-[#FFD60A]/40 bg-background px-3 py-2 text-[12.5px] font-mono text-foreground focus:outline-none"
+                    />
+                  ) : (
+                    <input
+                      value={draft}
+                      onChange={(e) => setDraftValue(e.target.value)}
+                      spellCheck={false}
+                      className="w-full rounded-lg border border-[#FFD60A]/40 bg-background px-3 py-2 text-[13px] font-mono text-foreground focus:outline-none"
+                    />
+                  )}
+                  {f.isHtml && draft.trim() && <SignaturePreview html={draft} />}
+                  {err && <div className="text-[12px] text-red-400">{err}</div>}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={save}
+                      disabled={saving}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-[#FFD60A]/40 bg-[#FFD60A]/10 px-3 py-1.5 text-xs font-medium text-[#FFD60A] hover:bg-[#FFD60A]/15 transition-colors disabled:opacity-50"
+                    >
+                      {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                      Save
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditing(null)}
+                      disabled={saving}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <X className="w-3.5 h-3.5" /> Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : value ? (
+                f.isHtml ? (
+                  <SignaturePreview html={value} />
+                ) : f.key === "booking_link" ? (
+                  <a
+                    href={value}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-[13px] text-[#FFD60A] hover:underline break-all"
+                  >
+                    <LinkIcon className="w-3.5 h-3.5 shrink-0" /> {value}
+                  </a>
+                ) : (
+                  <p className="text-[13px] text-foreground/90 whitespace-pre-line leading-relaxed">{value}</p>
+                )
+              ) : (
+                <p className="text-[12.5px] italic text-muted-foreground/60">
+                  Not set yet — the agent works without it until someone fills it in.
+                </p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </Panel>
   );
 }

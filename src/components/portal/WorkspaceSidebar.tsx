@@ -5,7 +5,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { useState, useEffect } from "react";
 import {
   LayoutDashboard, Target, Mail, MessageCircle,
-  CalendarDays, CalendarClock, KanbanSquare, Library, ChevronsUpDown, ArrowLeft, Check,
+  CalendarDays, CalendarClock, KanbanSquare, Brain, ChevronsUpDown, ArrowLeft, Check,
   Settings, LogOut, PanelLeftClose, PanelLeftOpen, ShieldBan, Route, Menu, X,
   Megaphone, Flame,
 } from "lucide-react";
@@ -35,7 +35,7 @@ function shortListLabel(name: string): string {
 // Counts come live from the parent layout; hide a badge at 0 so an empty
 // workspace (e.g. Luxvance before its leads land) reads clean, not "0".
 // Layout (Jose 2026-07-16): the three "whole-workspace" views sit at the very top
-// with no header (Dashboard · Intelligence Library · Client Success Roadmap), then
+// with no header (Dashboard · the client's Brain · Client Success Roadmap), then
 // the funnel sections follow: Targeted lists → Cold outreach → Ads → CRM, with the
 // Blocklist as a standalone guard at the bottom. A group with group:"" renders its
 // items without a section header.
@@ -56,7 +56,9 @@ function buildNav(w: Workspace | null, enabled: Set<string>, slug: string, lists
       group: "",
       items: [
         { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-        { key: "library", label: "Intelligence Library", icon: Library },
+        // "<Client> Brain" — the client's name owns the module (Jose, 2026-07-25):
+        // Arco Irish Brain, Kcal Brain. The agent's editable memory, not a "library".
+        { key: "library", label: w?.name ? `${w.name} Brain` : "Brain", icon: Brain },
         { key: "roadmap", label: "Client Success Roadmap", icon: Route },
       ],
     },
