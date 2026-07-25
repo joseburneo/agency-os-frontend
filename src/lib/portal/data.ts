@@ -275,9 +275,14 @@ export async function loadCrm(
   const empty = { cards: [] as CrmCard[], warm: 0, meetings: 0 };
   if (!slug) return empty; // never ask the API for "every workspace"
   try {
+    // Bounded: a Render mid-deploy answers nothing for minutes, and an unbounded
+    // fetch here once stalled the Vercel build's prerender of "/" past its 60s
+    // budget. Better an empty CRM slice than a failed build or a hung page.
     const [pRes, sRes] = await Promise.all([
-      fetch(`${CRM_API}/api/crm/prospects?workspace=${encodeURIComponent(slug)}`, { next: { revalidate: 60 } }),
-      fetch(`${CRM_API}/api/crm/summary?workspace=${encodeURIComponent(slug)}`, { next: { revalidate: 60 } }),
+      fetch(`${CRM_API}/api/crm/prospects?workspace=${encodeURIComponent(slug)}`,
+        { next: { revalidate: 60 }, signal: AbortSignal.timeout(15000) }),
+      fetch(`${CRM_API}/api/crm/summary?workspace=${encodeURIComponent(slug)}`,
+        { next: { revalidate: 60 }, signal: AbortSignal.timeout(15000) }),
     ]);
     const pJson = pRes.ok ? await pRes.json() : null;
     const sJson = sRes.ok ? await sRes.json() : null;
@@ -548,18 +553,24 @@ export async function loadWorkspaces(): Promise<Workspace[] | null> {
     .order("name", { ascending: true });
   if (!rows) return null;
 
-  const out: Workspace[] = [];
-  for (const row of rows) {
-    const { count } = await sb
-      .from("target_list_leads")
-      .select("id", { count: "exact", head: true })
-      .eq("workspace_id", row.id as string);
-    const w = workspaceFromRow(row as Record<string, unknown>, count ?? 0);
-    // Warm/meetings from the same CRM source (wired for Luxvance today).
-    const crm = await loadCrm(w.slug);
-    w.warmLeads = crm.warm;
-    w.meetings = crm.meetings;
-    out.push(w);
-  }
-  return out;
+  // All workspaces in parallel. This used to be a sequential loop — one lead
+  // count plus two CRM fetches per workspace, one after another — and with ten
+  // workspaces that chain blew the 60s prerender budget whenever the Render API
+  // was slow or mid-deploy, failing the whole Vercel build on "/".
+  return Promise.all(
+    rows.map(async (row) => {
+      const [{ count }, crm] = await Promise.all([
+        sb
+          .from("target_list_leads")
+          .select("id", { count: "exact", head: true })
+          .eq("workspace_id", row.id as string),
+        // Warm/meetings from the same CRM source (wired for Luxvance today).
+        loadCrm(String(row.slug)),
+      ]);
+      const w = workspaceFromRow(row as Record<string, unknown>, count ?? 0);
+      w.warmLeads = crm.warm;
+      w.meetings = crm.meetings;
+      return w;
+    })
+  );
 }
