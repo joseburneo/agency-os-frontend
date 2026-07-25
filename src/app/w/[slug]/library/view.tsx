@@ -158,12 +158,15 @@ export function IntelligenceView({
   const [optErr, setOptErr] = useState<string | null>(null);
   const [suggestion, setSuggestion] = useState<{ title: string; body: string } | null>(null);
 
+  // Every knowledge area renders, filled or not (Octave-style): an empty area
+  // shown as an invitation gets filled; an empty area hidden stays empty forever.
   const groups = GROUPS.map((g) => ({
     ...g,
     items: sections
       .filter((s) => s.kind === g.kind)
       .sort((a, b) => a.sort - b.sort),
-  })).filter((g) => g.items.length > 0);
+  }));
+  const filledCount = groups.filter((g) => g.items.length > 0).length;
 
   // Most recent updatedAt across all sections — the freshness of the brain.
   const lastUpdated = sections.reduce<string>((acc, s) => {
@@ -529,8 +532,33 @@ export function IntelligenceView({
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <StatTile label="Sections" value={String(sections.length)} sub="knowledge entries" />
-        <StatTile label="Areas covered" value={String(groups.length)} sub={`of ${GROUPS.length} knowledge areas`} />
+        <StatTile label="Areas covered" value={`${filledCount}/${GROUPS.length}`} sub="knowledge areas filled" />
         <StatTile label="Last updated" value={fmtDate(lastUpdated)} sub="most recent section" tone="good" />
+      </div>
+
+      {/* Area map — one chip per knowledge area, dimmed when empty. Jump nav +
+          completeness meter in one: the gaps are visible at a glance. */}
+      <div className="flex flex-wrap gap-1.5">
+        {groups.map((g) => {
+          const GIcon = g.icon;
+          const has = g.items.length > 0;
+          return (
+            <a
+              key={g.kind}
+              href={`#brain-${g.kind}`}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors",
+                has
+                  ? "border-[#FFD60A]/25 bg-[#FFD60A]/5 text-foreground hover:border-[#FFD60A]/50"
+                  : "border-border/60 text-muted-foreground/50 hover:text-muted-foreground"
+              )}
+            >
+              <GIcon className={cn("w-3 h-3", has ? "text-[#FFD60A]" : "")} />
+              {g.label}
+              <span className="tabular-nums opacity-70">{g.items.length}</span>
+            </a>
+          );
+        })}
       </div>
 
       {/* Add section — the composer for brand-new knowledge. */}
@@ -570,8 +598,36 @@ export function IntelligenceView({
         groups.map((g) => {
           const Icon = g.icon;
           const isPlaybook = g.kind === "playbook";
+          // An empty area is a visible invitation, not a hidden hole.
+          if (g.items.length === 0) {
+            return (
+              <div key={g.kind} id={`brain-${g.kind}`} className="flex flex-col gap-2 scroll-mt-24">
+                <div className="flex items-center gap-2 flex-wrap opacity-60">
+                  <SectionLabel>{g.label}</SectionLabel>
+                  <Icon className="w-3.5 h-3.5 text-muted-foreground" />
+                </div>
+                <div className="rounded-xl border border-dashed border-border/70 px-4 py-3 flex items-center gap-3">
+                  <p className="text-[12.5px] italic text-muted-foreground/60 flex-1">
+                    Nothing here yet — the agent works without it until someone adds what it should know.
+                  </p>
+                  {editable && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditMode(true);
+                        openEditor({ id: null, kind: g.kind, title: "", body: "" });
+                      }}
+                      className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-[11px] text-muted-foreground hover:text-[#FFD60A] hover:border-[#FFD60A]/40 transition-colors shrink-0"
+                    >
+                      <Plus className="w-3 h-3" /> Add
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          }
           return (
-            <div key={g.kind} className="flex flex-col gap-4">
+            <div key={g.kind} id={`brain-${g.kind}`} className="flex flex-col gap-4 scroll-mt-24">
               <div className="flex items-center gap-2 flex-wrap">
                 <SectionLabel>{g.label}</SectionLabel>
                 <Icon className="w-3.5 h-3.5 text-[#FFD60A]" />
