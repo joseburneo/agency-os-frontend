@@ -23,7 +23,7 @@ type NavItem = {
   indent?: boolean; // a sub-item under its parent (the individual lists)
 };
 type NavGroup = { group: string; items: NavItem[] };
-type WsLite = { slug: string; name: string; accent: string; kind?: string; domain?: string };
+type WsLite = { slug: string; name: string; accent: string; kind?: string; domain?: string; isAgency?: boolean };
 type ListLite = { key: string; name: string; count: number };
 
 // "List 1 · No in-house HR" -> "No in-house HR"; "VIP" -> "VIP". The section header
@@ -195,8 +195,12 @@ export function WorkspaceSidebar({ slug, ws, workspaces, lists = [], demo = fals
                 more of the second. Mixed together, the accounts that matter get
                 lost among the demos. */}
             {(() => {
-              const clients = workspaces.filter((w) => w.kind !== "magnet");
-              const magnets = workspaces.filter((w) => w.kind === "magnet");
+              // Three tiers, never mixed: the agency runs the show, clients pay
+              // for it, demos sell it. Luxvance among the clients read as if the
+              // agency were its own account.
+              const agency = workspaces.filter((w) => w.isAgency);
+              const clients = workspaces.filter((w) => !w.isAgency && w.kind !== "magnet");
+              const magnets = workspaces.filter((w) => !w.isAgency && w.kind === "magnet");
               const row = (wsl: WsLite) => (
                 <Link
                   key={wsl.slug}
@@ -217,8 +221,18 @@ export function WorkspaceSidebar({ slug, ws, workspaces, lists = [], demo = fals
               );
               return (
                 <div className="max-h-[70vh] overflow-y-auto">
-                  {clients.length > 0 && heading("Clients", clients.length)}
-                  {clients.map(row)}
+                  {agency.length > 0 && (
+                    <>
+                      {heading("Agency", agency.length)}
+                      {agency.map(row)}
+                    </>
+                  )}
+                  {clients.length > 0 && (
+                    <div className={cn(agency.length > 0 && "border-t border-border mt-1")}>
+                      {heading("Clients", clients.length)}
+                      {clients.map(row)}
+                    </div>
+                  )}
                   {magnets.length > 0 && (
                     <div className="border-t border-border mt-1">
                       {heading("Demo accounts", magnets.length)}
