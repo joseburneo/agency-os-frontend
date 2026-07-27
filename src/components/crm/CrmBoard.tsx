@@ -38,6 +38,7 @@ type Card = {
   has_linkedin: boolean;
   reply_snippet: string;
   last_reply_at: string | null;
+  gone_quiet_days: number;
   waiting_on: "us" | "them" | "closed";
   wants_meeting: boolean;
   heat: number;
@@ -70,6 +71,9 @@ type Detail = Card & {
   build_audience: string;
   build_leads: number;
   build_published: boolean;
+  build_first_opened_at: string | null;
+  build_last_opened_at: string | null;
+  build_open_count: number;
   live_channel: string;
   can_send_email: boolean;
   intent_label: string;
@@ -1053,6 +1057,12 @@ function BuildCard({ d, onChanged, autoOptimize = false }: { d: Detail; onChange
     ? { txt: "Delivered to prospect", cls: "text-[#26D07C]" }
     : d.build_published ? { txt: "Published · link live", cls: "text-[#FFD60A]" }
     : { txt: "Built · link not resolving", cls: "text-[#ef4444]" };
+  // The open signal: THE follow-up trigger. "Opened 20m ago" means they are
+  // looking at it right now — reach out while the tab is still warm.
+  const opened = d.build_last_opened_at
+    ? { txt: `Opened ${timeAgo(d.build_last_opened_at)}${(d.build_open_count || 0) > 1 ? ` · ${d.build_open_count} visits` : ""}`,
+        hot: Date.now() - new Date(d.build_last_opened_at).getTime() < 3600000 }
+    : d.build_delivered ? { txt: "Not opened yet", hot: false } : null;
 
   return (
     <div>
@@ -1078,7 +1088,14 @@ function BuildCard({ d, onChanged, autoOptimize = false }: { d: Detail; onChange
                 {d.build_audience || "Personalized sample"}{d.build_leads ? ` · ${d.build_leads} sample leads` : ""}
               </div>
             </div>
-            <span className={`shrink-0 text-xs ${statusLine.cls}`}>{statusLine.txt}</span>
+            <div className="shrink-0 text-right">
+              <span className={`block text-xs ${statusLine.cls}`}>{statusLine.txt}</span>
+              {opened && (
+                <span className={`block text-[11px] mt-0.5 ${opened.hot ? "text-[#26D07C] font-medium" : "text-muted-foreground"}`}>
+                  {opened.hot ? "🔥 " : ""}{opened.txt}
+                </span>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <a href={d.build_url} target="_blank" rel="noreferrer"
@@ -2046,7 +2063,11 @@ function BoardCard({ r, onOpen }: { r: Card; onOpen: (id: number) => void }) {
     r.waiting_on === "us"
       ? { text: owed <= 0 ? "replied today" : `${owed}d silent`, cls: owed >= 7 ? "text-[#ff9b9b]" : owed >= 3 ? "text-[#f0b45f]" : "text-muted-foreground" }
       : r.waiting_on === "them"
-      ? { text: r.next_touch_at ? (isDue(r.next_touch_at) ? "nudge due" : `next ${fmtDate(r.next_touch_at)}`) : timeAgo(r.last_touch_at), cls: r.next_touch_at && isDue(r.next_touch_at) ? "text-[#FFD60A]" : "text-muted-foreground" }
+      ? (r.gone_quiet_days
+          // We answered, they went silent, nothing is scheduled: without this the
+          // card fell out of every queue forever (the Hisham blind spot).
+          ? { text: `quiet ${r.gone_quiet_days}d · nudge due`, cls: "text-[#FFD60A]" }
+          : { text: r.next_touch_at ? (isDue(r.next_touch_at) ? "nudge due" : `next ${fmtDate(r.next_touch_at)}`) : timeAgo(r.last_touch_at), cls: r.next_touch_at && isDue(r.next_touch_at) ? "text-[#FFD60A]" : "text-muted-foreground" })
       : { text: r.stage_label || r.status_label, cls: "text-muted-foreground" };
   return (
     <div role="button" tabIndex={0} draggable

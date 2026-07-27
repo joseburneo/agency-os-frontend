@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { WorkspaceSidebar } from "@/components/portal/WorkspaceSidebar";
 import { DemoBanner } from "@/components/portal/DemoBanner";
+import { VisitBeacon } from "@/components/portal/VisitBeacon";
 import { getWorkspace, WORKSPACES } from "@/lib/portal/mock";
 import { loadWorkspaces, loadListsMeta } from "@/lib/portal/data";
 import { portalMode } from "@/lib/portal/access";
@@ -35,6 +36,10 @@ export default async function WorkspaceLayout({
 
   return (
     <div className="w-full">
+      {/* Open tracking, magnets only: the beacon fires client-side (past any ISR
+          cache) and the API route drops agency visits, so only the prospect's
+          own opens reach the CRM card. */}
+      {kind === "magnet" && mode !== "agency" && <VisitBeacon slug={slug} />}
       {demo && <DemoBanner name={ws.name} />}
       {/* Mobile: column (sticky top bar above content). Desktop: original row. */}
       <div className="flex flex-col lg:flex-row lg:gap-6 lg:items-start">
