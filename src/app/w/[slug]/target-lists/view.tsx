@@ -76,6 +76,7 @@ function bodyForStep(l: Lead, step: number): string {
   return step === 2 ? l.emailBody2 ?? "" : step === 3 ? l.emailBody3 ?? "" : l.emailBody ?? "";
 }
 function subjectForStep(l: Lead, step: number): string {
+  if (step === 0) return ""; // step 0 = the LinkedIn note tab, no subject line
   const s = l.emailSubject ?? "";
   return step === 1 || !s ? s : `Re: ${s}`;
 }
@@ -471,25 +472,15 @@ export function TargetListsView({
                   {showNote && (
                     <td className="px-4 py-3">
                       {l.linkedinNote ? (
+                        // A blind "Copy note" told nobody WHAT was behind it. This
+                        // opens the same drawer as the email, on the LinkedIn tab,
+                        // where the note is readable and copyable (Jose, 2026-07-27).
                         <button
-                          onClick={() => copyText(`note-${l.id}`, l.linkedinNote!)}
-                          title="Copy the personalised LinkedIn connection note for this person"
-                          className={cn(
-                            "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[12px] font-medium transition-colors whitespace-nowrap",
-                            copied === `note-${l.id}`
-                              ? "border-[#26D07C]/30 bg-[#26D07C]/10 text-[#26D07C]"
-                              : "border-border bg-card text-foreground hover:border-white/20"
-                          )}
+                          onClick={() => { setPreview(l); setPreviewStep(0); }}
+                          title="Read the personalised LinkedIn connection note written for this person"
+                          className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1.5 text-[12px] font-medium text-foreground hover:border-white/20 transition-colors whitespace-nowrap"
                         >
-                          {copied === `note-${l.id}` ? (
-                            <>
-                              <Check className="w-3.5 h-3.5" /> Copied
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="w-3.5 h-3.5" /> Copy note
-                            </>
-                          )}
+                          <Eye className="w-3.5 h-3.5" /> View note
                         </button>
                       ) : (
                         <span className="text-muted-foreground">—</span>
@@ -637,19 +628,27 @@ export function TargetListsView({
             </div>
 
             <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-4">
-              <div>
-                <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground mb-1">To</div>
-                <div className="text-sm font-mono text-foreground">
-                  {preview.hasEmail
-                    ? preview.emailDisplay
-                    : magnet
-                      ? "verified address · delivered after your call"
-                      : "no email yet"}
+              {previewStep === 0 ? (
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground mb-1">Channel</div>
+                  <div className="text-sm font-mono text-foreground">LinkedIn · connection request</div>
                 </div>
-              </div>
-              {/* One thread, three touches. Tabs switch the touch; Email 1 leads,
-                  the follow-ups only appear once they exist on the lead. */}
-              {(preview.emailBody2 || preview.emailBody3) && (
+              ) : (
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground mb-1">To</div>
+                  <div className="text-sm font-mono text-foreground">
+                    {preview.hasEmail
+                      ? preview.emailDisplay
+                      : magnet
+                        ? "verified address · delivered after your call"
+                        : "no email yet"}
+                  </div>
+                </div>
+              )}
+              {/* One thread across channels: the email touches plus the LinkedIn
+                  connection note, each a tab. Tabs only appear once a second
+                  channel or touch exists on the lead. */}
+              {(preview.emailBody2 || preview.emailBody3 || preview.linkedinNote) && (
                 <div className="flex items-center gap-1.5">
                   {[1, 2, 3].map((n) => {
                     const has = n === 1 ? Boolean(preview.emailBody) : n === 2 ? Boolean(preview.emailBody2) : Boolean(preview.emailBody3);
@@ -670,6 +669,19 @@ export function TargetListsView({
                       </button>
                     );
                   })}
+                  {preview.linkedinNote && (
+                    <button
+                      type="button"
+                      onClick={() => setPreviewStep(0)}
+                      className={`rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors ${
+                        previewStep === 0
+                          ? "border border-[#5aa2ff]/40 bg-[#5aa2ff]/10 text-[#8ec2ff]"
+                          : "border border-border bg-card text-muted-foreground hover:text-foreground hover:border-white/20"
+                      }`}
+                    >
+                      LinkedIn note
+                    </button>
+                  )}
                 </div>
               )}
               {subjectForStep(preview, previewStep) && (
@@ -678,31 +690,79 @@ export function TargetListsView({
                   <div className="text-sm font-medium text-foreground">{subjectForStep(preview, previewStep)}</div>
                 </div>
               )}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Message</div>
-                  <div className="text-[10px] text-muted-foreground">
-                    <span className="underline decoration-[#FFD60A]/70 decoration-2 underline-offset-2 text-[#FFD60A]">underlined</span> = personalized to this lead
+              {previewStep === 0 ? (
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Connection note</div>
+                    <div className="text-[10px] text-muted-foreground tabular-nums">
+                      {(preview.linkedinNote ?? "").length}/300 characters
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-border bg-input p-4 text-[13px] leading-relaxed text-foreground whitespace-pre-wrap">
+                    {preview.linkedinNote}
                   </div>
                 </div>
-                <div className="rounded-lg border border-border bg-input p-4 text-[13px] leading-relaxed text-foreground whitespace-pre-wrap">
-                  {renderPersonalized(bodyForStep(preview, previewStep), preview.name.split(" ")[0] ?? "", preview.company)}
+              ) : (
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Message</div>
+                    <div className="text-[10px] text-muted-foreground">
+                      <span className="underline decoration-[#FFD60A]/70 decoration-2 underline-offset-2 text-[#FFD60A]">underlined</span> = personalized to this lead
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-border bg-input p-4 text-[13px] leading-relaxed text-foreground whitespace-pre-wrap">
+                    {renderPersonalized(bodyForStep(preview, previewStep), preview.name.split(" ")[0] ?? "", preview.company)}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             <div className="p-5 border-t border-border flex items-center justify-between gap-3">
-              <span className="text-[11px] text-muted-foreground">
-                Email {previewStep} · opens in your mail app, from you, signature and all.
-              </span>
-              {preview.canSend && (
-                <button
-                  type="button"
-                  onClick={() => openCompose(preview, previewStep)}
-                  className="inline-flex items-center gap-2 rounded-lg border border-[#FFD60A]/30 bg-[#FFD60A]/10 px-4 py-2 text-[13px] font-semibold text-[#FFD60A] hover:bg-[#FFD60A]/15 transition-colors"
-                >
-                  <Send className="w-4 h-4" /> Send Email {previewStep}
-                </button>
+              {previewStep === 0 ? (
+                <>
+                  <span className="text-[11px] text-muted-foreground">
+                    Copy the note, hit Connect on their profile, paste.
+                  </span>
+                  <div className="flex items-center gap-2">
+                    {preview.linkedinUrl && (
+                      <a
+                        href={preview.linkedinUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-[13px] font-medium text-foreground hover:border-white/20 transition-colors"
+                      >
+                        Open LinkedIn <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => copyText("drawer-note", preview.linkedinNote ?? "")}
+                      className={cn(
+                        "inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-[13px] font-semibold transition-colors",
+                        copied === "drawer-note"
+                          ? "border-[#26D07C]/30 bg-[#26D07C]/10 text-[#26D07C]"
+                          : "border-[#5aa2ff]/40 bg-[#5aa2ff]/10 text-[#8ec2ff] hover:bg-[#5aa2ff]/15"
+                      )}
+                    >
+                      {copied === "drawer-note" ? (<><Check className="w-4 h-4" /> Copied</>) : (<><Copy className="w-4 h-4" /> Copy note</>)}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <span className="text-[11px] text-muted-foreground">
+                    Email {previewStep} · opens in your mail app, from you, signature and all.
+                  </span>
+                  {preview.canSend && (
+                    <button
+                      type="button"
+                      onClick={() => openCompose(preview, previewStep)}
+                      className="inline-flex items-center gap-2 rounded-lg border border-[#FFD60A]/30 bg-[#FFD60A]/10 px-4 py-2 text-[13px] font-semibold text-[#FFD60A] hover:bg-[#FFD60A]/15 transition-colors"
+                    >
+                      <Send className="w-4 h-4" /> Send Email {previewStep}
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </div>
