@@ -59,7 +59,7 @@ To be eligible for the grant the candidate must bring new skills to the leadersh
 
 We combine executive search, business psychology, and rigorous assessment to find leaders with the capability and cultural fit to lead transformation and accelerate growth. Getting these hires wrong causes severe disruption; getting them right is critical for scaling businesses like [Company].
 
-Where there is already a [HR title] in place, I prefer to work alongside them; I would be glad to include [Senior HR lead] so the appointment is a shared decision.
+The best outcomes come from close partnership with the [HR title], who brings invaluable organisational context. I would be delighted to work with [Senior HR lead] throughout any search and selection work you are considering, while ensuring you retain ownership.
 
 If strengthening your leadership team is on your agenda, I would welcome a conversation about how we can support your goals.
 
