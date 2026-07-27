@@ -409,7 +409,57 @@ function Briefing({ onOpen, workspace }: { onOpen: (id: number) => void; workspa
 }
 
 // ── conversation thread (live from Instantly) ────────────────────────
-type ThreadMsg = { from_me: boolean; at: string | null; subject: string; text: string; from_addr: string; to_addr: string; eaccount: string };
+type ThreadMsg = { from_me: boolean; at: string | null; subject: string; text: string; sig?: string; from_addr: string; to_addr: string; eaccount: string };
+
+// URLs and emails become real links inside a bubble — a pasted Build link should be
+// clickable, and seeing it as a link confirms it went out as one.
+const LINK_RE = /(https?:\/\/[^\s<>()]+[^\s<>().,;:!?'"]|[\w.+-]+@[\w-]+\.[\w.]+)/g;
+function linkify(text: string, color: string) {
+  return text.split(LINK_RE).map((part, i) =>
+    i % 2 === 1 ? (
+      <a key={i} href={part.includes("@") && !part.startsWith("http") ? `mailto:${part}` : part}
+        target="_blank" rel="noopener noreferrer"
+        className="underline underline-offset-2 break-all hover:opacity-80" style={{ color }}>
+        {part}
+      </a>
+    ) : part
+  );
+}
+
+// WhatsApp-style day chips + exact clock times: "5d ago" on every bubble made the
+// thread feel like a log; a conversation reads by day and hour.
+function dayKey(s: string | null): string { return s ? new Date(s).toDateString() : ""; }
+function dayLabel(s: string | null): string {
+  if (!s) return "";
+  const d = new Date(s), now = new Date();
+  const one = 86400000, today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const that = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  if (that === today) return "Today";
+  if (today - that === one) return "Yesterday";
+  return d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+}
+function clock(s: string | null): string {
+  return s ? new Date(s).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "";
+}
+
+// The prospect's letterhead (name/title/phones) rides under the message, collapsed.
+// It stays one tap away — sometimes the phone number in it is exactly what Jose wants.
+function SigToggle({ sig }: { sig: string }) {
+  const [openSig, setOpenSig] = useState(false);
+  return (
+    <div className="mt-1.5">
+      <button type="button" onClick={() => setOpenSig((o) => !o)}
+        className="text-[10px] tracking-wide text-[#9aa2b1] hover:text-[#4b5563] transition-colors">
+        {openSig ? "hide signature" : "· · · signature"}
+      </button>
+      {openSig && (
+        <div className="mt-1 pt-1.5 border-t border-black/10 text-[11.5px] leading-snug text-[#6b7280] whitespace-pre-wrap">
+          {sig}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // Distill the email chrome: strip Re:/Fwd: chains, collapse whitespace.
 function cleanSubject(s: string): string {
@@ -465,47 +515,54 @@ function ConvoBlock({ c, themName, defaultOpen }: { c: Convo; themName: string; 
         <span className="shrink-0 text-[10px] text-muted-foreground w-3 text-center">{open ? "▾" : "▸"}</span>
       </button>
       {open && (
-        <div className="px-3 pb-3 pt-2.5 space-y-3 border-t border-border">
+        <div className="px-3 pb-3 pt-2.5 space-y-1 border-t border-border">
           {ordered.map((m, i) => {
             const orig = c.messages.length - 1 - i;
-            const who = m.from_me ? "You" : themName;
             const latest = i === 0 && !m.from_me;
             const route = routeShow[orig] && (m.from_addr || m.to_addr) ? (
               <>{shortAddr(m.from_addr)} <span style={{ color: src.bar }}>&gt;</span> {shortAddr(m.to_addr)}</>
             ) : null;
+            // Newest-first list: the day chip sits above the newest message of each day.
+            const newDay = i === 0 || dayKey(m.at) !== dayKey(ordered[i - 1].at);
             return (
-              <div key={i} className={`flex gap-2.5 ${m.from_me ? "flex-row-reverse" : ""}`}>
-                <div className="shrink-0 w-8 h-8 rounded-full grid place-items-center text-[11px] font-semibold overflow-hidden"
-                  style={m.from_me ? { background: "rgba(255,214,10,.15)", color: "#FFD60A" } : { background: src.tint }}>
-                  {m.from_me ? "JB" : <Favicon domain={src.logo} label={src.name} size={16} />}
-                </div>
-                {m.from_me ? (
-                  // OUR reply — dark bubble tinted with the channel colour it went out on
-                  <div className="max-w-[82%] rounded-2xl px-3.5 py-2.5 text-sm border"
-                    style={{ background: src.tint, borderColor: src.ring }}>
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span className="text-[11px] font-semibold" style={{ color: src.bar }}>You</span>
-                      <span className="text-[11px] text-muted-foreground tabular-nums">{timeAgo(m.at)}</span>
-                      <span className="text-[9px] uppercase tracking-wide" style={{ color: src.bar }}>via {src.name}</span>
-                    </div>
-                    {route && <div className="text-[10.5px] text-muted-foreground/80 mb-1.5 truncate">{route}</div>}
-                    <div className="text-foreground whitespace-pre-wrap leading-relaxed">{m.text}</div>
-                  </div>
-                ) : (
-                  // THEIR reply — white "paper" like the real inbox, so HTML email renders faithfully
-                  <div className="max-w-[82%] rounded-2xl overflow-hidden border shadow-sm bg-white"
-                    style={{ borderColor: latest ? src.ring : "rgba(0,0,0,.10)", borderLeft: `3px solid ${src.bar}` }}>
-                    <div className="px-3.5 py-2.5 text-sm text-[#1a1a1a]">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-[11px] font-semibold text-[#111]">{who}</span>
-                        <span className="text-[11px] text-[#6b7280] tabular-nums">{timeAgo(m.at)}</span>
-                        {latest && <span className="text-[10px] font-medium" style={{ color: src.bar }}>latest</span>}
-                      </div>
-                      {route && <div className="text-[10.5px] text-[#6b7280] mb-1.5 truncate">{route}</div>}
-                      <div className="whitespace-pre-wrap leading-relaxed text-[#1a1a1a]">{m.text}</div>
-                    </div>
+              <div key={i}>
+                {newDay && (
+                  <div className="flex items-center gap-3 py-2">
+                    <span className="flex-1 h-px bg-border/60" />
+                    <span className="text-[9.5px] uppercase tracking-[0.14em] text-muted-foreground/70">{dayLabel(m.at)}</span>
+                    <span className="flex-1 h-px bg-border/60" />
                   </div>
                 )}
+                <div className={`flex gap-2.5 ${m.from_me ? "flex-row-reverse" : ""}`}>
+                  <div className="shrink-0 w-8 h-8 rounded-full grid place-items-center text-[11px] font-semibold overflow-hidden"
+                    style={m.from_me ? { background: "rgba(255,214,10,.15)", color: "#FFD60A" } : { background: src.tint }}>
+                    {m.from_me ? "JB" : <Favicon domain={src.logo} label={src.name} size={16} />}
+                  </div>
+                  <div className={`max-w-[min(82%,60ch)] flex flex-col ${m.from_me ? "items-end" : "items-start"}`}>
+                    {m.from_me ? (
+                      // OUR message — elevated navy, thin gold border (iMessage Luxvance)
+                      <div className="rounded-2xl rounded-br-md px-3.5 py-2.5 text-sm border"
+                        style={{ background: "rgba(255,255,255,0.045)", borderColor: "rgba(255,214,10,0.4)" }}>
+                        <div className="text-foreground whitespace-pre-wrap leading-relaxed">{linkify(m.text, "#FFD60A")}</div>
+                      </div>
+                    ) : (
+                      // THEIR message — white paper, black text, like the real inbox
+                      <div className="rounded-2xl rounded-bl-md border shadow-sm bg-white px-3.5 py-2.5 text-sm text-[#1a1a1a]"
+                        style={{ borderColor: latest ? src.ring : "rgba(0,0,0,.10)" }}>
+                        <div className="whitespace-pre-wrap leading-relaxed">{linkify(m.text, "#1d4ed8")}</div>
+                        {m.sig ? <SigToggle sig={m.sig} /> : null}
+                      </div>
+                    )}
+                    {/* meta line UNDER the bubble: hour · via · route — never competing with the text */}
+                    <div className={`mt-1 px-1 flex items-center gap-1.5 text-[10px] text-muted-foreground/80 ${m.from_me ? "flex-row-reverse" : ""}`}
+                      title={m.at ? new Date(m.at).toLocaleString("en-GB") : undefined}>
+                      <span className="tabular-nums">{clock(m.at)}</span>
+                      {m.from_me && <span style={{ color: src.bar }}>via {src.name} ✓</span>}
+                      {latest && <span className="font-medium" style={{ color: src.bar }}>latest</span>}
+                      {route && <span className="truncate max-w-[40ch]">{route}</span>}
+                    </div>
+                  </div>
+                </div>
               </div>
             );
           })}
@@ -517,11 +574,12 @@ function ConvoBlock({ c, themName, defaultOpen }: { c: Convo; themName: string; 
 
 function Conversation({ id, themName, fallback, refreshKey }: { id: number; themName: string; fallback?: string; refreshKey?: number }) {
   const [convos, setConvos] = useState<Convo[] | null>(null);
+  const [uniboxUrl, setUniboxUrl] = useState<string>("");
   useEffect(() => {
     setConvos(null);
     fetch(`${API}/api/crm/prospect/${id}/thread`)
       .then((r) => r.json())
-      .then((j) => setConvos(j.conversations || []))
+      .then((j) => { setConvos(j.conversations || []); setUniboxUrl(j.unibox_url || ""); })
       .catch(() => setConvos([]));
   }, [id, refreshKey]);
 
@@ -538,6 +596,12 @@ function Conversation({ id, themName, fallback, refreshKey }: { id: number; them
         <span>// CONVERSATIONS · {convos.length}</span>
         {repliedCount > 0 && <span className="text-[#26D07C]/70 normal-case tracking-normal">{repliedCount} replied</span>}
         {convos.length - repliedCount > 0 && <span className="text-muted-foreground/60 normal-case tracking-normal">{convos.length - repliedCount} cold campaign{convos.length - repliedCount > 1 ? "s" : ""}</span>}
+        {uniboxUrl && (
+          <a href={uniboxUrl} target="_blank" rel="noopener noreferrer"
+            className="ml-auto normal-case tracking-normal text-[10.5px] text-muted-foreground hover:text-[#FFD60A] transition-colors">
+            Open in Instantly ↗
+          </a>
+        )}
       </div>
       {convos.map((c, i) => (
         <ConvoBlock key={c.eaccount} c={c} themName={themName} defaultOpen={i === 0} />
