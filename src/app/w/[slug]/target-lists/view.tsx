@@ -140,6 +140,14 @@ export function TargetListsView({
     () => data.leads.some((l) => l.listId === activeList && l.segment === "vip"),
     [data.leads, activeList]
   );
+  // The per-lead LinkedIn connection note is half the value of a magnet row,
+  // and it was gated behind the VIP layout — magnet leads carry no segment, so
+  // Jose's prospects never saw the notes the Build wrote for them. Show the
+  // column wherever notes actually exist.
+  const showNote = useMemo(
+    () => isVip || data.leads.some((l) => l.listId === activeList && !!l.linkedinNote),
+    [data.leads, activeList, isVip]
+  );
   // The "Has senior HR" list names each company's HR lead so Paul can position as a
   // partner. Show that person (name + title) as a column, the way the old portal did,
   // in place of Sector (which is empty for this list). Detected from unfiltered rows.
@@ -379,7 +387,7 @@ export function TargetListsView({
                   <th className="text-left font-medium px-4 py-3">Sector</th>
                 ) : null}
                 <th className="text-left font-medium px-4 py-3">LinkedIn</th>
-                {isVip && <th className="text-left font-medium px-4 py-3">Note</th>}
+                {showNote && <th className="text-left font-medium px-4 py-3">Note</th>}
                 {isVip && <th className="text-left font-medium px-4 py-3">Phone</th>}
                 <th className="text-right font-medium px-4 py-3">{magnet ? "Your outreach" : "Email"}</th>
               </tr>
@@ -460,7 +468,7 @@ export function TargetListsView({
                       )}
                     </div>
                   </td>
-                  {isVip && (
+                  {showNote && (
                     <td className="px-4 py-3">
                       {l.linkedinNote ? (
                         <button
