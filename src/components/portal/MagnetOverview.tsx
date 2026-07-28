@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, ExternalLink } from "lucide-react";
-import { Panel, SectionLabel } from "./ui";
+import { Panel, Pill, SectionLabel, StatTile } from "./ui";
 import { CompanyMark } from "./CompanyMark";
 
 // The page a prospect lands on. It replaces the KPI dashboard for a magnet,
@@ -30,6 +30,15 @@ export function MagnetOverview({
   // A magnet can carry a step-by-step plan instead of (or beside) a list brief.
   const steps = Array.isArray(brief.plan_steps)
     ? (brief.plan_steps as Record<string, unknown>[]).filter((s) => str(s.title))
+    : [];
+  // Optional visual timeline: phases on a vertical rail plus a stat strip. A
+  // program with dates reads faster as a picture than as prose, but only some
+  // magnets are programs, so both arrays are opt-in fields of the brief.
+  const phases = Array.isArray(brief.timeline)
+    ? (brief.timeline as Record<string, unknown>[]).filter((p) => str(p.title))
+    : [];
+  const stats = Array.isArray(brief.timeline_stats)
+    ? (brief.timeline_stats as Record<string, unknown>[]).filter((s) => str(s.value))
     : [];
 
   const facts: [string, string][] = [
@@ -120,6 +129,68 @@ export function MagnetOverview({
                 ))}
               </ul>
             )}
+          </Panel>
+        </section>
+      )}
+
+      {phases.length > 0 && (
+        <section>
+          <SectionLabel>{str(brief.timeline_label) || "The timeline"}</SectionLabel>
+          {stats.length > 0 && (
+            <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {stats.map((s, i) => (
+                <StatTile
+                  key={i}
+                  label={str(s.label)}
+                  value={str(s.value)}
+                  sub={str(s.sub) || undefined}
+                  tone={s.tone === "good" || s.tone === "warn" ? s.tone : "default"}
+                />
+              ))}
+            </div>
+          )}
+          <Panel className="mt-2 px-5 py-5">
+            {phases.map((p, i) => {
+              const color =
+                str(p.tone) === "green" ? "#26D07C" : str(p.tone) === "muted" ? "#8A93A6" : "#FFD60A";
+              const last = i === phases.length - 1;
+              return (
+                <div key={i} className="relative flex gap-4 pb-6 last:pb-0">
+                  {!last && (
+                    <span
+                      aria-hidden
+                      className="absolute left-[7px] top-[22px] bottom-0 w-px bg-gradient-to-b from-white/20 to-white/5"
+                    />
+                  )}
+                  <span
+                    aria-hidden
+                    className="relative z-10 mt-1 w-[15px] h-[15px] rounded-full border-2 shrink-0"
+                    style={{ borderColor: color, background: "#0A0E1A", boxShadow: `0 0 8px ${color}55` }}
+                  >
+                    <span className="absolute inset-[2.5px] rounded-full" style={{ background: color }} />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span
+                        className="text-[10px] font-bold uppercase tracking-[0.16em]"
+                        style={{ color }}
+                      >
+                        {str(p.tag)}
+                      </span>
+                      {str(p.chip) && (
+                        <Pill tone={str(p.tone) === "green" ? "green" : "gold"}>{str(p.chip)}</Pill>
+                      )}
+                    </div>
+                    <div className="text-[14px] font-semibold text-foreground mt-0.5">{str(p.title)}</div>
+                    {str(p.detail) && (
+                      <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground max-w-xl">
+                        {str(p.detail)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </Panel>
         </section>
       )}
