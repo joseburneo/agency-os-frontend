@@ -66,6 +66,7 @@ type Detail = Card & {
   phone: string;
   linkedin_url: string;
   wa_link: string;
+  contacts: { email: string; first_seen_at?: string }[];
   build_slug: string | null;
   build_name: string;
   build_audience: string;
@@ -639,8 +640,14 @@ function useComposer(d: Detail, onSent: () => void) {
   const [sendOpts, setSendOpts] = useState<SendOption[]>([]);
   const [fromKey, setFromKey] = useState("");
   const [threadAcct, setThreadAcct] = useState<{ account: string; alive: boolean }>({ account: "", alive: true });
+  // Reply-all routing (the Tanya case, 2026-07-28): To = whoever actually wrote
+  // last on the thread, CC = the rest of its participants. Editable chips —
+  // what you see is exactly what the send will do.
+  const [routeTo, setRouteTo] = useState("");
+  const [routeCc, setRouteCc] = useState<string[] | null>(null);
+  const [ccAdd, setCcAdd] = useState("");
   useEffect(() => {
-    setSendOpts([]); setFromKey("");
+    setSendOpts([]); setFromKey(""); setRouteTo(""); setRouteCc(null); setCcAdd("");
     fetch(`${API}/api/crm/prospect/${id}/send-options`)
       .then((r) => r.json())
       .then((j) => {
@@ -648,6 +655,7 @@ function useComposer(d: Detail, onSent: () => void) {
         setSendOpts(opts);
         setThreadAcct({ account: j.thread_account || "", alive: !!j.thread_account_alive });
         if (opts.length) setFromKey(`${opts[0].via}|${opts[0].eaccount}`);
+        if (j.routing?.to) { setRouteTo(j.routing.to); setRouteCc(j.routing.cc || []); }
       })
       .catch(() => {});
   }, [id]);
@@ -675,7 +683,11 @@ function useComposer(d: Detail, onSent: () => void) {
     setSending(true);
     fetch(`${API}/api/crm/prospect/${id}/send`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, channel: "email", eaccount: selectedOpt?.eaccount, via: selectedOpt?.via }),
+      body: JSON.stringify({
+        text, channel: "email", eaccount: selectedOpt?.eaccount, via: selectedOpt?.via,
+        // Routing chips travel with the send; absent = the thread's own default.
+        ...(routeTo ? { to: routeTo, cc: routeCc ?? [] } : {}),
+      }),
     })
       .then(async (r) => {
         if (r.ok) { setSent("ok"); setDraft(chan, ""); setThreadKey((k) => k + 1); onSent(); }
@@ -711,7 +723,7 @@ function useComposer(d: Detail, onSent: () => void) {
   const canSendEmail = chan === "email" && (sendOpts.length > 0 || d.can_send_email);
   const gmailLive = d.live_channel === "gmail";
   const draftLabel = chan === "email" ? "Draft with AI" : chan === "linkedin" ? "Draft LinkedIn" : chan === "whatsapp" ? "Draft WhatsApp" : "Talking points";
-  return { d, chan, setChan, text, setDraft, gen, send, logTouch, refresh: onSent, askCopilot, drafting, sending, sent, setSent, co, setCo, coBusy, coLog, canSendEmail, gmailLive, draftLabel, threadKey, sendOpts, fromKey, setFromKey, selectedOpt, threadAcct };
+  return { d, chan, setChan, text, setDraft, gen, send, logTouch, refresh: onSent, askCopilot, drafting, sending, sent, setSent, co, setCo, coBusy, coLog, canSendEmail, gmailLive, draftLabel, threadKey, sendOpts, fromKey, setFromKey, selectedOpt, threadAcct, routeTo, routeCc, setRouteCc, ccAdd, setCcAdd };
 }
 type ComposerCtl = ReturnType<typeof useComposer>;
 
@@ -873,7 +885,7 @@ function CallPanel({ d, onTouched }: { d: Detail; onTouched: () => void }) {
 }
 
 function Composer({ c }: { c: ComposerCtl }) {
-  const { d, chan, setChan, text, setDraft, gen, send, logTouch, drafting, sending, sent, setSent, canSendEmail, gmailLive, draftLabel, sendOpts, fromKey, setFromKey, selectedOpt, threadAcct } = c;
+  const { d, chan, setChan, text, setDraft, gen, send, logTouch, drafting, sending, sent, setSent, canSendEmail, gmailLive, draftLabel, sendOpts, fromKey, setFromKey, selectedOpt, threadAcct, routeTo, routeCc, setRouteCc, ccAdd, setCcAdd } = c;
   // Compact by default so an empty composer never steals the conversation's space; it opens
   // on click or as soon as there's a draft (incl. one the copilot / Draft-with-AI wrote).
   const [open, setOpen] = useState(false);
@@ -906,6 +918,37 @@ function Composer({ c }: { c: ComposerCtl }) {
             : "Copy & send by hand"}
         </span>
       </div>
+
+      {/* Reply-all routing (the Tanya case): who this reply actually goes to.
+          To = whoever wrote last on the thread; CC chips are removable and you
+          can add one. What you see here is exactly what the send does. */}
+      {chan === "email" && routeTo && (
+        <div className="flex items-center flex-wrap gap-1.5 mb-2 text-[11px]">
+          <span className="text-muted-foreground">To:</span>
+          <span className="inline-flex items-center rounded-md border border-[#FFD60A]/35 bg-[#FFD60A]/10 px-2 py-0.5 text-[#FFD60A]">{routeTo}</span>
+          {(routeCc ?? []).length > 0 && <span className="text-muted-foreground ml-1">CC:</span>}
+          {(routeCc ?? []).map((a) => (
+            <span key={a} className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2 py-0.5 text-foreground">
+              {a}
+              <button type="button" aria-label={`Quitar ${a} del CC`}
+                onClick={() => setRouteCc((routeCc ?? []).filter((x) => x !== a))}
+                className="text-muted-foreground hover:text-[#ff9b9b]">×</button>
+            </span>
+          ))}
+          <input
+            value={ccAdd}
+            onChange={(e) => setCcAdd(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && ccAdd.includes("@")) {
+                setRouteCc([...(routeCc ?? []), ccAdd.trim().toLowerCase()]);
+                setCcAdd("");
+              }
+            }}
+            placeholder="+ CC…"
+            className="w-24 bg-transparent border-b border-border/60 text-[11px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-[#FFD60A]/50 px-1 py-0.5"
+          />
+        </div>
+      )}
 
       {/* the dialer sits above the notes: on the Call tab the phone is the action,
           the talking points below it are the preparation */}
@@ -1559,6 +1602,19 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
                   className="truncate text-blue-300 hover:text-blue-200">LinkedIn profile</a>
                 <ExternalLink className="w-3 h-3 text-blue-300/70 shrink-0" />
                 <span className="ml-auto shrink-0"><CopyBtn value={d.linkedin_url} /></span>
+              </div>
+            )}
+            {/* Colleagues seen writing on this thread (Tanya answering for Jaya):
+                the account's other people, straight from the conversation. */}
+            {(d.contacts ?? []).length > 0 && (
+              <div className="pt-1.5 mt-1 border-t border-border/60">
+                <div className="text-[9.5px] uppercase tracking-[0.14em] text-muted-foreground/70 mb-1">Also on this thread</div>
+                {(d.contacts ?? []).map((ct) => (
+                  <div key={ct.email} className="flex items-center gap-1 text-[12px]">
+                    <span className="truncate text-foreground/90" title={ct.email}>{ct.email}</span>
+                    <span className="ml-auto shrink-0"><CopyBtn value={ct.email} /></span>
+                  </div>
+                ))}
               </div>
             )}
             {siteUrl && (
