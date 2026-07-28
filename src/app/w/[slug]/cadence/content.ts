@@ -53,7 +53,7 @@ const E1 = `Hi [First name],
 
 I hope you are well.
 
-After 25 years as a Global Head of Talent and Chief People Officer for both blue-chip and scaling businesses, I founded Arco Irish Executive Search to help CEOs make leadership appointments with confidence. I also advise Enterprise Ireland on People and Management. Did you know that Enterprise Ireland offers a Key Hires Grant of €150k for fast-scaling Irish businesses?
+After 25 years as a Global Head of Talent and Chief People Officer for both blue-chip and scaling businesses, I founded Arco Irish Executive Search six years ago to help CEOs make leadership appointments with confidence. I also advise Enterprise Ireland on People and Management. Did you know that Enterprise Ireland offers a Key Hires Grant of €150k for fast-scaling Irish businesses?
 
 To be eligible for the grant the candidate must bring new skills to the leadership team. I have a track record of helping organisations make this Key hire. With agentic AI increasingly on the agenda, leaders now more than ever require technical know-how, the judgement to make better decisions, the ability to embrace change, and the gravitas to bring their people with them.
 
