@@ -46,6 +46,8 @@ type Card = {
   deal_amount?: number | null;
   phone?: string;
   linkedin_url?: string;
+  call_at?: string | null;
+  call_held_at?: string | null;
 };
 
 type Funnel = {
@@ -1850,7 +1852,8 @@ function RecordBody({ d, id, themName, reload, both }: { d: Detail; id: number; 
 const STAGES: { key: string; label: string }[] = [
   { key: "mql", label: "MQL" },
   { key: "sql", label: "SQL" },
-  { key: "discovery", label: "Discovery call" },
+  { key: "discovery_booked", label: "Discovery booked" },
+  { key: "discovery_held", label: "Discovery held" },
   { key: "proposal_sent", label: "Proposal sent" },
   { key: "won", label: "Won" },
   { key: "lost", label: "Lost / Parked" },
@@ -1943,7 +1946,7 @@ function Record({ id, initial, queue, onNavigate, onClose, onChanged }: { id: nu
   const h = head ? heatChip(head.heat) : null;
   const headDomain = head ? domainOf(head.email) : "";
   // Signal Green means "won / meeting booked" — never decorate a cold or lost prospect with it.
-  const closedWon = d?.stage === "won" || d?.stage === "discovery" || head?.waiting_on === "closed";
+  const closedWon = d?.stage === "won" || d?.stage === "discovery_booked" || d?.stage === "discovery_held" || head?.waiting_on === "closed";
   const avatarCls = closedWon
     ? "bg-[#26D07C]/12 text-[#26D07C] border border-[#26D07C]/30"
     : "bg-secondary text-foreground border border-border";
@@ -2097,11 +2100,20 @@ function BoardCard({ r, onOpen }: { r: Card; onOpen: (id: number) => void }) {
   const isNew = r.waiting_on === "us" && !!r.last_reply_at && (Date.now() - new Date(r.last_reply_at).getTime()) < 24 * 3600 * 1000;
   const wantsMeet = r.wants_meeting && r.waiting_on !== "closed";
   const owed = r.waiting_on === "us" ? daysSince(r.last_reply_at) : 0;
+  // In the Booked column the clock is the CALL: upcoming date (green), no date yet
+  // (gold, go book it), or a past date with no transcript = a no-show to rescue (red).
+  const callClock = r.stage === "discovery_booked"
+    ? (r.call_at
+        ? (new Date(r.call_at).getTime() < Date.now() && !r.call_held_at
+            ? { text: "call missed · rebook", cls: "text-[#ff9b9b]" }
+            : { text: `call ${fmtDate(r.call_at)}`, cls: "text-[#26D07C]" })
+        : { text: "no date · book it", cls: "text-[#FFD60A]" })
+    : null;
   // The footer clock reads differently per column: when the ball is with us it's a
   // "silent for N days" debt (loud past 3d); when it's on them it's the next scheduled
   // nudge; when closed it's the stage. This is the single most action-driving line.
-  const clock =
-    r.waiting_on === "us"
+  const clock = callClock ??
+    (r.waiting_on === "us"
       ? { text: owed <= 0 ? "replied today" : `${owed}d silent`, cls: owed >= 7 ? "text-[#ff9b9b]" : owed >= 3 ? "text-[#f0b45f]" : "text-muted-foreground" }
       : r.waiting_on === "them"
       ? (r.gone_quiet_days
@@ -2109,7 +2121,7 @@ function BoardCard({ r, onOpen }: { r: Card; onOpen: (id: number) => void }) {
           // card fell out of every queue forever (the Hisham blind spot).
           ? { text: `quiet ${r.gone_quiet_days}d · nudge due`, cls: "text-[#FFD60A]" }
           : { text: r.next_touch_at ? (isDue(r.next_touch_at) ? "nudge due" : `next ${fmtDate(r.next_touch_at)}`) : timeAgo(r.last_touch_at), cls: r.next_touch_at && isDue(r.next_touch_at) ? "text-[#FFD60A]" : "text-muted-foreground" })
-      : { text: r.stage_label || r.status_label, cls: "text-muted-foreground" };
+      : { text: r.stage_label || r.status_label, cls: "text-muted-foreground" });
   return (
     <div role="button" tabIndex={0} draggable
       onClick={() => onOpen(r.id)}
@@ -2370,12 +2382,13 @@ function sortCards(list: Card[], by: SortKey): Card[] {
 }
 
 const FUNNEL: { key: string; title: string; hint: string; tone?: "green" | "muted" }[] = [
-  { key: "mql",           title: "MQL",           hint: "replied · mild interest" },
-  { key: "sql",           title: "SQL",           hint: "real intent + fit" },
-  { key: "discovery",     title: "Discovery call", hint: "call booked / held" },
-  { key: "proposal_sent", title: "Proposal sent", hint: "after they saw the Build" },
-  { key: "won",           title: "Won",           hint: "closed · client", tone: "green" },
-  { key: "lost",          title: "Lost / Parked", hint: "dead or not now", tone: "muted" },
+  { key: "mql",              title: "MQL",              hint: "replied · mild interest" },
+  { key: "sql",              title: "SQL",              hint: "asked for something concrete" },
+  { key: "discovery_booked", title: "Discovery booked", hint: "call scheduled · make it happen" },
+  { key: "discovery_held",   title: "Discovery held",   hint: "call done · work the follow-up" },
+  { key: "proposal_sent",    title: "Proposal sent",    hint: "after they saw the Build" },
+  { key: "won",              title: "Won",              hint: "closed · client", tone: "green" },
+  { key: "lost",             title: "Lost / Parked",    hint: "dead or not now", tone: "muted" },
 ];
 
 // ── page ─────────────────────────────────────────────────────────────
