@@ -2331,7 +2331,7 @@ function catRank(cat: string): number {
 // available client-side, not a literal "we sent a LinkedIn DM" flag.
 type FilterKey =
   | "us" | "them" | "nudge" | "hot" | "wants" | "meetings"
-  | "build_sent" | "no_build"
+  | "build_sent" | "build_ready" | "no_build"
   | "has_phone" | "has_linkedin";
 
 const FILTERS: { key: FilterKey; label: string; group: string; test: (c: Card) => boolean }[] = [
@@ -2341,8 +2341,10 @@ const FILTERS: { key: FilterKey; label: string; group: string; test: (c: Card) =
   { key: "hot",      label: "🔥 Hot",            group: "Status", test: (c) => c.heat >= 70 },
   { key: "wants",    label: "📅 Wants meeting",   group: "Status", test: (c) => c.wants_meeting },
   { key: "meetings", label: "✅ Booked",          group: "Status", test: (c) => c.status === "meeting_booked" },
-  { key: "build_sent", label: "🧲 Build sent",    group: "Build",  test: (c) => c.build_delivered },
-  { key: "no_build",   label: "No Build",         group: "Build",  test: (c) => !c.has_build },
+  { key: "build_sent",  label: "🧲 Build sent",        group: "Build", test: (c) => c.build_delivered },
+  // The goldmine state: the asset exists, the prospect has never seen it. 44 cards on day one.
+  { key: "build_ready", label: "💤 Build never sent",  group: "Build", test: (c) => c.has_build && !c.build_delivered },
+  { key: "no_build",    label: "No Build",             group: "Build", test: (c) => !c.has_build },
   { key: "has_phone",    label: "☎ Phone / WhatsApp", group: "Reach", test: (c) => c.has_phone },
   { key: "has_linkedin", label: "🔗 LinkedIn",        group: "Reach", test: (c) => c.has_linkedin },
 ];
