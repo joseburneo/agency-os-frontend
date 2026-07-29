@@ -2310,10 +2310,10 @@ function BoardColumn({ title, hint, accent, tone, rows, onOpen, onDrop }: {
 // Per-column sort — the controls a VP actually works a pipeline by.
 type SortKey = "heat" | "stalled" | "value" | "recent" | "name";
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: "recent", label: "⚡ Last reply first" },
   { key: "heat", label: "🔥 Priority (hottest)" },
   { key: "stalled", label: "🕒 Most stalled" },
   { key: "value", label: "⭐ Best fit (Positive/SQL)" },
-  { key: "recent", label: "⚡ Recently active" },
   { key: "name", label: "A–Z name" },
 ];
 function catRank(cat: string): number {
@@ -2365,7 +2365,10 @@ function sortCards(list: Card[], by: SortKey): Card[] {
     case "value":
       return r.sort((a, b) => catRank(b.category) - catRank(a.category) || b.heat - a.heat);
     case "recent":
-      return r.sort((a, b) => Math.max(ms(b.last_reply_at), ms(b.last_touch_at)) - Math.max(ms(a.last_reply_at), ms(a.last_touch_at)));
+      // THEIR last message first (Instantly-unibox order). Speed-to-reply is the rule,
+      // and this order makes a cross-check against Instantly trivial: same list, same
+      // top — a reply missing here is a reply the CRM failed to ingest.
+      return r.sort((a, b) => ms(b.last_reply_at) - ms(a.last_reply_at) || ms(b.last_touch_at) - ms(a.last_touch_at));
     case "name":
       return r.sort((a, b) => a.name.localeCompare(b.name));
     default: // heat
@@ -2411,7 +2414,7 @@ export function CrmBoard({ workspace, basePath = "/crm", live = true }: { worksp
     return n;
   });
   const [view, setView] = useState<"queue" | "board" | "todos">("board");
-  const [sortBy, setSortBy] = useState<SortKey>("heat");
+  const [sortBy, setSortBy] = useState<SortKey>("recent");
   const [openId, setOpenId] = useState<number | null>(null);
 
   const load = useCallback(() => {
