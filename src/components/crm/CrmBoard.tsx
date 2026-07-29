@@ -197,18 +197,6 @@ function heatChip(heat: number): { label: string; cls: string; hot: boolean } {
   return { label: "Cool", cls: "bg-secondary text-muted-foreground border border-border", hot: false };
 }
 
-// Category → a color-coded pill. Signal Green for Positive/SQL (a live buyer), gold for
-// MQL, muted for the rest. Green = "go" per the brand's on-screen accent rule.
-function catPill(category: string): { label: string; cls: string } {
-  const c = (category || "").toLowerCase();
-  if (c.includes("positive") || c.includes("sql"))
-    return { label: category, cls: "bg-[#26D07C]/15 text-[#26D07C] border border-[#26D07C]/30" };
-  if (c.includes("mql"))
-    return { label: category, cls: "bg-[#FFD60A]/12 text-[#FFD60A] border border-[#FFD60A]/25" };
-  if (c.includes("neg") || c.includes("not") || c.includes("unsub"))
-    return { label: category, cls: "bg-[#ef4444]/10 text-[#ff9b9b] border border-[#ef4444]/25" };
-  return { label: category || "Reply", cls: "bg-secondary text-muted-foreground border border-border" };
-}
 
 // Deal-rot: the longer a reply we owe goes unanswered, the louder the left edge.
 function rotEdge(card: Card): string {
@@ -1954,7 +1942,6 @@ function Record({ id, initial, queue, onNavigate, onClose, onChanged }: { id: nu
   const head = d ?? initial;
   const h = head ? heatChip(head.heat) : null;
   const headDomain = head ? domainOf(head.email) : "";
-  const cat = head?.category ? catPill(head.category) : null;
   // Signal Green means "won / meeting booked" — never decorate a cold or lost prospect with it.
   const closedWon = d?.stage === "won" || d?.stage === "discovery" || head?.waiting_on === "closed";
   const avatarCls = closedWon
@@ -1975,7 +1962,6 @@ function Record({ id, initial, queue, onNavigate, onClose, onChanged }: { id: nu
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-lg font-semibold text-foreground truncate">{head?.name || "…"}</h2>
                 {h && <Badge text={h.hot ? "🔥 Hot" : h.label} className={h.cls} />}
-                {cat && <Badge text={cat.label} className={cat.cls} />}
               </div>
               <p className="text-sm text-muted-foreground mt-0.5 truncate flex items-center gap-1.5">
                 {headDomain && <Favicon domain={headDomain} label={head?.company} size={16} />}
@@ -2105,7 +2091,6 @@ function TileAction({ href, active, title, color, children }: {
 // ── board (kanban) ───────────────────────────────────────────────────
 function BoardCard({ r, onOpen }: { r: Card; onOpen: (id: number) => void }) {
   const h = heatChip(r.heat);
-  const cat = catPill(r.category);
   const dom = domainOf(r.email);
   const waHref = r.phone ? `https://wa.me/${r.phone.replace(/[^\d]/g, "")}` : undefined;
   const liHref = r.linkedin_url || (r.name ? linkedinSearchUrl(r.name, r.company) : undefined);
@@ -2166,9 +2151,8 @@ function BoardCard({ r, onOpen }: { r: Card; onOpen: (id: number) => void }) {
         </p>
       )}
 
-      {/* meta: segment · country · value · the action-driving clock */}
+      {/* meta: country · value · the action-driving clock (the column already tells the stage) */}
       <div className="flex items-center gap-1.5 mt-3 text-[11px]">
-        <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full font-medium ${cat.cls}`}>{cat.label}</span>
         {r.country && <span className="text-muted-foreground/70 truncate max-w-[4.5rem]">{r.country}</span>}
         {r.deal_amount != null && <span className="text-[#26D07C] font-semibold tabular-nums">${Number(r.deal_amount).toLocaleString()}</span>}
         <span className={`ml-auto tabular-nums ${clock.cls}`}>{clock.text}</span>
