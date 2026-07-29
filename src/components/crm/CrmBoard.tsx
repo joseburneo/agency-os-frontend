@@ -2332,9 +2332,7 @@ function catRank(cat: string): number {
 type FilterKey =
   | "us" | "them" | "nudge" | "hot" | "wants" | "meetings"
   | "build_sent" | "no_build"
-  | "has_phone" | "has_linkedin"
-  | "fu2" | "fu3"
-  | "ch_email" | "ch_linkedin" | "ch_whatsapp" | "ch_call";
+  | "has_phone" | "has_linkedin";
 
 const FILTERS: { key: FilterKey; label: string; group: string; test: (c: Card) => boolean }[] = [
   { key: "us",       label: "⚡ Your turn",      group: "Status", test: (c) => c.waiting_on === "us" },
@@ -2347,12 +2345,6 @@ const FILTERS: { key: FilterKey; label: string; group: string; test: (c: Card) =
   { key: "no_build",   label: "No Build",         group: "Build",  test: (c) => !c.has_build },
   { key: "has_phone",    label: "☎ Phone / WhatsApp", group: "Reach", test: (c) => c.has_phone },
   { key: "has_linkedin", label: "🔗 LinkedIn",        group: "Reach", test: (c) => c.has_linkedin },
-  { key: "fu2", label: "2+ emails sent", group: "Cadence", test: (c) => (c.seq_step || 0) >= 2 },
-  { key: "fu3", label: "3+ emails sent", group: "Cadence", test: (c) => (c.seq_step || 0) >= 3 },
-  { key: "ch_email",    label: "Last: Email",    group: "Last touch", test: (c) => (c.last_channel || "") === "email" },
-  { key: "ch_linkedin", label: "Last: LinkedIn", group: "Last touch", test: (c) => (c.last_channel || "") === "linkedin" },
-  { key: "ch_whatsapp", label: "Last: WhatsApp", group: "Last touch", test: (c) => (c.last_channel || "") === "whatsapp" },
-  { key: "ch_call",     label: "Last: Call",     group: "Last touch", test: (c) => (c.last_channel || "") === "call" },
 ];
 const FILTER_BY_KEY = Object.fromEntries(FILTERS.map((f) => [f.key, f.test])) as Record<FilterKey, (c: Card) => boolean>;
 function passesAll(c: Card, active: Set<FilterKey>): boolean {
@@ -2379,6 +2371,21 @@ function sortCards(list: Card[], by: SortKey): Card[] {
     default: // heat
       return r.sort((a, b) => b.heat - a.heat || ms(a.last_reply_at) - ms(b.last_reply_at));
   }
+}
+
+// The two call columns ignore the global sort: what matters there is the CALL.
+// Booked: soonest call first, then no-shows/undated (they need action, not hiding).
+// Held: most recent call first (freshest context, recap owed).
+function sortColumn(list: Card[], stageKey: string, by: SortKey): Card[] {
+  const ms = (s?: string | null) => (s ? new Date(s).getTime() : 0);
+  if (stageKey === "discovery_booked") {
+    const FAR = 8.64e15; // undated sinks below any real date
+    return [...list].sort((a, b) => (ms(a.call_at) || FAR) - (ms(b.call_at) || FAR) || b.heat - a.heat);
+  }
+  if (stageKey === "discovery_held") {
+    return [...list].sort((a, b) => ms(b.call_held_at) - ms(a.call_held_at) || b.heat - a.heat);
+  }
+  return sortCards(list, by);
 }
 
 const FUNNEL: { key: string; title: string; hint: string; tone?: "green" | "muted" }[] = [
@@ -2584,7 +2591,7 @@ export function CrmBoard({ workspace, basePath = "/crm", live = true }: { worksp
       ) : (
         <div ref={boardRef} onDragOver={autoScroll} className="flex gap-3 overflow-x-auto pb-4">
           {FUNNEL.map((s) => {
-            const col = sortCards(rows.filter((x) => matchQuery(x, q) && passesAll(x, filters) && (x.stage || "mql") === s.key), sortBy);
+            const col = sortColumn(rows.filter((x) => matchQuery(x, q) && passesAll(x, filters) && (x.stage || "mql") === s.key), s.key, sortBy);
             return (
               <BoardColumn key={s.key} title={s.title} hint={s.hint} tone={s.tone}
                 accent={s.key === "sql"} rows={col} onOpen={openRecord}
