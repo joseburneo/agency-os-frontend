@@ -79,7 +79,7 @@ The difference between an appointment that accelerates a business and one that s
 
 That is what we measure. Alongside the search, and for the appointments that truly matter, I can put a shortlist through the leading psychometric assessments, so fit is tested rather than guessed. As Greg Hayden, CEO of Ethos Engineering, put it after our first Director-level review, "Paul's expertise transformed how we attract and develop talent."
 
-I would be glad to show you how it would apply to a role you are weighing.
+I would be glad to show you how it would apply to a role you are considering.
 
 Would you be open to a short conversation in the coming days?
 
