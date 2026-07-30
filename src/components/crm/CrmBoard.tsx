@@ -2308,9 +2308,11 @@ function BoardColumn({ title, hint, accent, tone, rows, onOpen, onDrop }: {
 // The funnel = our lead journey, in order. Each column is a stage; drag a card right as
 // the deal advances. Kept in sync with the backend FUNNEL_STAGES.
 // Per-column sort — the controls a VP actually works a pipeline by.
-type SortKey = "heat" | "stalled" | "value" | "recent" | "name";
+type SortKey = "heat" | "stalled" | "value" | "recent" | "they" | "we" | "name";
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: "recent", label: "⚡ Last activity first" },
+  { key: "they", label: "↙ They replied (newest)" },
+  { key: "we", label: "↗ We sent (newest)" },
   { key: "heat", label: "🔥 Priority (hottest)" },
   { key: "stalled", label: "🕒 Most stalled" },
   { key: "value", label: "⭐ Best fit (Positive/SQL)" },
@@ -2372,6 +2374,10 @@ function sortCards(list: Card[], by: SortKey): Card[] {
       // already shows, so the column order and the card agree.
       return r.sort((a, b) =>
         Math.max(ms(b.last_reply_at), ms(b.last_touch_at)) - Math.max(ms(a.last_reply_at), ms(a.last_touch_at)));
+    case "they": // their last inbound, newest first (Instantly-unibox order)
+      return r.sort((a, b) => ms(b.last_reply_at) - ms(a.last_reply_at));
+    case "we": // our last outbound, newest first
+      return r.sort((a, b) => ms(b.last_touch_at) - ms(a.last_touch_at));
     case "name":
       return r.sort((a, b) => a.name.localeCompare(b.name));
     default: // heat
