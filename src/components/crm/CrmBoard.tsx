@@ -48,7 +48,29 @@ type Card = {
   linkedin_url?: string;
   call_at?: string | null;
   call_held_at?: string | null;
+  last_email_touch_at?: string | null;
 };
+
+// Country → emoji flag. Values may be "Ireland" or "Dublin, County Dublin, Ireland":
+// match on the LAST comma segment. Unknown countries simply render without a flag.
+const FLAG_ISO: Record<string, string> = {
+  "united arab emirates": "AE", ireland: "IE", "united kingdom": "GB", "united states": "US",
+  spain: "ES", germany: "DE", switzerland: "CH", india: "IN", singapore: "SG", lebanon: "LB",
+  jordan: "JO", canada: "CA", philippines: "PH", france: "FR", italy: "IT", sweden: "SE",
+  "sierra leone": "SL", finland: "FI", estonia: "EE", australia: "AU", kuwait: "KW",
+  "south africa": "ZA", netherlands: "NL", "saudi arabia": "SA",
+  israel: "IL", portugal: "PT", greece: "GR", egypt: "EG", qatar: "QA", bahrain: "BH",
+  oman: "OM", kenya: "KE", nigeria: "NG", brazil: "BR", mexico: "MX", ecuador: "EC",
+  "czech republic": "CZ", czechia: "CZ", poland: "PL", denmark: "DK", norway: "NO",
+  austria: "AT", belgium: "BE", serbia: "RS", "united states of america": "US",
+};
+function countryFlag(country?: string | null): string {
+  if (!country) return "";
+  const last = country.split(",").pop()?.trim().toLowerCase() || "";
+  const iso = FLAG_ISO[last] || (last.length === 2 ? last.toUpperCase() : "");
+  if (!/^[A-Z]{2}$/.test(iso)) return "";
+  return String.fromCodePoint(...[...iso].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65));
+}
 
 type Funnel = {
   total: number;
@@ -2165,7 +2187,7 @@ function BoardCard({ r, onOpen }: { r: Card; onOpen: (id: number) => void }) {
 
       {/* meta: country · value · the action-driving clock (the column already tells the stage) */}
       <div className="flex items-center gap-1.5 mt-3 text-[11px]">
-        {r.country && <span className="text-muted-foreground/70 truncate max-w-[4.5rem]">{r.country}</span>}
+        {r.country && <span className="text-muted-foreground/70 truncate max-w-[7rem]">{countryFlag(r.country) && <span className="mr-1">{countryFlag(r.country)}</span>}{r.country}</span>}
         {r.deal_amount != null && <span className="text-[#26D07C] font-semibold tabular-nums">${Number(r.deal_amount).toLocaleString()}</span>}
         <span className={`ml-auto tabular-nums ${clock.cls}`}>{clock.text}</span>
       </div>
@@ -2173,7 +2195,8 @@ function BoardCard({ r, onOpen }: { r: Card; onOpen: (id: number) => void }) {
       {/* pulse — who moved last, with direction: ↙ they replied · ↗ we sent (+channel) */}
       <div className="flex items-center gap-2.5 mt-1.5 text-[10px]">
         <span title="Last time THEY wrote to us" className="text-[#5aa2ff]/85">↙ they replied <span className="tabular-nums">{agoShort(r.last_reply_at)}</span></span>
-        <span title="Last time WE wrote to them" className="text-[#26D07C]/80">↗ we sent <span className="tabular-nums">{agoShort(r.last_touch_at)}</span>{r.last_channel ? ` · ${chLabel(r.last_channel)}` : ""}</span>
+        {/* EMAIL clock only — a call or WhatsApp never paints this line (email decides the turn) */}
+        <span title="Last EMAIL we sent them" className="text-[#26D07C]/80">↗ we sent <span className="tabular-nums">{agoShort(r.last_email_touch_at ?? r.last_touch_at)}</span>{r.last_email_touch_at ? " · Email" : (r.last_channel ? ` · ${chLabel(r.last_channel)}` : "")}</span>
       </div>
 
       {/* channels — reachability at a glance + one-click open (email / call / WhatsApp / LinkedIn / Build) */}
@@ -2375,8 +2398,8 @@ function sortCards(list: Card[], by: SortKey): Card[] {
         Math.max(ms(b.last_reply_at), ms(b.last_touch_at)) - Math.max(ms(a.last_reply_at), ms(a.last_touch_at)));
     case "they": // their last inbound, newest first (Instantly-unibox order)
       return r.sort((a, b) => ms(b.last_reply_at) - ms(a.last_reply_at));
-    case "we": // our last outbound, newest first
-      return r.sort((a, b) => ms(b.last_touch_at) - ms(a.last_touch_at));
+    case "we": // our last EMAIL, newest first (calls/WA do not count — email decides)
+      return r.sort((a, b) => ms(b.last_email_touch_at ?? b.last_touch_at) - ms(a.last_email_touch_at ?? a.last_touch_at));
     case "name":
       return r.sort((a, b) => a.name.localeCompare(b.name));
     default: // heat
