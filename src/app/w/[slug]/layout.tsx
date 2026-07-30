@@ -15,11 +15,14 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const all = (await loadWorkspaces()) ?? WORKSPACES;
   const ws = all.find((w) => w.slug === slug) ?? getWorkspace(slug) ?? null;
   if (!ws) return {};
+  // The agency's own workspaces (and anything on our domain) keep the LV icon;
+  // only prospect/client workspaces wear their company's favicon.
+  const ownBrand = ws.isAgency || !ws.domain || /luxvance\.com$/i.test(ws.domain);
   return {
     title: ws.name,
-    ...(ws.domain
-      ? { icons: { icon: `https://www.google.com/s2/favicons?domain=${encodeURIComponent(ws.domain)}&sz=64` } }
-      : {}),
+    ...(ownBrand
+      ? {}
+      : { icons: { icon: `https://www.google.com/s2/favicons?domain=${encodeURIComponent(ws.domain!)}&sz=64` } }),
   };
 }
 
