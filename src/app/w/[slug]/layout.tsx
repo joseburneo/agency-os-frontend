@@ -7,6 +7,22 @@ import { loadWorkspaces, loadListsMeta } from "@/lib/portal/data";
 import { portalMode } from "@/lib/portal/access";
 import { loadWorkspaceKind } from "@/lib/portal/data";
 
+// The tab belongs to the client: their favicon and their name, not ours (Jose,
+// 30 jul — "esto es TU workspace"). Same logo source CompanyMark already uses;
+// workspaces without a domain keep the LV icon.
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const all = (await loadWorkspaces()) ?? WORKSPACES;
+  const ws = all.find((w) => w.slug === slug) ?? getWorkspace(slug) ?? null;
+  if (!ws) return {};
+  return {
+    title: ws.name,
+    ...(ws.domain
+      ? { icons: { icon: `https://www.google.com/s2/favicons?domain=${encodeURIComponent(ws.domain)}&sz=64` } }
+      : {}),
+  };
+}
+
 export default async function WorkspaceLayout({
   children,
   params,
