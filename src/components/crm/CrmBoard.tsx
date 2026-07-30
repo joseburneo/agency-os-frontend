@@ -2309,14 +2309,13 @@ function BoardColumn({ title, hint, accent, tone, rows, onOpen, onDrop }: {
 // the deal advances. Kept in sync with the backend FUNNEL_STAGES.
 // Per-column sort — the controls a VP actually works a pipeline by.
 type SortKey = "heat" | "stalled" | "value" | "recent" | "they" | "we" | "name";
+// Four orders only (Jose, 30 jul): the two directions, urgency, and rot.
+// "Last activity" was redundant with the two directions; Best-fit ≈ Priority; A–Z unused.
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
-  { key: "recent", label: "⚡ Last activity first" },
   { key: "they", label: "↙ They replied (newest)" },
   { key: "we", label: "↗ We sent (newest)" },
   { key: "heat", label: "🔥 Priority (hottest)" },
   { key: "stalled", label: "🕒 Most stalled" },
-  { key: "value", label: "⭐ Best fit (Positive/SQL)" },
-  { key: "name", label: "A–Z name" },
 ];
 function catRank(cat: string): number {
   const c = (cat || "").toLowerCase();
@@ -2423,7 +2422,7 @@ export function CrmBoard({ workspace, basePath = "/crm", live = true }: { worksp
     return n;
   });
   const [view, setView] = useState<"queue" | "board" | "todos">("board");
-  const [sortBy, setSortBy] = useState<SortKey>("recent");
+  const [sortBy, setSortBy] = useState<SortKey>("they");
   const [openId, setOpenId] = useState<number | null>(null);
 
   const load = useCallback(() => {
@@ -2544,11 +2543,6 @@ export function CrmBoard({ workspace, basePath = "/crm", live = true }: { worksp
             <Check className="w-4 h-4" /> To-dos
           </button>
         </div>
-        <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortKey)}
-          title="Sort each column"
-          className="bg-card border border-border rounded-lg px-2.5 py-1.5 text-sm text-muted-foreground hover:text-foreground focus:outline-none focus:ring-1 focus:ring-[#FFD60A]/40 cursor-pointer shrink-0">
-          {SORT_OPTIONS.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
-        </select>
         <button onClick={load} title="Refresh" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground px-2 py-1.5 shrink-0">
           <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
         </button>
@@ -2568,8 +2562,15 @@ export function CrmBoard({ workspace, basePath = "/crm", live = true }: { worksp
         </div>
       )}
 
-      {/* filter chip bar — combinable (AND), Master-Inbox style: isolate the exact cohort to work */}
+      {/* filter chip bar — combinable (AND), Master-Inbox style: isolate the exact cohort to work.
+          The sort selector lives HERE, next to the cards it orders (Jose, 30 jul). */}
       <div className="flex items-center gap-1.5 flex-wrap mb-3">
+        <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortKey)}
+          title="Sort each column"
+          className="bg-card border border-border rounded-full px-2.5 py-1 text-[11px] text-muted-foreground hover:text-foreground focus:outline-none focus:ring-1 focus:ring-[#FFD60A]/40 cursor-pointer shrink-0">
+          {SORT_OPTIONS.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
+        </select>
+        <span className="w-px h-4 bg-border mx-1" />
         {FILTERS.filter((f) => f.group !== "Status").map((f) => {
           const on = filters.has(f.key);
           return (
