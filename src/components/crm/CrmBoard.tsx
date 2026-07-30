@@ -2310,7 +2310,7 @@ function BoardColumn({ title, hint, accent, tone, rows, onOpen, onDrop }: {
 // Per-column sort — the controls a VP actually works a pipeline by.
 type SortKey = "heat" | "stalled" | "value" | "recent" | "name";
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
-  { key: "recent", label: "⚡ Last reply first" },
+  { key: "recent", label: "⚡ Last activity first" },
   { key: "heat", label: "🔥 Priority (hottest)" },
   { key: "stalled", label: "🕒 Most stalled" },
   { key: "value", label: "⭐ Best fit (Positive/SQL)" },
@@ -2367,10 +2367,11 @@ function sortCards(list: Card[], by: SortKey): Card[] {
     case "value":
       return r.sort((a, b) => catRank(b.category) - catRank(a.category) || b.heat - a.heat);
     case "recent":
-      // THEIR last message first (Instantly-unibox order). Speed-to-reply is the rule,
-      // and this order makes a cross-check against Instantly trivial: same list, same
-      // top — a reply missing here is a reply the CRM failed to ingest.
-      return r.sort((a, b) => ms(b.last_reply_at) - ms(a.last_reply_at) || ms(b.last_touch_at) - ms(a.last_touch_at));
+      // Jose's rule (30 jul): freshest activity on EITHER side first — the latest of
+      // "they wrote" / "we wrote", newest to oldest. Matches the ↙/↗ line every card
+      // already shows, so the column order and the card agree.
+      return r.sort((a, b) =>
+        Math.max(ms(b.last_reply_at), ms(b.last_touch_at)) - Math.max(ms(a.last_reply_at), ms(a.last_touch_at)));
     case "name":
       return r.sort((a, b) => a.name.localeCompare(b.name));
     default: // heat
