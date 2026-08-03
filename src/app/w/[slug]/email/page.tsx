@@ -65,7 +65,11 @@ export default async function EmailCampaignsPage({ params }: { params: Promise<{
       {/* Summary */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         <StatTile label="Total sent" value={totalSent.toLocaleString()} sub="emails, all campaigns" />
-        <StatTile label="Avg open rate" value={pct(avgOpen, 0)} sub="weighted by volume" />
+        <StatTile
+          label="Avg open rate"
+          value={avgOpen > 0 ? pct(avgOpen, 0) : "—"}
+          sub={avgOpen > 0 ? "weighted by volume" : "open tracking off"}
+        />
         <StatTile label="Avg reply rate" value={pct(avgReply)} sub="weighted by volume" />
         <StatTile label="Positive replies" value={totalPositive.toLocaleString()} sub="handed to the CRM" tone="good" />
         <StatTile label="Active campaigns" value={String(activeCount)} sub={`of ${campaigns.length} total`} />
@@ -120,7 +124,13 @@ export default async function EmailCampaignsPage({ params }: { params: Promise<{
                       {c.sent > 0 ? c.sent.toLocaleString() : <span className="text-muted-foreground">—</span>}
                     </td>
                     <td className="py-3 pr-4 text-right tabular-nums text-foreground">
-                      {c.sent > 0 ? pct(c.openRate, 0) : <span className="text-muted-foreground">—</span>}
+                      {/* 0% with sends means tracking is off (deliberate on some
+                          campaigns), not that nobody opened — show a dash. */}
+                      {c.sent > 0 && c.openRate > 0 ? (
+                        pct(c.openRate, 0)
+                      ) : (
+                        <span className="text-muted-foreground" title={c.sent > 0 ? "Open tracking off" : undefined}>—</span>
+                      )}
                     </td>
                     <td className="py-3 pr-4 text-right">
                       <span className="relative inline-flex items-center justify-end w-28 h-5">

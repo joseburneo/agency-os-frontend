@@ -3,7 +3,7 @@ import { db } from "./server";
 import type {
   Workspace, WorkspaceData, TargetList, Lead, OutreachChannel, Kpi, JourneyItem,
   CrmCard, CrmStage, ReplyCategory, BlocklistEntry, BlocklistReason, BlocklistSource,
-  IntelligenceSection, IntelligenceKind, RoadmapItem,
+  IntelligenceSection, IntelligenceKind, RoadmapItem, EmailCampaign,
 } from "./types";
 
 // Relationship timeline shown inside the Library module. Seeded per workspace
@@ -461,6 +461,47 @@ export async function loadRoadmap(slug: string): Promise<RoadmapItem[]> {
   return ROADMAP_SEED[slug] ?? [];
 }
 
+// Email campaign stats, live from the `campaigns` table (synced from Instantly by
+// the Render backend; the agency /campaigns page reads the same rows). Scope:
+// workspaces.client_id → campaigns.client_id. Rates arrive as "1.01%" strings.
+// `steps` is not synced; every live sequence today is 3 emails.
+const asPct = (v: unknown) => {
+  const n = parseFloat(String(v ?? "").replace("%", ""));
+  return Number.isFinite(n) ? n : 0;
+};
+const asStatus = (v: unknown): EmailCampaign["status"] => {
+  const s = String(v ?? "").toLowerCase();
+  return s === "active" || s === "paused" || s === "completed" ? s : "draft";
+};
+
+export const loadEmailCampaigns = cache(async function loadEmailCampaigns(
+  slug: string
+): Promise<EmailCampaign[]> {
+  const sb = db();
+  if (!sb) return [];
+  const { data: wsRow } = await sb
+    .from("workspaces")
+    .select("client_id")
+    .eq("slug", slug)
+    .maybeSingle();
+  if (!wsRow?.client_id) return [];
+  const { data: rows } = await sb
+    .from("campaigns")
+    .select("id, campaign_name, status, emails_sent, open_rate, reply_rate, opportunities")
+    .eq("client_id", wsRow.client_id)
+    .order("emails_sent", { ascending: false });
+  return (rows ?? []).map((r) => ({
+    id: String(r.id),
+    name: r.campaign_name ?? "Untitled campaign",
+    status: asStatus(r.status),
+    sent: r.emails_sent ?? 0,
+    openRate: asPct(r.open_rate),
+    replyRate: asPct(r.reply_rate),
+    positive: r.opportunities ?? 0,
+    steps: 3,
+  }));
+});
+
 // Whole-workspace load for every module. Target Lists (cold population) is fully
 // live. The warm/campaign/content modules read live too, but their source tables
 // are only populated as the campaign runs, so today they come back EMPTY — the
@@ -494,7 +535,7 @@ export async function loadPortal(
     activity: [],
     lists,
     leads,
-    emailCampaigns: [],
+    emailCampaigns: await loadEmailCampaigns(slug),
     linkedinCampaigns: [],
     phoneTouches: [],
     content: [],

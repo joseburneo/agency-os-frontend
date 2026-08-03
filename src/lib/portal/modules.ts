@@ -25,11 +25,14 @@ export const ALL_MODULES: ModuleKey[] = [
 ];
 
 const OVERRIDES: Record<string, ModuleKey[]> = {
-  // Arco Irish — cold-outreach engagement: email + LinkedIn + CRM, plus its lead
-  // lists (the Build), the sequence & schedule (cadence), intelligence library
-  // (the client brain), do-not-contact blocklist and the client-success roadmap.
-  // No WhatsApp, no content calendar, no ads / Meta.
-  "arco-irish": ["dashboard", "target-lists", "email", "linkedin", CADENCE_MODULE, "crm", "library", "blocklist", "roadmap"],
+  // Arco Irish — cold-outreach engagement: email + CRM, plus its lead lists (the
+  // Build), the sequence & schedule (cadence), intelligence library (the client
+  // brain), do-not-contact blocklist and the client-success roadmap.
+  // No WhatsApp, no content calendar, no ads / Meta. LinkedIn is worked white-glove
+  // from the VIP lists (no LinkedIn sequencer running), so the LinkedIn Campaigns
+  // module stays hidden until one exists — an empty tab reads as a broken product
+  // (Jose, 2026-08-03).
+  "arco-irish": ["dashboard", "target-lists", "email", CADENCE_MODULE, "crm", "library", "blocklist", "roadmap"],
 
   // Kcal and Connect Resources — email-led outbound. Same shape as Arco but without
   // LinkedIn: both ran on email only, and an empty LinkedIn tab reads as a broken
