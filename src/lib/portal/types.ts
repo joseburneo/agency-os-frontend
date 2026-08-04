@@ -62,6 +62,8 @@ export interface Lead {
   role: string;
   company: string;
   sector: string;
+  country?: string; // "City, Country" or bare country — the table shows flag + country
+
   domain: string; // for the favicon
   emailDisplay: string; // the owning client sees the real address; a demo prospect sees it masked
   linkedin: boolean;

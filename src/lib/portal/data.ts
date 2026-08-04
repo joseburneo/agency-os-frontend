@@ -68,7 +68,7 @@ function workspaceFromRow(row: Record<string, unknown>, coldLeads: number): Work
 // count — the dashboard and the channel modules — pass withBodies:false and move
 // ~100KB instead.
 const LEAD_COLS =
-  "id,list_id,list_segment,full_name,role,company,sector,domain,email,linkedin_url,linkedin_company,has_draft,phone,why_now,hr_lead_name,hr_lead_title";
+  "id,list_id,list_segment,full_name,role,company,sector,domain,country,email,linkedin_url,linkedin_company,has_draft,phone,why_now,hr_lead_name,hr_lead_title";
 // Email 1 (previewed + sent from the table) and the VIP's prepared LinkedIn note.
 // Email 2/3 and linkedin2 are per-lead in the DB but nothing renders them yet;
 // they stay out so the table doesn't carry another megabyte for nothing.
@@ -173,6 +173,7 @@ export const loadTargetLists = cache(async function loadTargetLists(
       whatsappNote: opts.unmask ? (r.whatsapp1 as string | null) || undefined : undefined,
       hrLeadName: (r.hr_lead_name as string | null) || undefined,
       hrLeadTitle: (r.hr_lead_title as string | null) || undefined,
+      country: (r.country as string | null) || undefined,
     };
   });
 

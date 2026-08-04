@@ -35,6 +35,23 @@ function renderPersonalized(body: string, firstName: string, company: string) {
   return out;
 }
 
+// Flag + country under the company name. `country` arrives as "City, Country"
+// or a bare country name; the flag map covers the markets we actually sell into.
+const COUNTRY_FLAGS: Record<string, string> = {
+  Spain: "🇪🇸", Belgium: "🇧🇪", Netherlands: "🇳🇱", France: "🇫🇷", Italy: "🇮🇹",
+  Denmark: "🇩🇰", "Czech Republic": "🇨🇿", Czechia: "🇨🇿", Luxembourg: "🇱🇺",
+  Germany: "🇩🇪", Portugal: "🇵🇹", "United Kingdom": "🇬🇧", Ireland: "🇮🇪",
+  "United States": "🇺🇸", "United Arab Emirates": "🇦🇪", Austria: "🇦🇹",
+  Switzerland: "🇨🇭", "New Zealand": "🇳🇿", Australia: "🇦🇺",
+};
+function countryLabel(raw?: string): string {
+  if (!raw) return "";
+  const country = raw.split(",").map((s) => s.trim()).filter(Boolean).pop() ?? "";
+  if (!country) return "";
+  const flag = COUNTRY_FLAGS[country];
+  return flag ? `${flag} ${country}` : country;
+}
+
 // The old portal truncated the VIP "why now" signal to ~120 chars in the cell,
 // full text on hover (title). Same rule here.
 function truncate(s: string, n = 120) {
@@ -399,7 +416,12 @@ export function TargetListsView({
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2.5">
                       <CompanyMark name={l.company} domain={l.domain} />
-                      <span className="font-semibold text-foreground">{l.company}</span>
+                      <div>
+                        <div className="font-semibold text-foreground">{l.company}</div>
+                        {l.country && (
+                          <div className="text-[11px] text-muted-foreground">{countryLabel(l.country)}</div>
+                        )}
+                      </div>
                     </div>
                   </td>
                   <td className="px-4 py-3">
