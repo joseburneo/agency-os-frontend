@@ -68,7 +68,7 @@ function workspaceFromRow(row: Record<string, unknown>, coldLeads: number): Work
 // count — the dashboard and the channel modules — pass withBodies:false and move
 // ~100KB instead.
 const LEAD_COLS =
-  "id,list_id,list_segment,full_name,role,company,sector,domain,email,linkedin_url,linkedin_company,has_draft,phone,why_now,hr_lead_name,hr_lead_title";
+  "id,list_id,list_segment,full_name,role,company,sector,domain,country,email,linkedin_url,linkedin_company,has_draft,phone,why_now,hr_lead_name,hr_lead_title";
 // Email 1 (previewed + sent from the table) and the VIP's prepared LinkedIn note.
 // Email 2/3 and linkedin2 are per-lead in the DB but nothing renders them yet;
 // they stay out so the table doesn't carry another megabyte for nothing.
@@ -173,6 +173,7 @@ export const loadTargetLists = cache(async function loadTargetLists(
       whatsappNote: opts.unmask ? (r.whatsapp1 as string | null) || undefined : undefined,
       hrLeadName: (r.hr_lead_name as string | null) || undefined,
       hrLeadTitle: (r.hr_lead_title as string | null) || undefined,
+      country: (r.country as string | null) || undefined,
     };
   });
 
@@ -442,6 +443,19 @@ export async function loadIntelligence(slug: string): Promise<IntelligenceSectio
 // relationship / competitor names — that's the Blocklist's job). Move to a
 // `client_roadmap` table when the volume justifies it.
 const ROADMAP_SEED: Record<string, RoadmapItem[]> = {
+  // Pepe / Terroir Comando: the $1,750/mo proposal delivered as a roadmap inside
+  // his own workspace (his team reviews it Friday Aug 7). Spanish on purpose.
+  "pepe-rodr-guez-de-vera": [
+    { id: "p1", date: "2026-08-03", status: "done", kind: "build", title: "Workspace y primeras listas construidas", detail: "29 sumilleres de restaurantes premium de España y 20 casas importadoras en los 6 países de vuestra nota, investigados y con el email y el mensaje de LinkedIn ya escritos. Sin coste para Terroir Comando: es nuestra muestra de trabajo.", tags: ["build", "listas"] },
+    { id: "p2", date: "2026-08-04", status: "done", kind: "call", title: "Llamada de descubrimiento", detail: "52 minutos con Pepe y Pedro: vuestro plan de 6 semanas, los viajes, Smartlead, HubSpot y el objetivo real: liberar el tiempo del equipo y llegar más veces al inbox del comprador.", tags: ["discovery"] },
+    { id: "p3", date: "2026-08-07", status: "in_progress", kind: "decision", title: "Vuestra decisión · plan de $1,750/mes", detail: "El equipo valora el plan: dos campañas al mes, un país cada una, siguiendo vuestro calendario de viajes, con todo lo de abajo incluido. Partimos de vuestras listas y las ampliamos con nuestros proveedores. Si usamos vuestra suscripción de Smartlead, lo descontamos del precio. Las dudas que salgan el viernes las respondemos por correo el mismo día.", tags: ["comercial"] },
+    { id: "p4", date: "", status: "planned", kind: "build", title: "Semana 1 · Infraestructura y deliverability, todo en un solo lugar", detail: "Analizamos vuestra infraestructura y volúmenes de envío, revisamos los ~10 dominios contra los spam houses y compramos los dominios y cuentas de correo extra que hagan falta, mitad Google y mitad Microsoft. Todo queda unificado en nuestra plataforma, con acceso para el equipo. Monitoreo con alertas, rotación con dominios de reserva, política GDPR lista para publicar, y conexión de Smartlead más el API hacia vuestro HubSpot.", tags: ["deliverability", "setup"] },
+    { id: "p5", date: "", status: "planned", kind: "build", title: "Semana 2 · La lista de cada país: la vuestra, ampliada", detail: "Partimos de vuestra lista y compramos con nuestros proveedores los prospectos que faltan para maximizar la cobertura del país. Cada contacto se califica y se enriquece uno a uno por nuestros agentes, con su business intelligence guardado en la base de datos, el teléfono cuando se puede conseguir, y los correos verificados dos veces para que no haya bounces.", tags: ["lista", "enriquecimiento"] },
+    { id: "p6", date: "", status: "planned", kind: "launch", title: "Semana 3 · Emails únicos, con vuestro branding", detail: "Un email por contacto, escrito con el contexto de cada casa y control de calidad multi-agente, visible aquí en vuestras listas antes de salir. El envío sale desde vuestro Smartlead, con vuestro look and feel, vuestra firma y vuestro branding: para el prospecto, quien escribe es Terroir Comando.", tags: ["copy", "launch"] },
+    { id: "p7", date: "", status: "planned", kind: "milestone", title: "Semana 4+ · Respuestas, seguimientos y agenda para el viaje", detail: "Todas las respuestas se ven en esta plataforma y cada positivo se crea como contacto en vuestro HubSpot por API. El copiloto avisa de cada seguimiento pendiente, por correo, LinkedIn o WhatsApp (con el teléfono ya en la ficha), y ayuda a escribir cada mensaje. Ninguna ficha se escapa. Objetivo: la agenda del viaje cargada antes de volar.", tags: ["respuestas", "reuniones"] },
+    { id: "p8", date: "", status: "planned", kind: "milestone", title: "Cada mes · dos países del calendario", detail: "Dos campañas al mes, un país cada una, sincronizadas con vuestros viajes: Alemania y Suiza para septiembre, Francia y Portugal después, y los que vengan. Nosotros llegamos antes que el avión.", tags: ["cadencia"] },
+    { id: "p9", date: "2027-01-05", status: "planned", kind: "milestone", title: "Enero · el proyecto completo", detail: "Cuando amplíes presupuesto: base de datos SQL propia, servidor en Alemania con los scripts, gestión completa de respuestas y el lead magnet de maridajes por menú que salió de tu idea en la llamada. La infraestructura queda vuestra.", tags: ["enero", "upgrade"] },
+  ],
   "arco-irish": [
     { id: "r1", date: "2026-06-25", status: "done", kind: "call", title: "Onboarding & discovery call", detail: "Captured Paul's voice, ICP and assets: boutique executive search selling to the CEO (not HR), British English, punchy but not too formal.", tags: ["voice", "ICP"] },
     { id: "r2", date: "2026-07-01", status: "done", kind: "milestone", title: "Retainer starts", detail: "Build & Operate plan begins. Arco Irish is the first Apex pilot.", tags: ["commercial"] },
