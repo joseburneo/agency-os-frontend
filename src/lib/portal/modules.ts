@@ -66,12 +66,19 @@ export const DEMO_MODULES: ModuleKey[] = ["dashboard", "target-lists", "email", 
 // rather than a generous gift.
 export const MAGNET_MODULES: ModuleKey[] = ["dashboard", "target-lists", "library"];
 
+// Per-magnet extras: a magnet that has advanced past "gift" into a live deal can
+// earn additional modules (e.g. the proposal delivered as a Client Success
+// Roadmap inside the prospect's own workspace).
+const MAGNET_EXTRAS: Record<string, ModuleKey[]> = {
+  "pepe-rodr-guez-de-vera": ["roadmap"],
+};
+
 // What a given visitor sees: the workspace's own set, further trimmed to the
 // demo set when this is a prospect preview.
 export function visibleModules(slug: string, demo: boolean, kind?: string): ModuleKey[] {
   // A magnet is trimmed for everyone who opens it, agency included: what Jose
   // reviews before sending has to be what the prospect will actually see.
-  if (kind === "magnet") return MAGNET_MODULES;
+  if (kind === "magnet") return [...MAGNET_MODULES, ...(MAGNET_EXTRAS[slug] ?? [])];
   const base = enabledModules(slug);
   return demo ? base.filter((m) => DEMO_MODULES.includes(m)) : base;
 }
