@@ -17,7 +17,8 @@ export type ModuleKey =
   | "crm"
   | "library"
   | "blocklist"
-  | "roadmap";
+  | "roadmap"
+  | "proposal";
 
 export interface Workspace {
   // 'client' pays us; 'magnet' is sales material built for one prospect. They

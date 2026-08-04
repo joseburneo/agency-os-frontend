@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Target, Mail, MessageCircle,
   CalendarDays, CalendarClock, KanbanSquare, Brain, ChevronsUpDown, ArrowLeft, Check,
   Settings, LogOut, PanelLeftClose, PanelLeftOpen, ShieldBan, Route, Menu, X,
-  Megaphone, Flame,
+  Megaphone, Flame, FileText,
 } from "lucide-react";
 import { cn, Linkedin } from "./ui";
 import { CompanyMark } from "./CompanyMark";
@@ -60,6 +60,7 @@ function buildNav(w: Workspace | null, enabled: Set<string>, slug: string, lists
         // Arco Irish Brain, Kcal Brain. The agent's editable memory, not a "library".
         { key: "library", label: w?.name ? `${w.name} Brain` : "Brain", icon: Brain },
         { key: "roadmap", label: "Client Success Roadmap", icon: Route },
+        { key: "proposal", label: "Commercial Proposal", icon: FileText },
       ],
     },
     {

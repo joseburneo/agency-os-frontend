@@ -70,7 +70,7 @@ export const MAGNET_MODULES: ModuleKey[] = ["dashboard", "target-lists", "librar
 // earn additional modules (e.g. the proposal delivered as a Client Success
 // Roadmap inside the prospect's own workspace).
 const MAGNET_EXTRAS: Record<string, ModuleKey[]> = {
-  "pepe-rodr-guez-de-vera": ["roadmap"],
+  "pepe-rodr-guez-de-vera": ["roadmap", "proposal"],
 };
 
 // What a given visitor sees: the workspace's own set, further trimmed to the
