@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { AGENCY_COOKIE, wsCookie, scopeToken, parseWsKeys } from "@/lib/portal/gate";
-import { getWorkspaceHash, verifyPassword } from "@/lib/portal/auth";
+import { getWorkspaceHash, verifyPassword, hasUsers, verifyUser } from "@/lib/portal/auth";
 
 // Validates a submitted key against the agency password OR the target
 // workspace's key, then sets the matching scope cookie. The agency password
@@ -20,11 +20,44 @@ const COOKIE_OPTS = {
   maxAge: 60 * 60 * 24 * 30, // 30 days
 };
 
+// Brute-force brake. The workspace keys were a guessable `<slug>-<year>` pattern
+// and this route had no limiter at all, so a few thousand guesses opened a client
+// portal. Per (ip, scope), in-process — one Vercel instance is enough friction for
+// a form nobody legitimate submits more than a handful of times.
+const ATTEMPTS = new Map<string, { n: number; until: number }>();
+const MAX_ATTEMPTS = 8;
+const WINDOW_MS = 10 * 60_000;
+
+function rateLimited(key: string): boolean {
+  const now = Date.now();
+  const hit = ATTEMPTS.get(key);
+  if (!hit || now > hit.until) return false;
+  return hit.n >= MAX_ATTEMPTS;
+}
+function recordFailure(key: string): void {
+  const now = Date.now();
+  const hit = ATTEMPTS.get(key);
+  if (!hit || now > hit.until) ATTEMPTS.set(key, { n: 1, until: now + WINDOW_MS });
+  else hit.n += 1;
+  if (ATTEMPTS.size > 5000) for (const [k, v] of ATTEMPTS) if (now > v.until) ATTEMPTS.delete(k);
+}
+
 export async function POST(request: NextRequest) {
   const form = await request.formData();
   const password = String(form.get("password") ?? "");
+  const email = String(form.get("email") ?? "");
   const next = safeNext(String(form.get("next") ?? "/"));
   const scope = String(form.get("scope") ?? "agency");
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const rlKey = `${ip}|${scope}`;
+
+  if (rateLimited(rlKey)) {
+    const back = new URL("/gate", request.url);
+    back.searchParams.set("next", next);
+    back.searchParams.set("scope", scope);
+    back.searchParams.set("error", "rate");
+    return NextResponse.redirect(back, { status: 303 });
+  }
 
   const secret = process.env.PORTAL_ACCESS_TOKEN;
   const agencyPw = process.env.PORTAL_AGENCY_PASSWORD;
@@ -46,14 +79,22 @@ export async function POST(request: NextRequest) {
     return res;
   }
 
-  // 2) This workspace — the client's own password (DB hash) if they've set one,
-  //    otherwise the bootstrap key from PORTAL_WS_KEYS (the temp password we
-  //    emailed them). Either way it unlocks only /w/<scope>.
+  // 2) This workspace. A client workspace with real users signs in with EMAIL +
+  //    PASSWORD (portal_users, one row per human, revocable individually). A
+  //    workspace with no users yet keeps the legacy shared password — its own DB
+  //    hash, else the bootstrap key from PORTAL_WS_KEYS — so nobody is locked out
+  //    mid-migration. Demo/magnet workspaces never reach here: the proxy lets them
+  //    straight through on the link alone.
   if (secret && scope !== "agency") {
-    const dbHash = await getWorkspaceHash(scope);
-    const ok = dbHash
-      ? await verifyPassword(password, dbHash)
-      : Boolean(wsKeys[scope] && password === wsKeys[scope]);
+    let ok = false;
+    if (await hasUsers(scope)) {
+      ok = (await verifyUser(scope, email, password)) !== null;
+    } else {
+      const dbHash = await getWorkspaceHash(scope);
+      ok = dbHash
+        ? await verifyPassword(password, dbHash)
+        : Boolean(wsKeys[scope] && password === wsKeys[scope]);
+    }
     if (ok) {
       const res = NextResponse.redirect(new URL(next, request.url), { status: 303 });
       res.cookies.set(wsCookie(scope), await scopeToken(secret, `ws:${scope}`), COOKIE_OPTS);
@@ -61,7 +102,8 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // 3) Wrong key — back to the gate for this scope.
+  // 3) Wrong credentials — back to the gate for this scope.
+  recordFailure(rlKey);
   const back = new URL("/gate", request.url);
   back.searchParams.set("next", next);
   back.searchParams.set("scope", scope);

@@ -1,5 +1,6 @@
 import { Lock, ShieldCheck } from "lucide-react";
 import { prettySlug } from "@/lib/portal/gate";
+import { hasUsers } from "@/lib/portal/auth";
 
 // Scope-aware access gate. Pure server component + HTML form (no client JS).
 // scope="agency" → Jose's command centre; scope=<slug> → that client's portal.
@@ -11,12 +12,17 @@ export default async function GatePage({
 }) {
   const { next = "/", error, scope = "agency" } = await searchParams;
   const isAgency = scope === "agency";
+  // A client workspace with real people on it signs in with email + password.
+  // One still on the shared bootstrap key keeps the single-field form.
+  const withEmail = !isAgency && (await hasUsers(scope));
   const name = isAgency ? "Luxvance" : prettySlug(scope);
   const eyebrow = isAgency ? "Luxvance · Agency" : name;
-  const title = isAgency ? "Agency access" : "Private workspace";
+  const title = isAgency ? "Agency access" : withEmail ? "Sign in" : "Private workspace";
   const blurb = isAgency
     ? "Your command centre across every workspace. Enter your agency key to continue."
-    : "This portal is invite-only. Enter your access key to continue.";
+    : withEmail
+      ? "Sign in with the email we set up for you."
+      : "This portal is invite-only. Enter your access key to continue.";
   const Icon = isAgency ? ShieldCheck : Lock;
 
   return (
@@ -47,26 +53,46 @@ export default async function GatePage({
         >
           <input type="hidden" name="next" value={next} />
           <input type="hidden" name="scope" value={scope} />
+          {withEmail && (
+            <>
+              <label className="text-[10px] uppercase tracking-[0.16em] text-[#8A93A6]">Email</label>
+              <input
+                type="email"
+                name="email"
+                autoFocus
+                required
+                autoComplete="username"
+                placeholder="you@company.com"
+                aria-invalid={error ? true : undefined}
+                className="h-11 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm text-[#EDEFF2] placeholder:text-[#8A93A6]/60 outline-none focus:border-[#FFD60A]/50 focus:ring-1 focus:ring-[#FFD60A]/40"
+              />
+            </>
+          )}
           <label className="text-[10px] uppercase tracking-[0.16em] text-[#8A93A6]">
-            {isAgency ? "Agency key" : "Access key"}
+            {isAgency ? "Agency key" : withEmail ? "Password" : "Access key"}
           </label>
           <input
             type="password"
             name="password"
-            autoFocus
+            autoFocus={!withEmail}
             required
+            autoComplete={withEmail ? "current-password" : "off"}
             placeholder="••••••••••••"
             aria-invalid={error ? true : undefined}
             className="h-11 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm text-[#EDEFF2] placeholder:text-[#8A93A6]/60 outline-none focus:border-[#FFD60A]/50 focus:ring-1 focus:ring-[#FFD60A]/40"
           />
-          {error && (
-            <p className="text-[12px] text-red-400">That key didn&apos;t match. Try again.</p>
-          )}
+          {error === "rate" ? (
+            <p className="text-[12px] text-red-400">Too many attempts. Wait a few minutes.</p>
+          ) : error ? (
+            <p className="text-[12px] text-red-400">
+              {withEmail ? "That email and password didn't match." : "That key didn't match. Try again."}
+            </p>
+          ) : null}
           <button
             type="submit"
             className="mt-1 h-11 rounded-lg bg-[#FFD60A] text-sm font-bold text-[#0A0E1A] transition-colors hover:bg-[#ffdf3a]"
           >
-            {isAgency ? "Enter command centre" : "Enter workspace"}
+            {isAgency ? "Enter command centre" : withEmail ? "Sign in" : "Enter workspace"}
           </button>
         </form>
 

@@ -10,7 +10,11 @@ import {
 import DOMPurify from "dompurify";
 import { useSoftphone, fmtDuration, type CallMode } from "./useSoftphone";
 
-const API = process.env.NEXT_PUBLIC_BACKEND_URL || "https://agency-os-api.onrender.com";
+// Same-origin: every /api/crm/* call goes through src/app/api/crm/[...path], which
+// authenticates the session, pins a client to its own workspace, and injects the
+// backend key server-side. The browser must never hold that key or reach Render
+// directly — that is exactly what left the whole CRM open to the internet.
+const API = "";
 
 // ── types ───────────────────────────────────────────────────────────
 type Card = {
@@ -386,8 +390,15 @@ function Briefing({ onOpen, workspace }: { onOpen: (id: number) => void; workspa
   const toggle = () => setOpen((o) => { const n = !o; if (typeof window !== "undefined") localStorage.setItem("crm.briefing", n ? "1" : "0"); return n; });
   useEffect(() => {
     setLoading(true);
+    // An error body parses as JSON perfectly well: FastAPI's {"detail": …} used to
+    // land in `s`, and the first read of s.counts / s.top threw during render. With
+    // no error boundary in the app that took the WHOLE CRM down, not just this
+    // panel. Validate the shape before trusting it.
     fetch(`${API}/api/crm/summary${workspace ? `?workspace=${encodeURIComponent(workspace)}` : ""}`)
-      .then((r) => r.json()).then(setS).catch(() => setS(null)).finally(() => setLoading(false));
+      .then(async (r) => (r.ok ? await r.json() : null))
+      .then((j) => setS(j && j.counts && Array.isArray(j.top) ? (j as Summary) : null))
+      .catch(() => setS(null))
+      .finally(() => setLoading(false));
   }, []);
   return (
     <div className="bg-gradient-to-br from-card to-card/40 border border-[#FFD60A]/20 rounded-2xl px-5 py-4 mb-4">
@@ -762,16 +773,37 @@ function ConvoBlock({ c, themName, defaultOpen }: { c: Convo; themName: string; 
 function Conversation({ id, themName, fallback, refreshKey }: { id: number; themName: string; fallback?: string; refreshKey?: number }) {
   const [convos, setConvos] = useState<Convo[] | null>(null);
   const [uniboxUrl, setUniboxUrl] = useState<string>("");
+  const [failed, setFailed] = useState(false);
+  const seq = useRef(0);
   useEffect(() => {
-    setConvos(null);
+    const mine = ++seq.current;
+    // Blank ONLY when the prospect changes. On a refresh (after a send) we keep the
+    // messages on screen: setConvos(null) tore down and rebuilt every iframe in the
+    // thread, so the whole conversation flashed white each time Jose replied.
+    setFailed(false);
     fetch(`${API}/api/crm/prospect/${id}/thread`)
-      .then((r) => r.json())
-      .then((j) => { setConvos(j.conversations || []); setUniboxUrl(j.unibox_url || ""); })
-      .catch(() => setConvos([]));
+      .then(async (r) => (r.ok ? await r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((j) => {
+        if (mine !== seq.current) return;   // a newer card won the race
+        setConvos(j.conversations || []);
+        setUniboxUrl(j.unibox_url || "");
+      })
+      .catch(() => { if (mine === seq.current) { setFailed(true); setConvos((c) => c ?? []); } });
   }, [id, refreshKey]);
+  useEffect(() => { setConvos(null); }, [id]);
 
   if (convos === null) return <div className="text-sm text-muted-foreground p-2">Loading conversation…</div>;
   if (convos.length === 0) {
+    // A failed request is not an empty thread. Saying "no conversation" during a
+    // Render cold start made a live prospect look untouched.
+    if (failed) {
+      return (
+        <div className="text-sm text-muted-foreground p-2">
+          Could not load the conversation. <button type="button" onClick={() => setConvos(null)}
+            className="underline hover:text-foreground">Retry</button>
+        </div>
+      );
+    }
     return fallback
       ? <div className="bg-card border border-border rounded-xl p-4 text-sm text-foreground whitespace-pre-wrap">{fallback}</div>
       : <div className="text-sm text-muted-foreground p-2">No email thread found in Instantly.</div>;
@@ -901,16 +933,30 @@ function useComposer(d: Detail, onSent: () => void) {
   }, [id]);
   const selectedOpt = sendOpts.find((o) => `${o.via}|${o.eaccount}` === fromKey) || null;
 
-  const setDraft = (c: Chan, v: string) => setDrafts((p) => ({ ...p, [c]: v }));
+  // Typing clears a previous confirmation, so the composer is never stuck showing
+  // "Sent." while you are writing the next message.
+  const setDraft = (c: Chan, v: string) => {
+    setDrafts((p) => ({ ...p, [c]: v }));
+    setSent((s) => (s === "ok" || s === "touched" ? null : s));
+  };
   const text = drafts[chan];
 
   const gen = (intent?: "book") => {
     setDrafting(true); setSent(null);
     const q = intent ? `?channel=${chan}&intent=${intent}` : `?channel=${chan}`;
     fetch(`${API}/api/crm/prospect/${id}/draft${q}`)
-      .then((r) => r.json())
-      .then((j: DraftResp) => { setDraft(chan, j.draft || ""); })
-      .catch(() => {})
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return (await r.json()) as DraftResp;
+      })
+      // Only ever REPLACE the composer with a real draft. A 500 returns valid JSON
+      // ({"detail": …}) whose .draft is undefined, and writing that wiped whatever
+      // Jose had typed. An empty answer leaves his text alone and says so.
+      .then((j) => {
+        if (j.draft && j.draft.trim()) setDraft(chan, j.draft);
+        else setSent("err:the drafter returned nothing");
+      })
+      .catch((e) => setSent(`err:${e instanceof Error ? e.message : "draft failed"}`))
       .finally(() => setDrafting(false));
   };
 
@@ -954,9 +1000,21 @@ function useComposer(d: Detail, onSent: () => void) {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message: instruction, draft: drafts[chan], target: chan, history: coLog.map((x) => ({ role: x.role === "you" ? "user" : "assistant", content: x.content })) }),
     })
-      .then((r) => r.json())
-      .then((j) => { if (j.draft) setDraft(chan, j.draft); setCoLog((l) => [...l, { role: "copilot", content: j.reply || "Updated the draft." }]); })
-      .catch(() => setCoLog((l) => [...l, { role: "copilot", content: "Copilot failed. Try again." }]))
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return await r.json();
+      })
+      // "Updated the draft." was printed even on a 500, whose JSON has no .reply —
+      // the copilot claimed success while nothing had changed.
+      .then((j) => {
+        if (j.draft) setDraft(chan, j.draft);
+        const said = j.reply || (j.draft ? "Updated the draft." : "No answer came back. Try again.");
+        setCoLog((l) => [...l, { role: "copilot", content: said }]);
+      })
+      .catch((e) => setCoLog((l) => [...l, {
+        role: "copilot",
+        content: `Copilot failed (${e instanceof Error ? e.message : "unknown"}). Your draft is untouched.`,
+      }]))
       .finally(() => setCoBusy(false));
   };
 
@@ -1247,11 +1305,18 @@ function Composer({ c }: { c: ComposerCtl }) {
       )}
 
       {/* actions */}
-      {sent === "ok" ? (
-        <div className="flex items-center gap-2 text-sm text-[#26D07C]"><Check className="w-4 h-4" /> Sent. Cadence advanced.</div>
-      ) : sent === "touched" ? (
-        <div className="flex items-center gap-2 text-sm text-[#26D07C]"><Check className="w-4 h-4" /> Logged as {CHANNEL_META[chan].label} touch. Ball's in their court now.</div>
-      ) : (
+      {/* The confirmation used to REPLACE the action row, and only a channel-tab
+          click cleared it — so after one send there was no Send button and the
+          only way back was LinkedIn and return. It now sits above the row and
+          clears the moment you type again. */}
+      {(sent === "ok" || sent === "touched") && (
+        <div className="flex items-center gap-2 text-sm text-[#26D07C]">
+          <Check className="w-4 h-4" />
+          {sent === "ok" ? "Sent. Cadence advanced."
+            : `Logged as ${CHANNEL_META[chan].label} touch. Ball's in their court now.`}
+        </div>
+      )}
+      {(
         <>
         {chan === "email" && sendOpts.length > 0 && (
           <div className="flex items-center gap-2 flex-wrap">
@@ -1304,7 +1369,9 @@ function Composer({ c }: { c: ComposerCtl }) {
         </div>
         </>
       )}
-      {sent?.startsWith("err:") && <div className="text-xs text-[#ef4444]">Send failed: {sent.slice(4)}</div>}
+      {sent?.startsWith("err:") && (
+        <div className="text-xs text-[#ef4444]">Send failed: {sent.slice(4)} · your text is still here.</div>
+      )}
       </>
       )}
     </div>
@@ -2174,24 +2241,33 @@ function Record({ id, initial, queue, onNavigate, onClose, onChanged }: { id: nu
   const prevId = qidx > 0 ? queue![qidx - 1] : null;
   const nextId = qidx >= 0 && queue && qidx < queue.length - 1 ? queue[qidx + 1] : null;
   const [d, setD] = useState<Detail | null>(null);
-  const [themName, setThemName] = useState(initial?.name?.trim().split(/\s+/)[0] || "Them");
+  const themName = initial?.name?.trim().split(/\s+/)[0] || "Them";
   const [loading, setLoading] = useState(true);
+  // Which load is current. Prev/next used to flip `id` while the previous
+  // prospect's detail was still in flight: the thread (keyed on the prop) showed
+  // the NEW person while the rail and the composer still held the OLD one, with
+  // no skeleton to signal it — so Send could post to the previous prospect.
+  const seq = useRef(0);
 
   const reload = useCallback((force = false) => {
+    const mine = ++seq.current;
     setLoading(true);
-    loadDetail(id, force).then((j) => setD(j)).finally(() => setLoading(false));
+    loadDetail(id, force)
+      .then((j) => { if (mine === seq.current) setD(j); })
+      .finally(() => { if (mine === seq.current) setLoading(false); });
   }, [id]);
-  useEffect(() => { reload(); }, [id, reload]);
-  useEffect(() => {
-    fetch(`${API}/api/crm/prospect/${id}/thread`).then((r) => r.json())
-      .then((j) => setThemName(j.them_name || "Them")).catch(() => {});
-  }, [id]);
+  // setD(null) on every id change: `loading && !d` then renders the skeleton, so
+  // the card is never a mix of two prospects.
+  useEffect(() => { setD(null); reload(); }, [id, reload]);
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { onClose(); return; }
       // J/K step through the work queue — but never while typing a draft/note/search.
       const el = document.activeElement;
       const typing = el && (el.tagName === "TEXTAREA" || el.tagName === "INPUT" || (el as HTMLElement).isContentEditable);
+      // Escape closes the card — but while writing it belongs to the field
+      // (cancel an inline edit), never to the modal: closing unmounts the
+      // composer and the draft dies with it.
+      if (e.key === "Escape" && !typing) { onClose(); return; }
       if (typing || !onNavigate) return;
       if ((e.key === "j" || e.key === "J") && nextId != null) { e.preventDefault(); onNavigate(nextId); }
       if ((e.key === "k" || e.key === "K") && prevId != null) { e.preventDefault(); onNavigate(prevId); }
