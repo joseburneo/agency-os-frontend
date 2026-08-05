@@ -472,12 +472,49 @@ const QUOTE_SELECTOR = [
   'div[id^="x_divRplyFwdMsg"]', "#appendonsend",
   "div.yahoo_quoted", "div.moz-cite-prefix", "div.protonmail_quote", "div.zmail_extra",
   "div.front-blockquote", "div.msg-quote",
+  // Outlook desktop / Word HTML carries NO class and NO id on its trail — the only
+  // structural marker is the thin rule above the "From:" header block. Without these
+  // two, 16% of real inbound mail rendered its whole quoted chain inline.
+  'div[style*="border-top:solid #E1E1E1"]', 'div[style*="border-top:solid #B5C4DF"]',
 ].join(", ");
 
-type MailParts = { main: string; quoted: string; empty: boolean };
+// Last resort when no structural marker exists: the first block whose own text OPENS
+// a quote header. Anchored at ^ so an outer wrapper holding the real message first
+// never matches — and document order means we get the outermost qualifying block.
+const QUOTE_TEXT_RE = /^\s*(-{2,}\s*Original Message|-{3,}\s*Forwarded message|_{5,}|On\s.{0,180}?\bwrote\s*:|From\s*:\s*(\S+@|[^\n<]{1,60}[<[]))/i;
+
+function findTextQuoteMarker(root: HTMLElement): Element | null {
+  for (const el of Array.from(root.querySelectorAll("div,p,blockquote,table,span"))) {
+    const t = (el.textContent || "").trim();
+    if (t && QUOTE_TEXT_RE.test(t)) return el;
+  }
+  // Outlook's header table often puts the label alone in its own bold run
+  // ("<b>From:</b> Paul <paul@…>"), which no block-level test can see.
+  for (const el of Array.from(root.querySelectorAll("b,strong"))) {
+    if (/^from\s*:?$/i.test((el.textContent || "").trim())) return el;
+  }
+  return null;
+}
+
+// Same markers, but matched INSIDE a text node — for clients that leave the header
+// loose in a block that also holds the reply ("…thanks.\n-----Original Message-----").
+// Returns the exact (node, offset) so the cut lands on the marker, not the block.
+const QUOTE_INLINE_RE = /(-{2,}\s*Original Message|-{3,}\s*Forwarded message|\n\s*_{5,}|(^|\n)\s*From\s*:\s*(\S+@|[^\n<]{1,60}[<[])|(^|\n)\s*On\s.{0,180}?\bwrote\s*:)/i;
+
+function findInlineQuoteStart(root: HTMLElement): { node: Text; offset: number } | null {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let n: Node | null;
+  while ((n = walker.nextNode())) {
+    const m = QUOTE_INLINE_RE.exec((n as Text).data || "");
+    if (m) return { node: n as Text, offset: m.index + (m[0].startsWith("\n") ? 1 : 0) };
+  }
+  return null;
+}
+
+type MailParts = { main: string; quoted: string; empty: boolean; mainBlank: boolean };
 
 function splitMail(raw: string): MailParts {
-  if (typeof window === "undefined") return { main: "", quoted: "", empty: true };
+  if (typeof window === "undefined") return { main: "", quoted: "", empty: true, mainBlank: false };
   // Sanitize first (scripts, event handlers, javascript: URLs all die here — the
   // iframe sandbox below is defense in depth, not the only wall), keeping the DOM
   // so we can split the quoted trail without a reparse.
@@ -487,11 +524,13 @@ function splitMail(raw: string): MailParts {
   }) as HTMLElement;
   // A mail client's quote marker plus EVERYTHING after it is the collapsed history
   // (Outlook puts the quoted body in ordinary siblings after #divRplyFwdMsg).
-  const marker = clean.querySelector(QUOTE_SELECTOR);
+  const marker = clean.querySelector(QUOTE_SELECTOR) || findTextQuoteMarker(clean);
+  const inline = marker ? null : findInlineQuoteStart(clean);
   let quoted = "";
-  if (marker && clean.lastChild) {
+  if ((marker || inline) && clean.lastChild) {
     const range = document.createRange();
-    range.setStartBefore(marker);
+    if (marker) range.setStartBefore(marker);
+    else if (inline) range.setStart(inline.node, Math.min(inline.offset, inline.node.length));
     range.setEndAfter(clean.lastChild);
     const holder = document.createElement("div");
     holder.appendChild(range.extractContents());
@@ -501,8 +540,11 @@ function splitMail(raw: string): MailParts {
   // or whitespace-only markup). The caller then falls back to the plain-text bubble
   // instead of showing a blank white card — or losing the message entirely.
   const visibleText = (clean.textContent || "").replace(/ /g, " ").trim();
-  const empty = !visibleText && !clean.querySelector("img,table") && !quoted;
-  return { main: clean.innerHTML, quoted, empty };
+  const hasMedia = !!clean.querySelector("img,table");
+  // A pure forward has no words of its own: the trail IS the message, so open it
+  // rather than showing an empty card with a "···" the reader has to discover.
+  const mainBlank = !visibleText && !hasMedia && !!quoted;
+  return { main: clean.innerHTML, quoted, empty: !visibleText && !hasMedia && !quoted, mainBlank };
 }
 
 // White paper, light color-scheme, images capped to the card width: the message
@@ -523,6 +565,8 @@ function mailDoc(main: string, quoted: string, showQuoted: boolean): string {
 function EmailHtmlBubble({ html, fromMe, borderColor, fallback }: { html: string; fromMe: boolean; borderColor?: string; fallback?: ReactNode }) {
   const parts = useMemo(() => splitMail(html), [html]);
   const [showQuoted, setShowQuoted] = useState(false);
+  // A forward with no covering note: show the trail straight away.
+  useEffect(() => { setShowQuoted(parts.mainBlank); }, [parts.mainBlank]);
   const frameRef = useRef<HTMLIFrameElement | null>(null);
   const roRef = useRef<ResizeObserver | null>(null);
   const [height, setHeight] = useState(64);
