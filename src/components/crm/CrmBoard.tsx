@@ -658,8 +658,12 @@ function useComposer(d: Detail, onSent: () => void) {
   const [routeTo, setRouteTo] = useState("");
   const [routeCc, setRouteCc] = useState<string[] | null>(null);
   const [ccAdd, setCcAdd] = useState("");
+  // The client owner's real inbox (clients.notify_email). Renders as a one-click
+  // "CC <owner>" chip — MANUAL only, the composer never adds it by itself (the
+  // auto-CC bridge was killed 2026-07-09 for leaking leads).
+  const [clientCc, setClientCc] = useState("");
   useEffect(() => {
-    setSendOpts([]); setFromKey(""); setRouteTo(""); setRouteCc(null); setCcAdd("");
+    setSendOpts([]); setFromKey(""); setRouteTo(""); setRouteCc(null); setCcAdd(""); setClientCc("");
     fetch(`${API}/api/crm/prospect/${id}/send-options`)
       .then((r) => r.json())
       .then((j) => {
@@ -668,6 +672,7 @@ function useComposer(d: Detail, onSent: () => void) {
         setThreadAcct({ account: j.thread_account || "", alive: !!j.thread_account_alive });
         if (opts.length) setFromKey(`${opts[0].via}|${opts[0].eaccount}`);
         if (j.routing?.to) { setRouteTo(j.routing.to); setRouteCc(j.routing.cc || []); }
+        setClientCc((j.client_cc_email || "").toLowerCase());
       })
       .catch(() => {});
   }, [id]);
@@ -735,7 +740,7 @@ function useComposer(d: Detail, onSent: () => void) {
   const canSendEmail = chan === "email" && (sendOpts.length > 0 || d.can_send_email);
   const gmailLive = d.live_channel === "gmail";
   const draftLabel = chan === "email" ? "Draft with AI" : chan === "linkedin" ? "Draft LinkedIn" : chan === "whatsapp" ? "Draft WhatsApp" : "Talking points";
-  return { d, chan, setChan, text, setDraft, gen, send, logTouch, refresh: onSent, askCopilot, drafting, sending, sent, setSent, co, setCo, coBusy, coLog, canSendEmail, gmailLive, draftLabel, threadKey, sendOpts, fromKey, setFromKey, selectedOpt, threadAcct, routeTo, routeCc, setRouteCc, ccAdd, setCcAdd };
+  return { d, chan, setChan, text, setDraft, gen, send, logTouch, refresh: onSent, askCopilot, drafting, sending, sent, setSent, co, setCo, coBusy, coLog, canSendEmail, gmailLive, draftLabel, threadKey, sendOpts, fromKey, setFromKey, selectedOpt, threadAcct, routeTo, routeCc, setRouteCc, ccAdd, setCcAdd, clientCc };
 }
 type ComposerCtl = ReturnType<typeof useComposer>;
 
@@ -897,7 +902,7 @@ function CallPanel({ d, onTouched }: { d: Detail; onTouched: () => void }) {
 }
 
 function Composer({ c }: { c: ComposerCtl }) {
-  const { d, chan, setChan, text, setDraft, gen, send, logTouch, drafting, sending, sent, setSent, canSendEmail, gmailLive, draftLabel, sendOpts, fromKey, setFromKey, selectedOpt, threadAcct, routeTo, routeCc, setRouteCc, ccAdd, setCcAdd } = c;
+  const { d, chan, setChan, text, setDraft, gen, send, logTouch, drafting, sending, sent, setSent, canSendEmail, gmailLive, draftLabel, sendOpts, fromKey, setFromKey, selectedOpt, threadAcct, routeTo, routeCc, setRouteCc, ccAdd, setCcAdd, clientCc } = c;
   // Compact by default so an empty composer never steals the conversation's space; it opens
   // on click or as soon as there's a draft (incl. one the copilot / Draft-with-AI wrote).
   const [open, setOpen] = useState(false);
@@ -959,6 +964,18 @@ function Composer({ c }: { c: ComposerCtl }) {
             placeholder="+ CC…"
             className="w-24 bg-transparent border-b border-border/60 text-[11px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-[#FFD60A]/50 px-1 py-0.5"
           />
+          {/* One-click CC to the client owner's real inbox (clients.notify_email).
+              Manual by design — never pre-added (the auto-CC bridge is dead). */}
+          {clientCc && !(routeCc ?? []).includes(clientCc) && (
+            <button
+              type="button"
+              onClick={() => setRouteCc([...(routeCc ?? []), clientCc])}
+              title={`Añadir ${clientCc} al CC`}
+              className="inline-flex items-center gap-1 rounded-md border border-[#26D07C]/35 bg-[#26D07C]/10 px-2 py-0.5 text-[#26D07C] hover:bg-[#26D07C]/20 transition-colors"
+            >
+              + CC client · {clientCc}
+            </button>
+          )}
         </div>
       )}
 
