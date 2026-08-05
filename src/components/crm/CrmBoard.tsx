@@ -7,6 +7,7 @@ import {
   Flame, LayoutGrid, List, Bot, ChevronRight, Zap, Mail, Magnet,
   PhoneCall, PhoneOff, Mic, MicOff, Smartphone, AlertTriangle,
 } from "lucide-react";
+import DOMPurify from "dompurify";
 import { useSoftphone, fmtDuration, type CallMode } from "./useSoftphone";
 
 const API = process.env.NEXT_PUBLIC_BACKEND_URL || "https://agency-os-api.onrender.com";
@@ -426,7 +427,7 @@ function Briefing({ onOpen, workspace }: { onOpen: (id: number) => void; workspa
 }
 
 // ── conversation thread (live from Instantly) ────────────────────────
-type ThreadMsg = { from_me: boolean; at: string | null; subject: string; text: string; sig?: string; from_addr: string; to_addr: string; eaccount: string };
+type ThreadMsg = { from_me: boolean; at: string | null; subject: string; text: string; html?: string; sig?: string; from_addr: string; to_addr: string; eaccount: string; email_id?: string };
 
 // URLs and emails become real links inside a bubble — a pasted Build link should be
 // clickable, and seeing it as a link confirms it went out as one.
@@ -457,6 +458,109 @@ function dayLabel(s: string | null): string {
 }
 function clock(s: string | null): string {
   return s ? new Date(s).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "";
+}
+
+// ── Gmail-style HTML mail rendering ──────────────────────────────────
+// The backend now serves each message's ORIGINAL html (inbound: the webhook's
+// reply_html; outbound: the branded body we actually delivered). We render it the
+// way Gmail does: DOMPurify-sanitized, inside a sandboxed iframe so email CSS can
+// never leak into the app (and vice versa), with the quoted reply trail split out
+// behind Gmail's "···" expander instead of destroyed server-side.
+
+const QUOTE_SELECTOR = [
+  "div.gmail_quote", 'blockquote[type="cite"]', 'div[id^="divRplyFwdMsg"]',
+  'div[id^="x_divRplyFwdMsg"]', "#appendonsend",
+  "div.yahoo_quoted", "div.moz-cite-prefix", "div.protonmail_quote", "div.zmail_extra",
+  "div.front-blockquote", "div.msg-quote",
+].join(", ");
+
+type MailParts = { main: string; quoted: string; empty: boolean };
+
+function splitMail(raw: string): MailParts {
+  if (typeof window === "undefined") return { main: "", quoted: "", empty: true };
+  // Sanitize first (scripts, event handlers, javascript: URLs all die here — the
+  // iframe sandbox below is defense in depth, not the only wall), keeping the DOM
+  // so we can split the quoted trail without a reparse.
+  const clean = DOMPurify.sanitize(raw, {
+    RETURN_DOM: true,
+    FORBID_TAGS: ["form", "input", "textarea", "select", "button", "dialog", "iframe"],
+  }) as HTMLElement;
+  // A mail client's quote marker plus EVERYTHING after it is the collapsed history
+  // (Outlook puts the quoted body in ordinary siblings after #divRplyFwdMsg).
+  const marker = clean.querySelector(QUOTE_SELECTOR);
+  let quoted = "";
+  if (marker && clean.lastChild) {
+    const range = document.createRange();
+    range.setStartBefore(marker);
+    range.setEndAfter(clean.lastChild);
+    const holder = document.createElement("div");
+    holder.appendChild(range.extractContents());
+    quoted = holder.innerHTML;
+  }
+  // "Empty" = nothing a human would see in the main part (sanitizer ate everything,
+  // or whitespace-only markup). The caller then falls back to the plain-text bubble
+  // instead of showing a blank white card — or losing the message entirely.
+  const visibleText = (clean.textContent || "").replace(/ /g, " ").trim();
+  const empty = !visibleText && !clean.querySelector("img,table") && !quoted;
+  return { main: clean.innerHTML, quoted, empty };
+}
+
+// White paper, light color-scheme, images capped to the card width: the message
+// renders exactly as the recipient's inbox showed it, inside our dark UI.
+function mailDoc(main: string, quoted: string, showQuoted: boolean): string {
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="referrer" content="no-referrer"><base target="_blank"><style>
+  :root{color-scheme:light}
+  html,body{margin:0;padding:0;background:#ffffff}
+  body{color:#1f2328;font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;word-break:break-word;overflow-wrap:anywhere;padding:12px 14px 8px}
+  img{max-width:100%;height:auto}
+  a{color:#1d4ed8}
+  p{margin:0 0 12px}
+  blockquote{margin:4px 0 4px .8ex;border-left:2px solid #d5d9df;padding-left:1ex;color:#5f6368}
+  .lx-quoted{margin-top:14px;padding-top:10px;border-top:1px solid #eceef1;color:#5f6368}
+  </style></head><body>${main}${showQuoted && quoted ? `<div class="lx-quoted">${quoted}</div>` : ""}</body></html>`;
+}
+
+function EmailHtmlBubble({ html, fromMe, borderColor, fallback }: { html: string; fromMe: boolean; borderColor?: string; fallback?: ReactNode }) {
+  const parts = useMemo(() => splitMail(html), [html]);
+  const [showQuoted, setShowQuoted] = useState(false);
+  const frameRef = useRef<HTMLIFrameElement | null>(null);
+  const roRef = useRef<ResizeObserver | null>(null);
+  const [height, setHeight] = useState(64);
+  const syncHeight = useCallback(() => {
+    const b = frameRef.current?.contentDocument?.body;
+    if (b) setHeight(Math.min(Math.max(b.scrollHeight + 4, 32), 6000));
+  }, []);
+  // Auto-height that keeps tracking: images/fonts load after onLoad, so observe the
+  // iframe body (same-origin is safe — sandbox has no allow-scripts, DOMPurify ran).
+  const onLoad = useCallback(() => {
+    syncHeight();
+    roRef.current?.disconnect();
+    const b = frameRef.current?.contentDocument?.body;
+    if (b && typeof ResizeObserver !== "undefined") {
+      const ro = new ResizeObserver(syncHeight);
+      ro.observe(b);
+      roRef.current = ro;
+    }
+  }, [syncHeight]);
+  useEffect(() => () => roRef.current?.disconnect(), []);
+  const srcDoc = useMemo(() => mailDoc(parts.main, parts.quoted, showQuoted), [parts, showQuoted]);
+  if (parts.empty) return <>{fallback ?? null}</>;
+  return (
+    <div className={`w-full rounded-2xl border shadow-sm bg-white overflow-hidden ${fromMe ? "rounded-br-md" : "rounded-bl-md"}`}
+      style={{ borderColor: borderColor || (fromMe ? "rgba(201,168,76,0.55)" : "rgba(0,0,0,.10)") }}>
+      <iframe ref={frameRef} title="email message" srcDoc={srcDoc} onLoad={onLoad}
+        sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+        referrerPolicy="no-referrer" loading="lazy"
+        className="block w-full" style={{ height, border: 0, background: "#fff" }} />
+      {parts.quoted && (
+        <button type="button" onClick={() => setShowQuoted((q) => !q)}
+          title={showQuoted ? "Hide quoted history" : "Show quoted history"}
+          className="mx-3.5 mb-2.5 px-2.5 py-1 rounded-full bg-[#eef1f4] hover:bg-[#dfe4e9] text-[#5f6368] text-[10px] leading-none tracking-[0.2em] transition-colors">
+          ···
+        </button>
+      )}
+    </div>
+  );
 }
 
 // The prospect's letterhead (name/title/phones) rides under the message, collapsed.
@@ -541,8 +645,11 @@ function ConvoBlock({ c, themName, defaultOpen }: { c: Convo; themName: string; 
             ) : null;
             // Newest-first list: the day chip sits above the newest message of each day.
             const newDay = i === 0 || dayKey(m.at) !== dayKey(ordered[i - 1].at);
+            // Stable identity: a new message prepending must not hand this row's
+            // iframe/toggle state to a DIFFERENT message (index keys shift on refresh).
+            const mkey = m.email_id || `${m.at}|${m.from_addr}|${orig}`;
             return (
-              <div key={i}>
+              <div key={mkey}>
                 {newDay && (
                   <div className="flex items-center gap-3 py-2">
                     <span className="flex-1 h-px bg-border/60" />
@@ -555,8 +662,27 @@ function ConvoBlock({ c, themName, defaultOpen }: { c: Convo; themName: string; 
                     style={m.from_me ? { background: "rgba(255,214,10,.15)", color: "#FFD60A" } : { background: src.tint }}>
                     {m.from_me ? "JB" : <Favicon domain={src.logo} label={src.name} size={16} />}
                   </div>
-                  <div className={`max-w-[min(82%,60ch)] flex flex-col ${m.from_me ? "items-end" : "items-start"}`}>
-                    {m.from_me ? (
+                  <div className={`${m.html ? "max-w-[min(94%,640px)] w-full" : "max-w-[min(82%,60ch)]"} flex flex-col ${m.from_me ? "items-end" : "items-start"}`}>
+                    {m.html ? (
+                      // Original HTML, rendered like the real inbox rendered it —
+                      // formatting, links, logos, signature — quoted trail behind "···".
+                      // If the sanitizer leaves nothing visible, fall back to the
+                      // plain-text bubble so a real message can never disappear.
+                      <EmailHtmlBubble html={m.html} fromMe={m.from_me}
+                        borderColor={!m.from_me && latest ? src.ring : undefined}
+                        fallback={m.from_me ? (
+                          <div className="rounded-2xl rounded-br-md px-3.5 py-2.5 text-sm border"
+                            style={{ background: "rgba(255,255,255,0.045)", borderColor: "rgba(255,214,10,0.4)" }}>
+                            <div className="text-foreground whitespace-pre-wrap leading-relaxed">{linkify(m.text, "#FFD60A")}</div>
+                          </div>
+                        ) : (
+                          <div className="rounded-2xl rounded-bl-md border shadow-sm bg-white px-3.5 py-2.5 text-sm text-[#1a1a1a]"
+                            style={{ borderColor: latest ? src.ring : "rgba(0,0,0,.10)" }}>
+                            <div className="whitespace-pre-wrap leading-relaxed">{linkify(m.text, "#1d4ed8")}</div>
+                            {m.sig ? <SigToggle sig={m.sig} /> : null}
+                          </div>
+                        )} />
+                    ) : m.from_me ? (
                       // OUR message — elevated navy, thin gold border (iMessage Luxvance)
                       <div className="rounded-2xl rounded-br-md px-3.5 py-2.5 text-sm border"
                         style={{ background: "rgba(255,255,255,0.045)", borderColor: "rgba(255,214,10,0.4)" }}>
@@ -632,7 +758,55 @@ type DraftResp = { channel: string; step: number; goal: string; draft: string; c
 // One way this reply can leave: on-thread via an alive Instantly account, or a
 // thread-resurrection send from the work mailbox (new email, In-Reply-To the stored
 // Message-ID, real history quoted) — that one survives any cancelled account.
-type SendOption = { via: "instantly" | "gmail"; eaccount: string; label: string; thread?: boolean };
+type SendOption = { via: "instantly" | "gmail"; eaccount: string; label: string; thread?: boolean; provider?: string };
+
+// ESP favicon for a mailbox row ("google" | "microsoft" from Instantly's
+// provider_code, resolved server-side — no extra requests, 2 cached favicons).
+function ProviderIcon({ provider }: { provider?: string }) {
+  const domain = provider === "google" ? "google.com" : provider === "microsoft" ? "microsoft.com" : "";
+  if (!domain) return <span className="w-3.5 shrink-0" />;
+  return <Favicon domain={domain} label={provider || ""} size={14} className="shrink-0" />;
+}
+
+// The Send-from picker. A native <select> cannot render images in its rows, so
+// this is a minimal listbox: same look, ESP logo per mailbox, zero extra weight
+// (Jose, 2026-08-05: "que se vea profesional pero que se mantenga rápido").
+function SenderSelect({ opts, value, onChange }: {
+  opts: SendOption[]; value: string; onChange: (key: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const sel = opts.find((o) => `${o.via}|${o.eaccount}` === value) || null;
+  return (
+    <div className="relative">
+      <button type="button" onClick={() => setOpen((v) => !v)}
+        className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs text-foreground max-w-full">
+        <ProviderIcon provider={sel?.provider} />
+        <span className="truncate">{sel?.label || "Pick a mailbox"}</span>
+        <span className="text-muted-foreground">▾</span>
+      </button>
+      {open && (
+        <>
+          {/* click-away layer */}
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute z-50 mt-1 min-w-full max-h-64 overflow-y-auto rounded-lg border border-border bg-popover shadow-xl py-1">
+            {opts.map((o) => {
+              const k = `${o.via}|${o.eaccount}`;
+              return (
+                <button key={k} type="button"
+                  onClick={() => { onChange(k); setOpen(false); }}
+                  className={`flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs whitespace-nowrap transition-colors hover:bg-white/[0.06] ${k === value ? "text-[#FFD60A]" : "text-foreground"}`}>
+                  <ProviderIcon provider={o.provider} />
+                  <span className="truncate">{o.label}</span>
+                  {k === value && <Check className="w-3 h-3 ml-auto shrink-0" />}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 type Chan = "email" | "linkedin" | "whatsapp" | "call";
 type CoLog = { role: "you" | "copilot"; content: string };
 
@@ -1038,12 +1212,7 @@ function Composer({ c }: { c: ComposerCtl }) {
         {chan === "email" && sendOpts.length > 0 && (
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-[11px] text-muted-foreground shrink-0">Send from</span>
-            <select value={fromKey} onChange={(e) => setFromKey(e.target.value)}
-              className="rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs text-foreground max-w-full">
-              {sendOpts.map((o) => (
-                <option key={`${o.via}|${o.eaccount}`} value={`${o.via}|${o.eaccount}`}>{o.label}</option>
-              ))}
-            </select>
+            <SenderSelect opts={sendOpts} value={fromKey} onChange={setFromKey} />
             {threadAcct.account && !threadAcct.alive && (
               <span className="text-[11px] text-[#FFD60A]">
                 Original mailbox ({threadAcct.account}) is gone — this sends as a continuation of the same thread.
