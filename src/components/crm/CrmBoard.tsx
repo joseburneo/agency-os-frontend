@@ -662,6 +662,10 @@ function useComposer(d: Detail, onSent: () => void) {
   // "CC <owner>" chip — MANUAL only, the composer never adds it by itself (the
   // auto-CC bridge was killed 2026-07-09 for leaking leads).
   const [clientCc, setClientCc] = useState("");
+  // What signature actually rides on the send (the workspace's own). Drives the
+  // banner under the textarea, which used to claim "Luxvance signature" in every
+  // workspace — a red flag inside a client's portal.
+  const [sigInfo, setSigInfo] = useState<{ present: boolean; owner: string }>({ present: false, owner: "" });
   useEffect(() => {
     setSendOpts([]); setFromKey(""); setRouteTo(""); setRouteCc(null); setCcAdd(""); setClientCc("");
     fetch(`${API}/api/crm/prospect/${id}/send-options`)
@@ -673,6 +677,7 @@ function useComposer(d: Detail, onSent: () => void) {
         if (opts.length) setFromKey(`${opts[0].via}|${opts[0].eaccount}`);
         if (j.routing?.to) { setRouteTo(j.routing.to); setRouteCc(j.routing.cc || []); }
         setClientCc((j.client_cc_email || "").toLowerCase());
+        setSigInfo({ present: !!j.signature?.present, owner: j.signature?.owner || "" });
       })
       .catch(() => {});
   }, [id]);
@@ -740,7 +745,7 @@ function useComposer(d: Detail, onSent: () => void) {
   const canSendEmail = chan === "email" && (sendOpts.length > 0 || d.can_send_email);
   const gmailLive = d.live_channel === "gmail";
   const draftLabel = chan === "email" ? "Draft with AI" : chan === "linkedin" ? "Draft LinkedIn" : chan === "whatsapp" ? "Draft WhatsApp" : "Talking points";
-  return { d, chan, setChan, text, setDraft, gen, send, logTouch, refresh: onSent, askCopilot, drafting, sending, sent, setSent, co, setCo, coBusy, coLog, canSendEmail, gmailLive, draftLabel, threadKey, sendOpts, fromKey, setFromKey, selectedOpt, threadAcct, routeTo, routeCc, setRouteCc, ccAdd, setCcAdd, clientCc };
+  return { d, chan, setChan, text, setDraft, gen, send, logTouch, refresh: onSent, askCopilot, drafting, sending, sent, setSent, co, setCo, coBusy, coLog, canSendEmail, gmailLive, draftLabel, threadKey, sendOpts, fromKey, setFromKey, selectedOpt, threadAcct, routeTo, routeCc, setRouteCc, ccAdd, setCcAdd, clientCc, sigInfo };
 }
 type ComposerCtl = ReturnType<typeof useComposer>;
 
@@ -998,12 +1003,15 @@ function Composer({ c }: { c: ComposerCtl }) {
         className="w-full bg-background border border-border rounded-lg p-3 text-sm text-foreground leading-relaxed focus:outline-none focus:ring-1 focus:ring-[#FFD60A]/50 resize-y"
       />
 
-      {/* the branded Luxvance signature is attached automatically on send */}
-      {chan === "email" && (
+      {/* The workspace's OWN signature is attached automatically on send (from
+          workspaces.signature_html via the Brain) — the banner names it truthfully
+          per workspace and disappears when none is configured. It used to claim
+          "Luxvance signature · logo · tagline" in every workspace, which read as
+          a red flag inside a client's portal (Jose, 2026-08-05). */}
+      {chan === "email" && c.sigInfo.present && (
         <div className="flex items-center gap-2 rounded-lg border border-[#FFD60A]/25 bg-[#FFD60A]/[0.06] px-2.5 py-1.5">
-          <Favicon domain="luxvance.com" label="Luxvance" size={16} />
           <span className="text-[11px] text-muted-foreground leading-tight">
-            <span className="text-[#FFD60A] font-medium">Luxvance signature</span> attached on send · logo · tagline · book link. Just end with a sign-off like <span className="text-foreground">Best,</span>
+            <span className="text-[#FFD60A] font-medium">{c.sigInfo.owner ? `${c.sigInfo.owner}'s signature` : "Signature"}</span> attached on send. Just end with a sign-off like <span className="text-foreground">Best,</span>
           </span>
         </div>
       )}
