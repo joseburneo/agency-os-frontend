@@ -104,6 +104,8 @@ function toGate(request: NextRequest, next: string, scope: string) {
 
 export const config = {
   matcher: [
-    "/((?!api|_next/static|_next/image|gate|favicon.ico|icon.png|apple-icon.png|manifest.webmanifest).*)",
+    // set-password is excluded for the same reason as gate: it is where someone
+    // WITHOUT a session lands to get one. Its own token is the authorisation.
+    "/((?!api|_next/static|_next/image|gate|set-password|favicon.ico|icon.png|apple-icon.png|manifest.webmanifest).*)",
   ],
 };

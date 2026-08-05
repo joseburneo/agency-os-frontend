@@ -14,7 +14,10 @@ export default async function GatePage({
   const isAgency = scope === "agency";
   // A client workspace with real people on it signs in with email + password.
   // One still on the shared bootstrap key keeps the single-field form.
-  const withEmail = !isAgency && (await hasUsers(scope));
+  // The agency gate always offers the email field: named superadmin accounts sign
+  // in there, and PORTAL_AGENCY_PASSWORD stays as break-glass — which is why the
+  // field is optional rather than required for that scope.
+  const withEmail = isAgency || (await hasUsers(scope));
   const name = isAgency ? "Luxvance" : prettySlug(scope);
   const eyebrow = isAgency ? "Luxvance · Agency" : name;
   const title = isAgency ? "Agency access" : withEmail ? "Sign in" : "Private workspace";
@@ -55,12 +58,14 @@ export default async function GatePage({
           <input type="hidden" name="scope" value={scope} />
           {withEmail && (
             <>
-              <label className="text-[10px] uppercase tracking-[0.16em] text-[#8A93A6]">Email</label>
+              <label className="text-[10px] uppercase tracking-[0.16em] text-[#8A93A6]">
+                Email{isAgency ? " (or leave blank for the shared key)" : ""}
+              </label>
               <input
                 type="email"
                 name="email"
                 autoFocus
-                required
+                required={!isAgency}
                 autoComplete="username"
                 placeholder="you@company.com"
                 aria-invalid={error ? true : undefined}
@@ -69,7 +74,7 @@ export default async function GatePage({
             </>
           )}
           <label className="text-[10px] uppercase tracking-[0.16em] text-[#8A93A6]">
-            {isAgency ? "Agency key" : withEmail ? "Password" : "Access key"}
+            {isAgency ? "Password or agency key" : withEmail ? "Password" : "Access key"}
           </label>
           <input
             type="password"

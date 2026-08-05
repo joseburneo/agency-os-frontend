@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { AGENCY_COOKIE, wsCookie, scopeToken, parseWsKeys } from "@/lib/portal/gate";
-import { getWorkspaceHash, verifyPassword, hasUsers, verifyUser } from "@/lib/portal/auth";
+import { getWorkspaceHash, verifyPassword, hasUsers, verifyUser, verifyAgencyUser } from "@/lib/portal/auth";
 
 // Validates a submitted key against the agency password OR the target
 // workspace's key, then sets the matching scope cookie. The agency password
@@ -69,6 +69,16 @@ export async function POST(request: NextRequest) {
 
   // 1) Agency key — unlocks everything, from any gate. Jose's password OR any
   //    named teammate key (e.g. Ben's).
+  // A named agency account (portal_users, role='agency') wins first — that is the
+  // per-person superadmin, and it opens any workspace just like the shared key did.
+  // PORTAL_AGENCY_PASSWORD stays as break-glass: if the DB or the invite email ever
+  // fails, we must not be locked out of our own product.
+  if (secret && email && (await verifyAgencyUser(email, password))) {
+    const res = NextResponse.redirect(new URL(next, request.url), { status: 303 });
+    res.cookies.set(AGENCY_COOKIE, await scopeToken(secret, "agency"), COOKIE_OPTS);
+    return res;
+  }
+
   const isAgencyPw = Boolean(
     secret && password &&
       (password === agencyPw || Object.values(agencyKeys).includes(password))
