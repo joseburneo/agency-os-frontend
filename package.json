@@ -12,6 +12,7 @@
     "@supabase/supabase-js": "^2.100.1",
     "@twilio/voice-sdk": "^2.18.3",
     "clsx": "^2.1.1",
+    "dompurify": "^3.4.13",
     "framer-motion": "^12.38.0",
     "lucide-react": "^1.7.0",
     "next": "16.2.1",

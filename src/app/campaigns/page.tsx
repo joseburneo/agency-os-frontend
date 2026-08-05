@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { AlertCircle, Search, Edit2, Loader2, RefreshCw, X, Check, Sparkles, ChevronUp, ChevronDown, Mail, MessageSquare, Zap, ArrowUpDown, ChevronRight, Filter, Users, Eye, Code2, Copy, CheckCircle2, ShieldAlert, ShieldCheck, Pencil, Save, RotateCcw, CalendarDays } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import DOMPurify from "dompurify";
 import { supabase } from "@/lib/supabase";
 
 const API_BASE = "https://agency-os-api.onrender.com";
@@ -975,7 +976,14 @@ export default function CampaignsPage() {
                                       <code>{variant.body_raw || variant.body}</code>
                                     </div>
                                   ) : variant.body_raw ? (
-                                    <div className="text-sm text-black bg-white rounded-md p-4 border border-border/50 overflow-x-auto prose prose-sm max-w-none [&_a]:text-blue-600 [&_a]:underline" dangerouslySetInnerHTML={{ __html: variant.body_raw }} />
+                                    <div className="text-sm text-black bg-white rounded-md p-4 border border-border/50 overflow-x-auto prose prose-sm max-w-none [&_a]:text-blue-600 [&_a]:underline"
+                                      // contain:paint makes this div the containing block for any
+                                      // position:fixed descendant — an overlay can never escape the
+                                      // preview card into the app viewport (no iframe here).
+                                      style={{ contain: "paint" }}
+                                      dangerouslySetInnerHTML={{ __html: typeof window === "undefined" ? "" : DOMPurify.sanitize(variant.body_raw, {
+                                        FORBID_TAGS: ["style", "form", "input", "textarea", "select", "button", "dialog", "iframe", "meta", "base", "link"],
+                                      }) }} />
                                   ) : (
                                     <div className="text-sm text-black bg-white rounded-md p-4 border border-border/50 overflow-x-auto whitespace-pre-wrap">
                                       {variant.body}
