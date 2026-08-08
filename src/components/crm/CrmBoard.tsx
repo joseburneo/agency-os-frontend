@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   X, Link2, MessageCircle, Phone, ExternalLink, Copy, Check,
   Search, RefreshCw, CalendarClock, Sparkles, Send, PenLine, Loader2,
@@ -15,6 +15,17 @@ import { useSoftphone, fmtDuration, type CallMode } from "./useSoftphone";
 // backend key server-side. The browser must never hold that key or reach Render
 // directly — that is exactly what left the whole CRM open to the internet.
 const API = "";
+
+// Whether this session may generate a Build (the personalized lead magnet).
+// AGENCY ONLY. A Build publishes a LUXVANCE-branded workspace at
+// app.luxvance.com/w/<slug> and spends Luxvance's Clay + OpenAI credits, so a
+// client generating one would hand their own prospect a demo of an agency that
+// prospect has never heard of (Jose, 2026-08-08). Personalized lead magnets are
+// a paid upgrade: when a client buys it, unlock that workspace on the BACKEND
+// (MAGNET_UPGRADE_WORKSPACES) — this context only decides whether to draw the
+// buttons, and hiding a button is not a permission.
+// Default false so any future caller that forgets the prop fails CLOSED.
+const CanBuildCtx = createContext(false);
 
 // ── types ───────────────────────────────────────────────────────────
 type Card = {
@@ -1780,6 +1791,8 @@ function Row({ k, v }: { k: string; v: ReactNode }) {
 // reachable, the Build status, and quick actions. Build/contact management tools tuck into a
 // collapsible so the rail stays clean by default.
 function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f?: boolean) => void }) {
+  // Agency only — see CanBuildCtx. A client sees the rest of the rail unchanged.
+  const canBuild = useContext(CanBuildCtx);
   const [tools, setTools] = useState(false);
   // Which pane the Build tools open on: fresh build vs refine-with-context.
   const [optimizeMode, setOptimizeMode] = useState(false);
@@ -2016,7 +2029,11 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
       {/* BUILD — the lead magnet. Sits high in the card because deciding who gets
           one is a first-class call Jose makes per prospect, not an afterthought.
           Creation is deliberately MANUAL: a magnet costs real money and not every
-          replier deserves one. Optimize reopens the same build with extra context. */}
+          replier deserves one. Optimize reopens the same build with extra context.
+          Hidden entirely for a client session: a Build is Luxvance-branded sales
+          material, so a client generating one would send their own prospect a demo
+          of an agency that prospect has never heard of. */}
+      {canBuild && (
       <div>
         <div className="flex items-center gap-2 mb-2">
           <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70 font-semibold"><span className="text-[13px] mr-1 align-middle">🧲</span> Build · the lead magnet</span>
@@ -2080,6 +2097,7 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
         {buildErr && <div className="mt-1.5 text-[11px] text-[#ef4444]">{buildErr}</div>}
         {tools && <div className="mt-3"><BuildCard d={d} onChanged={both} autoOptimize={optimizeMode} /></div>}
       </div>
+      )}
 
       {/* NOTES — call outcomes / next-step context that must survive a re-open */}
       <div>
@@ -2747,7 +2765,7 @@ const FUNNEL: { key: string; title: string; hint: string; tone?: "green" | "mute
 ];
 
 // ── page ─────────────────────────────────────────────────────────────
-export function CrmBoard({ workspace, basePath = "/crm", live = true }: { workspace?: string; basePath?: string; live?: boolean }) {
+export function CrmBoard({ workspace, basePath = "/crm", live = true, canBuild = false }: { workspace?: string; basePath?: string; live?: boolean; canBuild?: boolean }) {
   const [funnel, setFunnel] = useState<Funnel | null>(null);
   const [rows, setRows] = useState<Card[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2856,6 +2874,7 @@ export function CrmBoard({ workspace, basePath = "/crm", live = true }: { worksp
   }
 
   return (
+    <CanBuildCtx.Provider value={canBuild}>
     <div className="w-full">
       <div className="crm-ambient" aria-hidden />
       {/* one compact command bar: identity · search · view · sort · refresh */}
@@ -2953,5 +2972,6 @@ export function CrmBoard({ workspace, basePath = "/crm", live = true }: { worksp
 
       {openId !== null && <Record id={openId} initial={rows.find((r) => r.id === openId)} queue={queueIds} onNavigate={openRecord} onClose={() => openRecord(null)} onChanged={load} />}
     </div>
+    </CanBuildCtx.Provider>
   );
 }
