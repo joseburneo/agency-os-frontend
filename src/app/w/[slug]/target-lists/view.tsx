@@ -58,6 +58,33 @@ function truncate(s: string, n = 120) {
   return s.length > n ? s.slice(0, n).trimEnd() + "…" : s;
 }
 
+// A "why now" that carries its source URL, stored as "… · https://…". The claim
+// is only worth as much as the link behind it: a prospect judging our research
+// clicks it, so the source ships as a link rather than as pasted URL text.
+function WhyNowCell({ value }: { value: string }) {
+  const parts = value.split(" · ");
+  const src = parts.find((p) => p.startsWith("http"));
+  const text = parts.filter((p) => !p.startsWith("http")).join(" · ");
+  return (
+    <span className="text-[12px] leading-snug" title={text}>
+      {truncate(text)}
+      {src && (
+        <>
+          {" "}
+          <a
+            href={src}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-0.5 text-[11px] text-blue-300 hover:text-blue-200 whitespace-nowrap"
+          >
+            source <ExternalLink className="w-2.5 h-2.5" />
+          </a>
+        </>
+      )}
+    </span>
+  );
+}
+
 // Built here, in the browser, on click — never server-side. A precomputed link carries
 // the whole body percent-encoded, so a 1,113-lead list would ship every email twice.
 // `canSend` needs a real address plus a drafted body.
@@ -173,6 +200,15 @@ export function TargetListsView({
     () => data.leads.some((l) => l.listId === activeList && l.segment === "hashr"),
     [data.leads, activeList]
   );
+  // The dated buying trigger behind each row. It used to be gated behind the VIP
+  // layout, so a magnet could research a signal per lead and then show none of
+  // it — the single thing a prospect asks for when judging a list ("why now?").
+  // Same detection pattern as showNote: the column appears where the data does,
+  // without dragging in the rest of the VIP layout (an empty Phone column).
+  const hasWhyNow = useMemo(
+    () => !isVip && data.leads.some((l) => l.listId === activeList && !!l.whyNow),
+    [data.leads, activeList, isVip]
+  );
   // Clay's people-search carries no sector, so a magnet list would render a
   // whole column of blanks — an awkward hole in the middle of the gift. The
   // column only earns its place when the data exists. Unfiltered rows again,
@@ -221,14 +257,18 @@ export function TargetListsView({
       ? ["Company", "Leader", "Role", "Why VIP", "Email", "LinkedIn", "LinkedIn note", "Phone"]
       : isHr
         ? ["Company", "Leader", "Role", "HR lead", "HR title", "Email", "LinkedIn"]
-        : ["Company", "Leader", "Role", "Sector", "Email", "LinkedIn"];
+        : hasWhyNow
+          ? ["Company", "Leader", "Role", "Why now", "Email", "LinkedIn"]
+          : ["Company", "Leader", "Role", "Sector", "Email", "LinkedIn"];
     const rows = leads.map((l) => {
       const base = [l.company, l.name, l.role];
       const rest = isVip
         ? [l.whyNow ?? "", l.hasEmail ? l.emailDisplay : "", l.linkedinUrl ?? "", l.linkedinNote ?? "", l.phone ?? ""]
         : isHr
           ? [l.hrLeadName ?? "", l.hrLeadTitle ?? "", l.hasEmail ? l.emailDisplay : "", l.linkedinUrl ?? ""]
-          : [l.sector, l.hasEmail ? l.emailDisplay : "", l.linkedinUrl ?? ""];
+          : hasWhyNow
+            ? [l.whyNow ?? "", l.hasEmail ? l.emailDisplay : "", l.linkedinUrl ?? ""]
+            : [l.sector, l.hasEmail ? l.emailDisplay : "", l.linkedinUrl ?? ""];
       return [...base, ...rest].map(csvEsc).join(",");
     });
     const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
@@ -401,6 +441,8 @@ export function TargetListsView({
                   <th className="text-left font-medium px-4 py-3">Why VIP</th>
                 ) : isHr ? (
                   <th className="text-left font-medium px-4 py-3">HR lead</th>
+                ) : hasWhyNow ? (
+                  <th className="text-left font-medium px-4 py-3">Why now</th>
                 ) : hasSector ? (
                   <th className="text-left font-medium px-4 py-3">Sector</th>
                 ) : null}
@@ -452,6 +494,14 @@ export function TargetListsView({
                         </>
                       ) : (
                         <span className="text-muted-foreground">— (CEO-direct)</span>
+                      )}
+                    </td>
+                  ) : hasWhyNow ? (
+                    <td className="px-4 py-3 text-muted-foreground max-w-[320px]">
+                      {l.whyNow ? (
+                        <WhyNowCell value={l.whyNow} />
+                      ) : (
+                        <span>—</span>
                       )}
                     </td>
                   ) : hasSector ? (
