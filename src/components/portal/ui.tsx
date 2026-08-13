@@ -60,7 +60,7 @@ export function StatTile({
   tone?: "default" | "good" | "warn";
 }) {
   const toneCls =
-    tone === "good" ? "text-[#26D07C]" : tone === "warn" ? "text-[#FFD60A]" : "text-foreground";
+    tone === "good" ? "text-signal-ink" : tone === "warn" ? "text-gold-ink" : "text-foreground";
   return (
     <Panel className="p-4 flex flex-col gap-1">
       <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{label}</div>
@@ -81,8 +81,8 @@ export function Pill({
 }) {
   const map: Record<string, string> = {
     muted: "bg-white/5 text-muted-foreground border-white/10",
-    gold: "bg-[#FFD60A]/10 text-[#FFD60A] border-[#FFD60A]/25",
-    green: "bg-[#26D07C]/10 text-[#26D07C] border-[#26D07C]/25",
+    gold: "bg-gold/10 text-gold-ink border-gold/25",
+    green: "bg-signal/10 text-signal-ink border-signal/25",
     red: "bg-red-500/10 text-red-400 border-red-500/25",
     blue: "bg-blue-500/10 text-blue-300 border-blue-500/25",
   };
@@ -150,7 +150,7 @@ export function ModuleHeader({
   return (
     <div className="flex items-start justify-between gap-4 flex-wrap">
       <div className="flex items-start gap-3 min-w-0">
-        <span className="grid place-items-center w-9 h-9 rounded-lg bg-[#FFD60A]/10 text-[#FFD60A] border border-[#FFD60A]/20 shrink-0">
+        <span className="grid place-items-center w-9 h-9 rounded-lg bg-gold/10 text-gold-ink border border-gold/20 shrink-0">
           <Icon className="w-[18px] h-[18px]" />
         </span>
         <div className="min-w-0">

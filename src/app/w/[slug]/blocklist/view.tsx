@@ -112,7 +112,7 @@ export function BlocklistView({ slug, wsName, entries }: { slug: string; wsName:
                   className={cn(
                     "inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
                     on
-                      ? "border-[#FFD60A]/40 bg-[#FFD60A]/10 text-[#FFD60A]"
+                      ? "border-gold/40 bg-gold/10 text-gold-ink"
                       : "border-border text-muted-foreground hover:text-foreground hover:border-white/20"
                   )}
                 >
@@ -135,7 +135,7 @@ export function BlocklistView({ slug, wsName, entries }: { slug: string; wsName:
             <button
               type="submit"
               disabled={adding}
-              className="inline-flex items-center gap-2 rounded-lg bg-[#FFD60A] px-4 py-2 text-sm font-semibold text-[#0A0E1A] hover:brightness-105 disabled:opacity-60 transition"
+              className="inline-flex items-center gap-2 rounded-lg bg-gold px-4 py-2 text-sm font-semibold text-ink-inverse hover:brightness-105 disabled:opacity-60 transition"
             >
               {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : justAdded ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
               {justAdded ? "Added" : "Add entry"}
@@ -216,7 +216,7 @@ function Field({ label, value, onChange, placeholder }: { label: string; value: 
         value={value}
         onChange={(ev) => onChange(ev.target.value)}
         placeholder={placeholder}
-        className="rounded-lg border border-border bg-white/[0.03] px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-[#FFD60A]/40 focus:outline-none"
+        className="rounded-lg border border-border bg-white/[0.03] px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-gold/40 focus:outline-none"
       />
     </label>
   );

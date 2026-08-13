@@ -25,14 +25,14 @@ export default async function AgencyView() {
         <div>
           <SectionLabel>Luxvance // Platform</SectionLabel>
           <h1 className="text-3xl font-extrabold tracking-tight mt-2">
-            Agency view<span className="text-[#FFD60A]">.</span>
+            Agency view<span className="text-gold-ink">.</span>
           </h1>
           <p className="text-sm text-muted-foreground mt-1.5">
             Your workspace and every client, one place. Each workspace is its own database.
           </p>
         </div>
         <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#26D07C] shadow-[0_0_6px_#26D07C]" />
+          <span className="w-1.5 h-1.5 rounded-full bg-signal shadow-[0_0_6px_var(--glow-signal)]" />
           All systems live
         </div>
       </div>
@@ -94,7 +94,7 @@ export default async function AgencyView() {
                   <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
                     <Users className="w-3.5 h-3.5" /> Client view
                   </span>
-                  <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#FFD60A] group-hover:gap-2.5 transition-all">
+                  <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-gold-ink group-hover:gap-2.5 transition-all">
                     Enter workspace <ArrowRight className="w-4 h-4" />
                   </span>
                 </div>

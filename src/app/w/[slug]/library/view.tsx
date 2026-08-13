@@ -101,7 +101,7 @@ function MetaPills({ meta }: { meta: Record<string, string> }) {
             href={v}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex max-w-full items-center gap-1 rounded-full border border-[#FFD60A]/25 bg-[#FFD60A]/10 px-2 py-0.5 text-[10px] font-semibold text-[#FFD60A] hover:bg-[#FFD60A]/20 transition-colors"
+            className="inline-flex max-w-full items-center gap-1 rounded-full border border-gold/25 bg-gold/10 px-2 py-0.5 text-[10px] font-semibold text-gold-ink hover:bg-gold/20 transition-colors"
           >
             <LinkIcon className="w-2.5 h-2.5 shrink-0" />
             <span className="truncate normal-case tracking-normal">{v.replace(URL_RE, "")}</span>
@@ -122,7 +122,7 @@ function MetaPills({ meta }: { meta: Record<string, string> }) {
 type EditorState = { id: string | null; kind: IntelligenceKind; title: string; body: string };
 
 const inputCls =
-  "w-full rounded-lg border border-border bg-white/[0.03] px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-[#FFD60A]/40 focus:outline-none";
+  "w-full rounded-lg border border-border bg-white/[0.03] px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-gold/40 focus:outline-none";
 
 export function IntelligenceView({
   slug,
@@ -347,7 +347,7 @@ export function IntelligenceView({
             <select
               value={editor.kind}
               onChange={(ev) => setEditor({ ...editor, kind: ev.target.value as IntelligenceKind })}
-              className={cn(inputCls, "appearance-none bg-[#0A0E1A]")}
+              className={cn(inputCls, "appearance-none bg-background")}
             >
               {KIND_OPTIONS.map((k) => (
                 <option key={k.value} value={k.value}>
@@ -381,7 +381,7 @@ export function IntelligenceView({
             type="button"
             onClick={saveEditor}
             disabled={saving}
-            className="inline-flex items-center gap-2 rounded-lg bg-[#26D07C] px-4 py-2 text-sm font-semibold text-[#0A0E1A] hover:brightness-105 disabled:opacity-60 transition"
+            className="inline-flex items-center gap-2 rounded-lg bg-signal px-4 py-2 text-sm font-semibold text-ink-inverse hover:brightness-105 disabled:opacity-60 transition"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             Save
@@ -407,8 +407,8 @@ export function IntelligenceView({
   // ── The copilot panel that lives inside a section card ──────────────────
   function OptimizePanel({ s }: { s: IntelligenceSection }) {
     return (
-      <div className="mt-1 pt-3 border-t border-[#FFD60A]/20 flex flex-col gap-3">
-        <div className="flex items-center gap-2 text-[11px] font-semibold text-[#FFD60A]">
+      <div className="mt-1 pt-3 border-t border-gold/20 flex flex-col gap-3">
+        <div className="flex items-center gap-2 text-[11px] font-semibold text-gold-ink">
           <Sparkles className="w-3.5 h-3.5" />
           Optimize with AI
         </div>
@@ -428,7 +428,7 @@ export function IntelligenceView({
               type="button"
               onClick={() => runOptimize(s)}
               disabled={optimizing}
-              className="inline-flex flex-1 sm:flex-none justify-center items-center gap-2 rounded-lg bg-[#FFD60A] px-4 py-2 text-sm font-semibold text-[#0A0E1A] hover:brightness-105 disabled:opacity-60 transition"
+              className="inline-flex flex-1 sm:flex-none justify-center items-center gap-2 rounded-lg bg-gold px-4 py-2 text-sm font-semibold text-ink-inverse hover:brightness-105 disabled:opacity-60 transition"
             >
               {optimizing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
               {optimizing ? "Thinking…" : "Optimize"}
@@ -451,12 +451,12 @@ export function IntelligenceView({
         )}
         {optErr && <p className="text-[12px] text-red-400">{optErr}</p>}
         {suggestion && (
-          <div className="rounded-lg border border-[#26D07C]/30 bg-[#26D07C]/[0.05] p-4 flex flex-col gap-2">
+          <div className="rounded-lg border border-signal/30 bg-signal/[0.05] p-4 flex flex-col gap-2">
             <div className="flex items-center gap-2">
               <Pill tone="green">suggested</Pill>
               <span className="text-[11px] text-muted-foreground">review before it touches the brain</span>
             </div>
-            <div className="text-[14px] font-semibold text-[#26D07C] leading-snug break-words">
+            <div className="text-[14px] font-semibold text-signal-ink leading-snug break-words">
               {suggestion.title}
             </div>
             <p className="text-[13px] text-muted-foreground leading-relaxed whitespace-pre-wrap break-words">
@@ -466,7 +466,7 @@ export function IntelligenceView({
               <button
                 type="button"
                 onClick={() => acceptSuggestion(s)}
-                className="inline-flex items-center gap-2 rounded-lg bg-[#26D07C] px-4 py-2 text-sm font-semibold text-[#0A0E1A] hover:brightness-105 transition"
+                className="inline-flex items-center gap-2 rounded-lg bg-signal px-4 py-2 text-sm font-semibold text-ink-inverse hover:brightness-105 transition"
               >
                 <Check className="w-4 h-4" />
                 Accept
@@ -495,7 +495,7 @@ export function IntelligenceView({
         actions={
           <div className="flex items-center gap-3 flex-wrap">
             <span className="inline-flex items-center gap-2 text-[11px] text-muted-foreground">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#26D07C] shadow-[0_0_6px_#26D07C]" /> agents reading
+              <span className="w-1.5 h-1.5 rounded-full bg-signal shadow-[0_0_6px_var(--glow-signal)]" /> agents reading
             </span>
             {editable && (
               <button
@@ -504,7 +504,7 @@ export function IntelligenceView({
                 className={cn(
                   "inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
                   editMode
-                    ? "border-[#FFD60A]/40 bg-[#FFD60A]/10 text-[#FFD60A]"
+                    ? "border-gold/40 bg-gold/10 text-gold-ink"
                     : "border-border text-muted-foreground hover:text-foreground hover:border-white/20"
                 )}
               >
@@ -517,12 +517,12 @@ export function IntelligenceView({
       />
 
       {/* One brain, two readers — the client and the agents see the same thing. */}
-      <Panel className="p-4 border-[#26D07C]/25 flex items-start sm:items-center gap-3">
-        <span className="grid place-items-center w-8 h-8 rounded-lg bg-[#26D07C]/10 text-[#26D07C] border border-[#26D07C]/20 shrink-0">
+      <Panel className="p-4 border-signal/25 flex items-start sm:items-center gap-3">
+        <span className="grid place-items-center w-8 h-8 rounded-lg bg-signal/10 text-signal-ink border border-signal/20 shrink-0">
           <Sparkles className="w-4 h-4" />
         </span>
         <p className="text-[13px] text-muted-foreground leading-relaxed">
-          This is the <span className="text-[#26D07C] font-semibold">exact context</span> the reply and
+          This is the <span className="text-signal-ink font-semibold">exact context</span> the reply and
           outreach agents read before generating a single line. What you see here is what they know —
           always in sync.
         </p>
@@ -549,11 +549,11 @@ export function IntelligenceView({
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors",
                 has
-                  ? "border-[#FFD60A]/25 bg-[#FFD60A]/5 text-foreground hover:border-[#FFD60A]/50"
+                  ? "border-gold/25 bg-gold/5 text-foreground hover:border-gold/50"
                   : "border-border/60 text-muted-foreground/50 hover:text-muted-foreground"
               )}
             >
-              <GIcon className={cn("w-3 h-3", has ? "text-[#FFD60A]" : "")} />
+              <GIcon className={cn("w-3 h-3", has ? "text-gold-ink" : "")} />
               {g.label}
               <span className="tabular-nums opacity-70">{g.items.length}</span>
             </a>
@@ -563,10 +563,10 @@ export function IntelligenceView({
 
       {/* Add section — the composer for brand-new knowledge. */}
       {editMode && editor && editor.id === null && (
-        <Panel className="p-5 border-[#FFD60A]/30 flex flex-col gap-4">
+        <Panel className="p-5 border-gold/30 flex flex-col gap-4">
           <div className="flex items-center gap-2">
             <SectionLabel>New section</SectionLabel>
-            <Plus className="w-3.5 h-3.5 text-[#FFD60A]" />
+            <Plus className="w-3.5 h-3.5 text-gold-ink" />
           </div>
           <EditorForm />
         </Panel>
@@ -576,7 +576,7 @@ export function IntelligenceView({
           <button
             type="button"
             onClick={() => openEditor({ id: null, kind: "playbook", title: "", body: "" })}
-            className="inline-flex items-center gap-2 rounded-lg border border-dashed border-[#FFD60A]/40 px-4 py-2 text-sm font-medium text-[#FFD60A] hover:bg-[#FFD60A]/10 transition"
+            className="inline-flex items-center gap-2 rounded-lg border border-dashed border-gold/40 px-4 py-2 text-sm font-medium text-gold-ink hover:bg-gold/10 transition"
           >
             <Plus className="w-4 h-4" />
             Add section
@@ -586,7 +586,7 @@ export function IntelligenceView({
 
       {sections.length === 0 ? (
         <Panel className="p-8 flex flex-col items-center gap-3 text-center">
-          <span className="grid place-items-center w-10 h-10 rounded-lg bg-[#FFD60A]/10 text-[#FFD60A] border border-[#FFD60A]/20">
+          <span className="grid place-items-center w-10 h-10 rounded-lg bg-gold/10 text-gold-ink border border-gold/20">
             <Library className="w-5 h-5" />
           </span>
           <p className="text-[13px] text-muted-foreground leading-relaxed max-w-md">
@@ -617,7 +617,7 @@ export function IntelligenceView({
                         setEditMode(true);
                         openEditor({ id: null, kind: g.kind, title: "", body: "" });
                       }}
-                      className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-[11px] text-muted-foreground hover:text-[#FFD60A] hover:border-[#FFD60A]/40 transition-colors shrink-0"
+                      className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-[11px] text-muted-foreground hover:text-gold-ink hover:border-gold/40 transition-colors shrink-0"
                     >
                       <Plus className="w-3 h-3" /> Add
                     </button>
@@ -630,7 +630,7 @@ export function IntelligenceView({
             <div key={g.kind} id={`brain-${g.kind}`} className="flex flex-col gap-4 scroll-mt-24">
               <div className="flex items-center gap-2 flex-wrap">
                 <SectionLabel>{g.label}</SectionLabel>
-                <Icon className="w-3.5 h-3.5 text-[#FFD60A]" />
+                <Icon className="w-3.5 h-3.5 text-gold-ink" />
                 <span className="text-[11px] text-muted-foreground tabular-nums">{g.items.length}</span>
                 {/* Playbook steers the agents — call it out. */}
                 {isPlaybook && <Pill tone="gold">steers every agent</Pill>}
@@ -639,7 +639,7 @@ export function IntelligenceView({
                     type="button"
                     onClick={() => openEditor({ id: null, kind: g.kind, title: "", body: "" })}
                     title={`Add to ${g.label}`}
-                    className="grid place-items-center w-5 h-5 rounded-md border border-border text-muted-foreground hover:text-[#FFD60A] hover:border-[#FFD60A]/40 transition"
+                    className="grid place-items-center w-5 h-5 rounded-md border border-border text-muted-foreground hover:text-gold-ink hover:border-gold/40 transition"
                   >
                     <Plus className="w-3 h-3" />
                   </button>
@@ -655,7 +655,7 @@ export function IntelligenceView({
                       key={s.id}
                       className={cn(
                         "p-5 flex flex-col gap-3 transition-colors hover:border-white/20",
-                        isPlaybook && "border-[#FFD60A]/30 bg-[#FFD60A]/[0.03] hover:border-[#FFD60A]/50",
+                        isPlaybook && "border-gold/30 bg-gold/[0.03] hover:border-gold/50",
                         (isEditing || isOptimizing) && "md:col-span-2"
                       )}
                     >
@@ -664,7 +664,7 @@ export function IntelligenceView({
                       ) : (
                         <>
                           <div className="flex items-start justify-between gap-3">
-                            <div className="text-[15px] font-semibold text-[#FFD60A] leading-snug break-words min-w-0">
+                            <div className="text-[15px] font-semibold text-gold-ink leading-snug break-words min-w-0">
                               {s.title}
                             </div>
                             <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
@@ -676,7 +676,7 @@ export function IntelligenceView({
                                       openEditor({ id: s.id, kind: s.kind, title: s.title, body: s.body })
                                     }
                                     title="Edit"
-                                    className="grid place-items-center w-7 h-7 rounded-lg text-muted-foreground hover:text-[#FFD60A] hover:bg-[#FFD60A]/10 transition"
+                                    className="grid place-items-center w-7 h-7 rounded-lg text-muted-foreground hover:text-gold-ink hover:bg-gold/10 transition"
                                   >
                                     <Pencil className="w-3.5 h-3.5" />
                                   </button>
@@ -687,8 +687,8 @@ export function IntelligenceView({
                                     className={cn(
                                       "grid place-items-center w-7 h-7 rounded-lg transition",
                                       isOptimizing
-                                        ? "text-[#FFD60A] bg-[#FFD60A]/10"
-                                        : "text-muted-foreground hover:text-[#FFD60A] hover:bg-[#FFD60A]/10"
+                                        ? "text-gold-ink bg-gold/10"
+                                        : "text-muted-foreground hover:text-gold-ink hover:bg-gold/10"
                                     )}
                                   >
                                     <Sparkles className="w-3.5 h-3.5" />
@@ -847,9 +847,9 @@ function BrainOpsPanel({ slug, ops, editable }: { slug: string; ops: BrainOps; e
   };
 
   return (
-    <Panel className="p-5 flex flex-col gap-5 border-[#FFD60A]/25">
+    <Panel className="p-5 flex flex-col gap-5 border-gold/25">
       <div className="flex items-center gap-2">
-        <span className="grid place-items-center w-8 h-8 rounded-lg bg-[#FFD60A]/10 text-[#FFD60A] border border-[#FFD60A]/20">
+        <span className="grid place-items-center w-8 h-8 rounded-lg bg-gold/10 text-gold-ink border border-gold/20">
           <Brain className="w-4 h-4" />
         </span>
         <div>
@@ -868,7 +868,7 @@ function BrainOpsPanel({ slug, ops, editable }: { slug: string; ops: BrainOps; e
           return (
             <div key={f.key} className="flex flex-col gap-2">
               <div className="flex items-center gap-2">
-                <Icon className="w-3.5 h-3.5 text-[#FFD60A]" />
+                <Icon className="w-3.5 h-3.5 text-gold-ink" />
                 <SectionLabel>{f.label}</SectionLabel>
                 {editable && !isEditing && (
                   <button
@@ -890,14 +890,14 @@ function BrainOpsPanel({ slug, ops, editable }: { slug: string; ops: BrainOps; e
                       onChange={(e) => setDraftValue(e.target.value)}
                       rows={f.isHtml ? 8 : 4}
                       spellCheck={false}
-                      className="w-full rounded-lg border border-[#FFD60A]/40 bg-background px-3 py-2 text-[12.5px] font-mono text-foreground focus:outline-none"
+                      className="w-full rounded-lg border border-gold/40 bg-background px-3 py-2 text-[12.5px] font-mono text-foreground focus:outline-none"
                     />
                   ) : (
                     <input
                       value={draft}
                       onChange={(e) => setDraftValue(e.target.value)}
                       spellCheck={false}
-                      className="w-full rounded-lg border border-[#FFD60A]/40 bg-background px-3 py-2 text-[13px] font-mono text-foreground focus:outline-none"
+                      className="w-full rounded-lg border border-gold/40 bg-background px-3 py-2 text-[13px] font-mono text-foreground focus:outline-none"
                     />
                   )}
                   {f.isHtml && draft.trim() && <SignaturePreview html={draft} />}
@@ -907,7 +907,7 @@ function BrainOpsPanel({ slug, ops, editable }: { slug: string; ops: BrainOps; e
                       type="button"
                       onClick={save}
                       disabled={saving}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-[#FFD60A]/40 bg-[#FFD60A]/10 px-3 py-1.5 text-xs font-medium text-[#FFD60A] hover:bg-[#FFD60A]/15 transition-colors disabled:opacity-50"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-gold/40 bg-gold/10 px-3 py-1.5 text-xs font-medium text-gold-ink hover:bg-gold/15 transition-colors disabled:opacity-50"
                     >
                       {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                       Save
@@ -930,7 +930,7 @@ function BrainOpsPanel({ slug, ops, editable }: { slug: string; ops: BrainOps; e
                     href={value}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 text-[13px] text-[#FFD60A] hover:underline break-all"
+                    className="inline-flex items-center gap-1.5 text-[13px] text-gold-ink hover:underline break-all"
                   >
                     <LinkIcon className="w-3.5 h-3.5 shrink-0" /> {value}
                   </a>

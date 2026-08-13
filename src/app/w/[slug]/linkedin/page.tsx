@@ -92,7 +92,7 @@ export default async function LinkedInPage({ params }: { params: Promise<{ slug:
                       <span className="text-[12px] tabular-nums text-foreground w-9 text-right shrink-0">{c.accepted}%</span>
                     </div>
                   </td>
-                  <td className="py-3 pr-4 text-right text-[13px] tabular-nums text-[#26D07C]">
+                  <td className="py-3 pr-4 text-right text-[13px] tabular-nums text-signal-ink">
                     {c.replied.toLocaleString("en-US")}
                   </td>
                   <td className="py-3 text-right text-[13px] tabular-nums text-foreground">

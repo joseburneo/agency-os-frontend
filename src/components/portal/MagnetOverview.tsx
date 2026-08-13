@@ -59,7 +59,7 @@ export function MagnetOverview({
               has no fetchable logo, so the header never shows a broken image. */}
           <CompanyMark name={name} domain={domain} size={48} />
           <div className="min-w-0">
-            <div className="text-[11px] uppercase tracking-[0.18em] text-[#FFD60A] font-semibold">
+            <div className="text-[11px] uppercase tracking-[0.18em] text-gold-ink font-semibold">
               {str(brief.build_name) || "Your list"}
             </div>
             <div className="text-[13px] text-muted-foreground truncate">{name}</div>
@@ -123,7 +123,7 @@ export function MagnetOverview({
               <ul className="mt-3 space-y-1.5">
                 {talking.map((t, i) => (
                   <li key={i} className="flex gap-2 text-[13.5px] leading-relaxed text-muted-foreground">
-                    <span className="text-[#FFD60A] shrink-0">·</span>
+                    <span className="text-gold-ink shrink-0">·</span>
                     <span>{t}</span>
                   </li>
                 ))}
@@ -201,7 +201,7 @@ export function MagnetOverview({
           <div className="mt-2 flex flex-col gap-2">
             {steps.map((s, i) => (
               <Panel key={i} className="flex gap-4">
-                <span className="shrink-0 text-[15px] font-bold text-[#FFD60A] tabular-nums pt-0.5">
+                <span className="shrink-0 text-[15px] font-bold text-gold-ink tabular-nums pt-0.5">
                   {String(i + 1).padStart(2, "0")}
                 </span>
                 <div className="min-w-0">
@@ -239,7 +239,7 @@ export function MagnetOverview({
         <SectionLabel>Your list</SectionLabel>
         <Link
           href={`/w/${slug}/target-lists`}
-          className="mt-2 flex items-center gap-3 rounded-xl border border-[#FFD60A]/30 bg-[#FFD60A]/[0.05] px-4 py-3.5 hover:bg-[#FFD60A]/10 transition-colors"
+          className="mt-2 flex items-center gap-3 rounded-xl border border-gold/30 bg-gold/[0.05] px-4 py-3.5 hover:bg-gold/10 transition-colors"
         >
           <div className="min-w-0">
             <div className="text-[14px] font-medium text-foreground">
@@ -249,7 +249,7 @@ export function MagnetOverview({
               Each one with their LinkedIn profile, and the email and LinkedIn message already written.
             </div>
           </div>
-          <ArrowRight className="w-4 h-4 text-[#FFD60A] ml-auto shrink-0" />
+          <ArrowRight className="w-4 h-4 text-gold-ink ml-auto shrink-0" />
         </Link>
       </section>
       )}
@@ -274,7 +274,7 @@ export function MagnetOverview({
               href="https://www.luxvance.com/book"
               target="_blank"
               rel="noopener noreferrer"
-              className="shrink-0 inline-flex items-center justify-center gap-2 rounded-lg bg-[#26D07C] px-4 py-2.5 text-[13px] font-semibold text-[#0A0E1A] hover:bg-[#3ad98c] transition-colors"
+              className="shrink-0 inline-flex items-center justify-center gap-2 rounded-lg bg-signal px-4 py-2.5 text-[13px] font-semibold text-ink-inverse hover:bg-signal-hi transition-colors"
             >
               {str(brief.cta_button) || "Book the 15 minutes"} <ExternalLink className="w-3.5 h-3.5" />
             </a>

@@ -29,7 +29,7 @@ export default async function GatePage({
   const Icon = isAgency ? ShieldCheck : Lock;
 
   return (
-    <div className="fixed inset-0 z-[100] grid place-items-center bg-[#0A0D14] px-6 font-mono">
+    <div className="fixed inset-0 z-[100] grid place-items-center bg-background px-6 font-mono">
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 opacity-60"
@@ -41,12 +41,12 @@ export default async function GatePage({
 
       <div className="relative w-full max-w-sm">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-5 grid h-12 w-12 place-items-center rounded-xl border border-[#FFD60A]/25 bg-[#FFD60A]/10">
-            <Icon className="h-5 w-5 text-[#FFD60A]" />
+          <div className="mx-auto mb-5 grid h-12 w-12 place-items-center rounded-xl border border-gold/25 bg-gold/10">
+            <Icon className="h-5 w-5 text-gold-ink" />
           </div>
-          <div className="text-[11px] uppercase tracking-[0.28em] text-[#8A93A6]">{eyebrow}</div>
-          <h1 className="mt-2 text-lg font-bold text-[#EDEFF2]">{title}</h1>
-          <p className="mt-1.5 text-[13px] leading-relaxed text-[#8A93A6]">{blurb}</p>
+          <div className="text-[11px] uppercase tracking-[0.28em] text-muted-foreground">{eyebrow}</div>
+          <h1 className="mt-2 text-lg font-bold text-foreground">{title}</h1>
+          <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">{blurb}</p>
         </div>
 
         <form
@@ -58,7 +58,7 @@ export default async function GatePage({
           <input type="hidden" name="scope" value={scope} />
           {withEmail && (
             <>
-              <label className="text-[10px] uppercase tracking-[0.16em] text-[#8A93A6]">
+              <label className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
                 Email{isAgency ? " (or leave blank for the shared key)" : ""}
               </label>
               <input
@@ -69,11 +69,11 @@ export default async function GatePage({
                 autoComplete="username"
                 placeholder="you@company.com"
                 aria-invalid={error ? true : undefined}
-                className="h-11 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm text-[#EDEFF2] placeholder:text-[#8A93A6]/60 outline-none focus:border-[#FFD60A]/50 focus:ring-1 focus:ring-[#FFD60A]/40"
+                className="h-11 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/40"
               />
             </>
           )}
-          <label className="text-[10px] uppercase tracking-[0.16em] text-[#8A93A6]">
+          <label className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
             {isAgency ? "Password or agency key" : withEmail ? "Password" : "Access key"}
           </label>
           <input
@@ -84,7 +84,7 @@ export default async function GatePage({
             autoComplete={withEmail ? "current-password" : "off"}
             placeholder="••••••••••••"
             aria-invalid={error ? true : undefined}
-            className="h-11 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm text-[#EDEFF2] placeholder:text-[#8A93A6]/60 outline-none focus:border-[#FFD60A]/50 focus:ring-1 focus:ring-[#FFD60A]/40"
+            className="h-11 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/40"
           />
           {error === "rate" ? (
             <p className="text-[12px] text-red-400">Too many attempts. Wait a few minutes.</p>
@@ -95,13 +95,13 @@ export default async function GatePage({
           ) : null}
           <button
             type="submit"
-            className="mt-1 h-11 rounded-lg bg-[#FFD60A] text-sm font-bold text-[#0A0E1A] transition-colors hover:bg-[#ffdf3a]"
+            className="mt-1 h-11 rounded-lg bg-gold text-sm font-bold text-ink-inverse transition-colors hover:bg-gold-hi"
           >
             {isAgency ? "Enter command centre" : withEmail ? "Sign in" : "Enter workspace"}
           </button>
         </form>
 
-        <p className="mt-6 text-center text-[11px] text-[#8A93A6]/70">
+        <p className="mt-6 text-center text-[11px] text-muted-foreground/70">
           Precision Leads. Engineered by Intelligence.
         </p>
       </div>

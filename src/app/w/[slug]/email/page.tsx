@@ -16,7 +16,7 @@ function StepDots({ steps }: { steps: number }) {
       {Array.from({ length: steps }).map((_, i) => (
         <span
           key={i}
-          className="w-1.5 h-1.5 rounded-full bg-[#FFD60A]/70"
+          className="w-1.5 h-1.5 rounded-full bg-gold/70"
           style={{ opacity: 1 - i * 0.14 }}
         />
       ))}
@@ -56,7 +56,7 @@ export default async function EmailCampaignsPage({ params }: { params: Promise<{
         desc="Your cold email campaigns — one sequence per target list, sending from warmed burner inboxes."
         actions={
           <span className="inline-flex items-center gap-2 text-[11px] text-muted-foreground">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#26D07C] shadow-[0_0_6px_#26D07C]" />
+            <span className="w-1.5 h-1.5 rounded-full bg-signal shadow-[0_0_6px_var(--glow-signal)]" />
             {activeCount} sending
           </span>
         }
@@ -108,7 +108,7 @@ export default async function EmailCampaignsPage({ params }: { params: Promise<{
                   >
                     <td className="py-3 pr-4">
                       <span className="inline-flex items-center gap-2 min-w-0">
-                        <span className={cn("font-medium truncate", isBest ? "text-[#FFD60A]" : "text-foreground")}>
+                        <span className={cn("font-medium truncate", isBest ? "text-gold-ink" : "text-foreground")}>
                           {c.name}
                         </span>
                         {isBest && <Pill tone="gold">Top</Pill>}
@@ -146,7 +146,7 @@ export default async function EmailCampaignsPage({ params }: { params: Promise<{
                         <span
                           className={cn(
                             "relative tabular-nums pr-1",
-                            isBest ? "text-[#FFD60A] font-semibold" : "text-foreground"
+                            isBest ? "text-gold-ink font-semibold" : "text-foreground"
                           )}
                         >
                           {c.sent > 0 ? pct(c.replyRate) : <span className="text-muted-foreground">—</span>}
@@ -155,7 +155,7 @@ export default async function EmailCampaignsPage({ params }: { params: Promise<{
                     </td>
                     <td className="py-3 text-right tabular-nums">
                       {c.positive > 0 ? (
-                        <span className="text-[#26D07C] font-semibold">{c.positive}</span>
+                        <span className="text-signal-ink font-semibold">{c.positive}</span>
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}
@@ -172,7 +172,7 @@ export default async function EmailCampaignsPage({ params }: { params: Promise<{
             Rates are weighted by send volume. Positive replies flow straight into the Sales CRM.
           </span>
           <span className="inline-flex items-center gap-2 text-[11px] text-muted-foreground tabular-nums">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#26D07C]" />
+            <span className="w-1.5 h-1.5 rounded-full bg-signal" />
             {totalPositive} positive from {totalSent.toLocaleString()} sends
           </span>
         </div>

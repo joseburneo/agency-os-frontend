@@ -234,8 +234,8 @@ function daysSince(s: string | null): number {
 // Heat → a color+icon+label chip. Gold is the priority accent; red flags the truly
 // hot. Never color alone (accessibility): always a label too.
 function heatChip(heat: number): { label: string; cls: string; hot: boolean } {
-  if (heat >= 70) return { label: "Hot", cls: "bg-[#ef4444]/15 text-[#ff9b9b] border border-[#ef4444]/30", hot: true };
-  if (heat >= 45) return { label: "Warm", cls: "bg-[#FFD60A]/12 text-[#FFD60A] border border-[#FFD60A]/25", hot: false };
+  if (heat >= 70) return { label: "Hot", cls: "bg-danger/15 text-danger-soft border border-danger/30", hot: true };
+  if (heat >= 45) return { label: "Warm", cls: "bg-gold/12 text-gold-ink border border-gold/25", hot: false };
   return { label: "Cool", cls: "bg-secondary text-muted-foreground border border-border", hot: false };
 }
 
@@ -244,9 +244,9 @@ function heatChip(heat: number): { label: string; cls: string; hot: boolean } {
 function rotEdge(card: Card): string {
   if (card.waiting_on !== "us") return "";
   const d = daysSince(card.last_reply_at);
-  if (d >= 7) return "border-l-2 border-l-[#ef4444]";
-  if (d >= 3) return "border-l-2 border-l-[#f59e0b]";
-  if (d >= 1) return "border-l-2 border-l-[#FFD60A]";
+  if (d >= 7) return "border-l-2 border-l-danger";
+  if (d >= 3) return "border-l-2 border-l-warn";
+  if (d >= 1) return "border-l-2 border-l-gold";
   return "border-l-2 border-l-transparent";
 }
 
@@ -277,10 +277,10 @@ function actNow(d: Detail): { title: string; detail: string; tone: "green" | "go
 }
 
 const CHANNEL_META: Record<string, { label: string; cls: string }> = {
-  email: { label: "Email", cls: "text-[#7cb0ff]" },
-  linkedin: { label: "LinkedIn", cls: "text-[#5fd0e0]" },
-  whatsapp: { label: "WhatsApp", cls: "text-[#26D07C]" },
-  call: { label: "Call", cls: "text-[#f0b45f]" },
+  email: { label: "Email", cls: "text-info" },
+  linkedin: { label: "LinkedIn", cls: "text-cyan" },
+  whatsapp: { label: "WhatsApp", cls: "text-signal-ink" },
+  call: { label: "Call", cls: "text-warn" },
 };
 
 function initials(name: string): string {
@@ -365,7 +365,7 @@ function CopyBtn({ value, label }: { value: string; label?: string }) {
       className="inline-flex items-center gap-1.5 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
       title="Copy"
     >
-      {ok ? <Check className="w-3.5 h-3.5 text-[#26D07C]" /> : <Copy className="w-3.5 h-3.5" />}
+      {ok ? <Check className="w-3.5 h-3.5 text-signal-ink" /> : <Copy className="w-3.5 h-3.5" />}
       {label && <span className="text-xs">{ok ? "Copied" : label}</span>}
     </button>
   );
@@ -375,13 +375,13 @@ function Tile({ label, value, accent, icon, onClick, active }: {
   label: string; value: number; accent?: boolean; icon?: ReactNode; onClick?: () => void; active?: boolean;
 }) {
   const cls = `bg-card rounded-xl px-4 py-3 border text-left w-full transition-colors ${
-    active ? "border-[#FFD60A] ring-1 ring-[#FFD60A]/40"
-    : accent && value > 0 ? "border-[#FFD60A]/40" : "border-border"
-  } ${onClick ? "hover:border-[#FFD60A]/60 cursor-pointer" : ""}`;
+    active ? "border-gold ring-1 ring-gold/40"
+    : accent && value > 0 ? "border-gold/40" : "border-border"
+  } ${onClick ? "hover:border-gold/60 cursor-pointer" : ""}`;
   const inner = (
     <>
       <div className="flex items-center gap-1.5">
-        <div className={`text-2xl font-semibold tabular-nums ${accent && value > 0 ? "text-[#FFD60A]" : "text-foreground"}`}>{value}</div>
+        <div className={`text-2xl font-semibold tabular-nums ${accent && value > 0 ? "text-gold-ink" : "text-foreground"}`}>{value}</div>
         {icon}
       </div>
       <div className="text-xs text-muted-foreground mt-0.5">{label}</div>
@@ -414,9 +414,9 @@ function Briefing({ onOpen, workspace }: { onOpen: (id: number) => void; workspa
       .finally(() => setLoading(false));
   }, []);
   return (
-    <div className="bg-gradient-to-br from-card to-card/40 border border-[#FFD60A]/20 rounded-2xl px-5 py-4 mb-4">
+    <div className="bg-gradient-to-br from-card to-card/40 border border-gold/20 rounded-2xl px-5 py-4 mb-4">
       <button onClick={toggle} className="w-full flex items-center gap-2 text-xs font-semibold uppercase tracking-wider">
-        <Sparkles className="w-4 h-4 text-[#FFD60A]" />
+        <Sparkles className="w-4 h-4 text-gold-ink" />
         <span className="neon-hl">// WHERE_YOU_STAND</span>
         {!open && s && <span className="normal-case tracking-normal text-muted-foreground font-normal truncate ml-1">— {s.counts.waiting_us} your turn · {s.counts.hot_now} hot · {s.counts.wants_meeting} want to meet</span>}
         <ChevronRight className={`w-4 h-4 text-muted-foreground ml-auto transition-transform ${open ? "rotate-90" : ""}`} />
@@ -432,8 +432,8 @@ function Briefing({ onOpen, workspace }: { onOpen: (id: number) => void; workspa
                 const h = heatChip(t.heat);
                 return (
                   <button key={t.id} onClick={() => onOpen(t.id)}
-                    className="inline-flex items-center gap-2 rounded-full bg-background border border-border px-3 py-1.5 text-sm hover:border-[#FFD60A]/50 transition-colors">
-                    {t.wants_meeting ? <span title="wants to meet">📅</span> : h.hot ? <Flame className="w-3.5 h-3.5 text-[#ff9b9b]" /> : null}
+                    className="inline-flex items-center gap-2 rounded-full bg-background border border-border px-3 py-1.5 text-sm hover:border-gold/50 transition-colors">
+                    {t.wants_meeting ? <span title="wants to meet">📅</span> : h.hot ? <Flame className="w-3.5 h-3.5 text-danger-soft" /> : null}
                     <span className="text-foreground font-medium">{t.name}</span>
                     <span className="text-xs text-muted-foreground">{timeAgo(t.last_reply_at)}</span>
                     <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
@@ -682,7 +682,7 @@ function ConvoBlock({ c, themName, defaultOpen }: { c: Convo; themName: string; 
   const ordered = [...c.messages].reverse(); // newest first inside the block
   return (
     <div className={`rounded-xl border overflow-hidden ${
-      c.active ? "border-[#FFD60A]/40 bg-[#FFD60A]/[0.02]"
+      c.active ? "border-gold/40 bg-gold/[0.02]"
       : c.replied ? "border-border" : "border-border/60"}`}>
       <button type="button" onClick={() => setOpen((o) => !o)}
         className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-secondary/40 transition-colors">
@@ -690,14 +690,14 @@ function ConvoBlock({ c, themName, defaultOpen }: { c: Convo; themName: string; 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <span className="text-[12px] font-semibold text-foreground truncate">{cleanSubject(c.subject) || "(no subject)"}</span>
-            {c.active && <span className="shrink-0 text-[8.5px] uppercase tracking-[0.1em] px-1 py-px rounded bg-[#FFD60A]/15 text-[#FFD60A]">active</span>}
+            {c.active && <span className="shrink-0 text-[8.5px] uppercase tracking-[0.1em] px-1 py-px rounded bg-gold/15 text-gold-ink">active</span>}
           </div>
           <div className="text-[10.5px] text-muted-foreground truncate">
             <span style={{ color: src.bar }}>{src.name}</span> · {c.eaccount}
           </div>
         </div>
         {c.replied
-          ? <span className="shrink-0 text-[10px] font-medium text-[#26D07C]">{c.reply_count} repl{c.reply_count > 1 ? "ies" : "y"}</span>
+          ? <span className="shrink-0 text-[10px] font-medium text-signal-ink">{c.reply_count} repl{c.reply_count > 1 ? "ies" : "y"}</span>
           : <span className="shrink-0 text-[10px] text-muted-foreground/80">no reply</span>}
         <span className="shrink-0 text-[10px] text-muted-foreground tabular-nums">{c.sent_count} sent</span>
         <span className="shrink-0 text-[10px] text-muted-foreground tabular-nums">{timeAgo(c.last_at)}</span>
@@ -824,13 +824,13 @@ function Conversation({ id, themName, fallback, refreshKey }: { id: number; them
   const repliedCount = convos.filter((c) => c.replied).length;
   return (
     <div className="space-y-2.5">
-      <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.12em] text-[#FFD60A]/65">
+      <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.12em] text-gold-ink/65">
         <span>// CONVERSATIONS · {convos.length}</span>
-        {repliedCount > 0 && <span className="text-[#26D07C]/70 normal-case tracking-normal">{repliedCount} replied</span>}
+        {repliedCount > 0 && <span className="text-signal-ink/70 normal-case tracking-normal">{repliedCount} replied</span>}
         {convos.length - repliedCount > 0 && <span className="text-muted-foreground/60 normal-case tracking-normal">{convos.length - repliedCount} cold campaign{convos.length - repliedCount > 1 ? "s" : ""}</span>}
         {uniboxUrl && (
           <a href={uniboxUrl} target="_blank" rel="noopener noreferrer"
-            className="ml-auto normal-case tracking-normal text-[10.5px] text-muted-foreground hover:text-[#FFD60A] transition-colors">
+            className="ml-auto normal-case tracking-normal text-[10.5px] text-muted-foreground hover:text-gold-ink transition-colors">
             Open in Instantly ↗
           </a>
         )}
@@ -884,7 +884,7 @@ function SenderSelect({ opts, value, onChange }: {
               return (
                 <button key={k} type="button"
                   onClick={() => { onChange(k); setOpen(false); }}
-                  className={`flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs whitespace-nowrap transition-colors hover:bg-white/[0.06] ${k === value ? "text-[#FFD60A]" : "text-foreground"}`}>
+                  className={`flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs whitespace-nowrap transition-colors hover:bg-white/[0.06] ${k === value ? "text-gold-ink" : "text-foreground"}`}>
                   <ProviderIcon provider={o.provider} />
                   <span className="truncate">{o.label}</span>
                   {k === value && <Check className="w-3 h-3 ml-auto shrink-0" />}
@@ -1172,7 +1172,7 @@ function CtxChip({ on, label, title }: { on: boolean; label: string; title: stri
   return (
     <span title={title}
       className={`text-[10px] rounded-full px-1.5 py-0.5 border ${on
-        ? "border-[#26D07C]/40 bg-[#26D07C]/10 text-[#26D07C]"
+        ? "border-signal/40 bg-signal/10 text-signal-ink"
         : "border-border bg-transparent text-muted-foreground/50 line-through"}`}>
       {label}
     </span>
@@ -1224,14 +1224,14 @@ function Copilot({ c }: { c: ComposerCtl }) {
   const draftReady = !!text.trim();
 
   return (
-    <div className="rounded-xl border border-[#FFD60A]/30 bg-[#FFD60A]/[0.05] p-3.5 space-y-2.5">
+    <div className="rounded-xl border border-gold/30 bg-gold/[0.05] p-3.5 space-y-2.5">
       <div className="flex items-center gap-2 flex-wrap">
-        <Bot className="w-4 h-4 text-[#FFD60A]" />
-        <span className="text-[11px] uppercase tracking-wider text-[#FFD60A] font-semibold">Copilot</span>
+        <Bot className="w-4 h-4 text-gold-ink" />
+        <span className="text-[11px] uppercase tracking-wider text-gold-ink font-semibold">Copilot</span>
         <span className="text-[10px] text-muted-foreground">it drafts, it asks, it never sends by itself</span>
         {coLog.length > 0 && (
           <button onClick={clearChat} disabled={coBusy} title="Start the conversation over"
-            className="ml-auto text-[10px] rounded-full border border-border px-2 py-0.5 text-muted-foreground hover:text-[#FFD60A] hover:border-[#FFD60A]/40 disabled:opacity-40 transition-colors">
+            className="ml-auto text-[10px] rounded-full border border-border px-2 py-0.5 text-muted-foreground hover:text-gold-ink hover:border-gold/40 disabled:opacity-40 transition-colors">
             New chat
           </button>
         )}
@@ -1241,7 +1241,7 @@ function Copilot({ c }: { c: ComposerCtl }) {
           missing (migration 015 not applied) the save fails and this says so, rather than
           letting a conversation vanish and look like a bug. */}
       {!coSaved && (
-        <div className="text-[10px] text-[#FFD60A]/80 leading-snug">
+        <div className="text-[10px] text-gold-ink/80 leading-snug">
           This chat is not being saved. Run migration 015 (`copilot_chat`) and it will persist with the prospect.
         </div>
       )}
@@ -1251,7 +1251,7 @@ function Copilot({ c }: { c: ComposerCtl }) {
             the copilot's first message. Costs nothing extra and means the panel is never a
             blank box waiting to be prompted. */}
         <div>
-          <span className="font-semibold text-[#FFD60A] inline-flex items-center gap-1.5">
+          <span className="font-semibold text-gold-ink inline-flex items-center gap-1.5">
             <Zap className="w-3.5 h-3.5" /> {opening.title}
           </span>
           <div className="text-foreground">{opening.detail}</div>
@@ -1259,10 +1259,10 @@ function Copilot({ c }: { c: ComposerCtl }) {
 
         {coLog.map((l, i) => (
           <div key={i}>
-            <span className={`font-semibold ${l.role === "you" ? "text-foreground" : "text-[#FFD60A]"}`}>
+            <span className={`font-semibold ${l.role === "you" ? "text-foreground" : "text-gold-ink"}`}>
               {l.role === "you" ? "You" : "Copilot"}
               {l.role === "copilot" && l.mode === "question" && <span className="ml-1.5 text-[10px] font-normal text-muted-foreground">needs one thing</span>}
-              {l.role === "copilot" && l.hasDraft && <span className="ml-1.5 text-[10px] font-normal text-[#26D07C]">draft in the composer</span>}
+              {l.role === "copilot" && l.hasDraft && <span className="ml-1.5 text-[10px] font-normal text-signal-ink">draft in the composer</span>}
             </span>
             <div className={`whitespace-pre-wrap ${l.role === "you" ? "text-muted-foreground" : "text-foreground"}`}>{l.content}</div>
           </div>
@@ -1271,13 +1271,13 @@ function Copilot({ c }: { c: ComposerCtl }) {
         {/* The turn being written. It becomes a normal log entry the moment it settles. */}
         {coBusy && (
           <div>
-            <span className="font-semibold text-[#FFD60A]">Copilot</span>
+            <span className="font-semibold text-gold-ink">Copilot</span>
             {coStream ? (
               <div className="whitespace-pre-wrap text-foreground">
-                {coStream}<span className="inline-block w-1.5 h-3.5 -mb-0.5 ml-0.5 bg-[#FFD60A] animate-pulse" />
+                {coStream}<span className="inline-block w-1.5 h-3.5 -mb-0.5 ml-0.5 bg-gold animate-pulse" />
               </div>
             ) : (
-              <div className="flex items-center gap-1.5 text-[#FFD60A] text-xs">
+              <div className="flex items-center gap-1.5 text-gold-ink text-xs">
                 <Loader2 className="w-3.5 h-3.5 animate-spin" /> reading the deal…
               </div>
             )}
@@ -1289,7 +1289,7 @@ function Copilot({ c }: { c: ComposerCtl }) {
         <div className="flex flex-wrap gap-1.5">
           {chips.map((p) => (
             <button key={p} onClick={() => askCopilot(p)} disabled={coBusy}
-              className="text-[11px] rounded-full border border-[#FFD60A]/30 px-2.5 py-1 text-muted-foreground hover:text-[#FFD60A] hover:border-[#FFD60A]/50 disabled:opacity-40 transition-colors">
+              className="text-[11px] rounded-full border border-gold/30 px-2.5 py-1 text-muted-foreground hover:text-gold-ink hover:border-gold/50 disabled:opacity-40 transition-colors">
               {p}
             </button>
           ))}
@@ -1299,16 +1299,16 @@ function Copilot({ c }: { c: ComposerCtl }) {
       {/* Act on the draft without leaving the panel. Send is the same call the composer
           makes, with the same sender and routing — this is a second door, not a second path. */}
       {draftReady && (
-        <div className="flex flex-wrap items-center gap-1.5 border-t border-[#FFD60A]/15 pt-2.5">
+        <div className="flex flex-wrap items-center gap-1.5 border-t border-gold/15 pt-2.5">
           {chan === "email" && canSendEmail && (
             <button onClick={send} disabled={sending || coBusy}
-              className="neon-btn inline-flex items-center gap-1.5 rounded-lg bg-[#FFD60A] px-3 py-1.5 text-[12px] font-semibold text-[#0A0E1A] hover:bg-[#ffdf3a] disabled:opacity-40 transition-colors">
+              className="neon-btn inline-flex items-center gap-1.5 rounded-lg bg-gold px-3 py-1.5 text-[12px] font-semibold text-ink-inverse hover:bg-gold-hi disabled:opacity-40 transition-colors">
               {sending ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Sending…</> : <><Send className="w-3.5 h-3.5" /> Send it</>}
             </button>
           )}
           {["Make it shorter", "More direct", "Warmer"].map((p) => (
             <button key={p} onClick={() => askCopilot(p)} disabled={coBusy}
-              className="text-[11px] rounded-full border border-border px-2.5 py-1 text-muted-foreground hover:text-foreground hover:border-[#FFD60A]/40 disabled:opacity-40 transition-colors">
+              className="text-[11px] rounded-full border border-border px-2.5 py-1 text-muted-foreground hover:text-foreground hover:border-gold/40 disabled:opacity-40 transition-colors">
               {p}
             </button>
           ))}
@@ -1317,14 +1317,14 @@ function Copilot({ c }: { c: ComposerCtl }) {
 
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
-          <Sparkles className="w-4 h-4 text-[#FFD60A] absolute left-3 top-1/2 -translate-y-1/2" />
+          <Sparkles className="w-4 h-4 text-gold-ink absolute left-3 top-1/2 -translate-y-1/2" />
           <input value={co} onChange={(e) => setCo(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); askCopilot(); } }}
             placeholder="Ask anything, or say 'draft the reply'…"
-            className="w-full bg-background border border-border rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#FFD60A]/50" />
+            className="w-full bg-background border border-border rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-gold/50" />
         </div>
         <button onClick={() => askCopilot()} disabled={coBusy || !co.trim()}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-[#FFD60A]/40 px-3 py-2 text-sm text-[#FFD60A] hover:bg-[#FFD60A]/10 disabled:opacity-40 transition-colors">
+          className="inline-flex items-center gap-1.5 rounded-lg border border-gold/40 px-3 py-2 text-sm text-gold-ink hover:bg-gold/10 disabled:opacity-40 transition-colors">
           {coBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
         </button>
       </div>
@@ -1334,7 +1334,7 @@ function Copilot({ c }: { c: ComposerCtl }) {
           instead of sitting beside the copilot repeating its context back at you. */}
       <div className="pt-1">
         <button onClick={() => setShowIntel((s) => !s)}
-          className="w-full flex items-center justify-between text-[11px] text-muted-foreground hover:text-[#FFD60A] transition-colors">
+          className="w-full flex items-center justify-between text-[11px] text-muted-foreground hover:text-gold-ink transition-colors">
           <span className="uppercase tracking-wider font-semibold">What it knows · the research</span>
           <ChevronRight className={`w-3.5 h-3.5 transition-transform ${showIntel ? "rotate-90" : ""}`} />
         </button>
@@ -1372,19 +1372,19 @@ function CallPanel({ d, onTouched }: { d: Detail; onTouched: () => void }) {
   }
 
   return (
-    <div className="rounded-lg border border-[#26D07C]/25 bg-[#26D07C]/[0.05] px-3 py-2.5 space-y-2">
+    <div className="rounded-lg border border-signal/25 bg-signal/[0.05] px-3 py-2.5 space-y-2">
       <div className="flex items-center gap-2 flex-wrap">
         {!busy ? (
           <button
             onClick={() => { setLogged(null); ph.call(d.phone, d.id, mode); }}
-            className="neon-btn inline-flex items-center gap-2 rounded-lg bg-[#26D07C] px-4 py-2 text-sm font-semibold text-[#0A0E1A] hover:bg-[#3ce08e] transition-colors">
+            className="neon-btn inline-flex items-center gap-2 rounded-lg bg-signal px-4 py-2 text-sm font-semibold text-ink-inverse hover:bg-signal-hi transition-colors">
             <PhoneCall className="w-4 h-4" /> Call {d.phone}
           </button>
         ) : (
           <>
-            <span className="inline-flex items-center gap-2 rounded-lg bg-[#26D07C]/12 px-3 py-2 text-sm text-[#26D07C]">
+            <span className="inline-flex items-center gap-2 rounded-lg bg-signal/12 px-3 py-2 text-sm text-signal-ink">
               {ph.state === "live"
-                ? <><span className="w-2 h-2 rounded-full bg-[#26D07C] animate-pulse" /> Live · <span className="tabular-nums">{fmtDuration(ph.seconds)}</span></>
+                ? <><span className="w-2 h-2 rounded-full bg-signal animate-pulse" /> Live · <span className="tabular-nums">{fmtDuration(ph.seconds)}</span></>
                 : <><Loader2 className="w-4 h-4 animate-spin" /> {ph.state === "ringing" ? "Ringing…" : "Connecting…"}</>}
             </span>
             {mode === "browser" && ph.state === "live" && (
@@ -1394,7 +1394,7 @@ function CallPanel({ d, onTouched }: { d: Detail; onTouched: () => void }) {
               </button>
             )}
             <button onClick={ph.hangup}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-[#ff5a5a] px-3 py-2 text-sm font-semibold text-[#0A0E1A] hover:bg-[#ff7676] transition-colors">
+              className="inline-flex items-center gap-1.5 rounded-lg bg-danger px-3 py-2 text-sm font-semibold text-ink-inverse hover:bg-danger-hi transition-colors">
               <PhoneOff className="w-4 h-4" /> Hang up
             </button>
           </>
@@ -1406,7 +1406,7 @@ function CallPanel({ d, onTouched }: { d: Detail; onTouched: () => void }) {
             title="Dial-out rings your own mobile first, then connects the prospect. Use it on networks that block VoIP."
             className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs transition-colors ${
               mode === "dialout"
-                ? "border-[#FFD60A]/40 text-[#FFD60A] bg-[#FFD60A]/8"
+                ? "border-gold/40 text-gold-ink bg-gold/8"
                 : "border-border text-muted-foreground hover:text-foreground hover:bg-secondary"}`}>
             <Smartphone className="w-3.5 h-3.5" /> {mode === "dialout" ? "Ring my mobile first" : "From the browser"}
           </button>
@@ -1416,12 +1416,12 @@ function CallPanel({ d, onTouched }: { d: Detail; onTouched: () => void }) {
       {/* what the prospect sees, and the recording state, never hidden */}
       <div className="text-[11px] text-muted-foreground flex items-center gap-2 flex-wrap">
         {ph.callerId && <span>They see <span className="text-foreground tabular-nums">{ph.callerId}</span></span>}
-        {ph.recording && <span className="text-[#FFD60A]">· recording on, the notice plays first</span>}
+        {ph.recording && <span className="text-gold-ink">· recording on, the notice plays first</span>}
         {mode === "dialout" && <span>· we ring your mobile, then bridge them</span>}
       </div>
 
       {ph.error && (
-        <div className="flex items-start gap-2 text-[12px] text-[#ff8a8a]">
+        <div className="flex items-start gap-2 text-[12px] text-danger-soft">
           <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" /> {ph.error}
         </div>
       )}
@@ -1429,7 +1429,7 @@ function CallPanel({ d, onTouched }: { d: Detail; onTouched: () => void }) {
       {/* right after hanging up: the one thing Twilio cannot know */}
       {ph.state === "ended" && ph.callSid && (
         logged ? (
-          <div className="flex items-center gap-2 text-[12px] text-[#26D07C]"><Check className="w-3.5 h-3.5" /> Logged as {logged}.</div>
+          <div className="flex items-center gap-2 text-[12px] text-signal-ink"><Check className="w-3.5 h-3.5" /> Logged as {logged}.</div>
         ) : (
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="text-[11px] text-muted-foreground mr-1">How did it go?</span>
@@ -1465,10 +1465,10 @@ function Composer({ c }: { c: ComposerCtl }) {
           {(["email", "linkedin", "whatsapp", "call"] as Chan[]).map((ch) => (
             <button key={ch} onClick={() => { setChan(ch); setSent(null); }}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                chan === ch ? "bg-[#FFD60A]/12 text-[#FFD60A]" : "text-muted-foreground hover:bg-secondary"}`}>
+                chan === ch ? "bg-gold/12 text-gold-ink" : "text-muted-foreground hover:bg-secondary"}`}>
               {CHANNEL_BRAND[ch]
                 ? <Favicon domain={CHANNEL_BRAND[ch]} label={CHANNEL_META[ch].label} size={14} />
-                : <Phone className="w-3.5 h-3.5 text-[#26D07C]" />}
+                : <Phone className="w-3.5 h-3.5 text-signal-ink" />}
               {CHANNEL_META[ch].label}
             </button>
           ))}
@@ -1487,14 +1487,14 @@ function Composer({ c }: { c: ComposerCtl }) {
       {chan === "email" && routeTo && (
         <div className="flex items-center flex-wrap gap-1.5 mb-2 text-[11px]">
           <span className="text-muted-foreground">To:</span>
-          <span className="inline-flex items-center rounded-md border border-[#FFD60A]/35 bg-[#FFD60A]/10 px-2 py-0.5 text-[#FFD60A]">{routeTo}</span>
+          <span className="inline-flex items-center rounded-md border border-gold/35 bg-gold/10 px-2 py-0.5 text-gold-ink">{routeTo}</span>
           {(routeCc ?? []).length > 0 && <span className="text-muted-foreground ml-1">CC:</span>}
           {(routeCc ?? []).map((a) => (
             <span key={a} className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2 py-0.5 text-foreground">
               {a}
               <button type="button" aria-label={`Quitar ${a} del CC`}
                 onClick={() => setRouteCc((routeCc ?? []).filter((x) => x !== a))}
-                className="text-muted-foreground hover:text-[#ff9b9b]">×</button>
+                className="text-muted-foreground hover:text-danger-soft">×</button>
             </span>
           ))}
           <input
@@ -1507,7 +1507,7 @@ function Composer({ c }: { c: ComposerCtl }) {
               }
             }}
             placeholder="+ CC…"
-            className="w-24 bg-transparent border-b border-border/60 text-[11px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-[#FFD60A]/50 px-1 py-0.5"
+            className="w-24 bg-transparent border-b border-border/60 text-[11px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-gold/50 px-1 py-0.5"
           />
           {/* One-click CC to the client owner's real inbox (clients.notify_email).
               Manual by design — never pre-added (the auto-CC bridge is dead). */}
@@ -1516,7 +1516,7 @@ function Composer({ c }: { c: ComposerCtl }) {
               type="button"
               onClick={() => setRouteCc([...(routeCc ?? []), clientCc])}
               title={`Añadir ${clientCc} al CC`}
-              className="inline-flex items-center gap-1 rounded-md border border-[#26D07C]/35 bg-[#26D07C]/10 px-2 py-0.5 text-[#26D07C] hover:bg-[#26D07C]/20 transition-colors"
+              className="inline-flex items-center gap-1 rounded-md border border-signal/35 bg-signal/10 px-2 py-0.5 text-signal-ink hover:bg-signal/20 transition-colors"
             >
               + CC client · {clientCc}
             </button>
@@ -1530,7 +1530,7 @@ function Composer({ c }: { c: ComposerCtl }) {
 
       {!expanded ? (
         <button type="button" onClick={() => setOpen(true)}
-          className="w-full text-left bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-muted-foreground hover:border-[#FFD60A]/40 transition-colors">
+          className="w-full text-left bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-muted-foreground hover:border-gold/40 transition-colors">
           {`Write your ${CHANNEL_META[chan].label} message, or ask the copilot…`}
         </button>
       ) : (
@@ -1542,7 +1542,7 @@ function Composer({ c }: { c: ComposerCtl }) {
         value={text} onChange={(e) => setDraft(chan, e.target.value)} autoFocus
         placeholder={`Write your ${CHANNEL_META[chan].label} message, or ask the copilot on the right…`}
         rows={Math.min(20, Math.max(8, text.split("\n").length + 2))}
-        className="w-full bg-background border border-border rounded-lg p-3 text-sm text-foreground leading-relaxed focus:outline-none focus:ring-1 focus:ring-[#FFD60A]/50 resize-y"
+        className="w-full bg-background border border-border rounded-lg p-3 text-sm text-foreground leading-relaxed focus:outline-none focus:ring-1 focus:ring-gold/50 resize-y"
       />
 
       {/* The workspace's OWN signature is attached automatically on send (from
@@ -1551,9 +1551,9 @@ function Composer({ c }: { c: ComposerCtl }) {
           "Luxvance signature · logo · tagline" in every workspace, which read as
           a red flag inside a client's portal (Jose, 2026-08-05). */}
       {chan === "email" && c.sigInfo.present && (
-        <div className="flex items-center gap-2 rounded-lg border border-[#FFD60A]/25 bg-[#FFD60A]/[0.06] px-2.5 py-1.5">
+        <div className="flex items-center gap-2 rounded-lg border border-gold/25 bg-gold/[0.06] px-2.5 py-1.5">
           <span className="text-[11px] text-muted-foreground leading-tight">
-            <span className="text-[#FFD60A] font-medium">{c.sigInfo.owner ? `${c.sigInfo.owner}'s signature` : "Signature"}</span> attached on send. Just end with a sign-off like <span className="text-foreground">Best,</span>
+            <span className="text-gold-ink font-medium">{c.sigInfo.owner ? `${c.sigInfo.owner}'s signature` : "Signature"}</span> attached on send. Just end with a sign-off like <span className="text-foreground">Best,</span>
           </span>
         </div>
       )}
@@ -1563,7 +1563,7 @@ function Composer({ c }: { c: ComposerCtl }) {
         <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => setDraft(chan, (text.trim() ? text.trimEnd() + "\n\n" : "") + `Here is your Build: ${d.build_url}`)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[#FFD60A]/30 bg-[#FFD60A]/8 px-2.5 py-1.5 text-xs text-[#FFD60A] hover:bg-[#FFD60A]/12 transition-colors">
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gold/30 bg-gold/8 px-2.5 py-1.5 text-xs text-gold-ink hover:bg-gold/12 transition-colors">
             🧲 Insert Build link
           </button>
           <span className="text-[11px] text-muted-foreground truncate">{d.build_name || "Their Build"}</span>
@@ -1576,7 +1576,7 @@ function Composer({ c }: { c: ComposerCtl }) {
           only way back was LinkedIn and return. It now sits above the row and
           clears the moment you type again. */}
       {(sent === "ok" || sent === "touched") && (
-        <div className="flex items-center gap-2 text-sm text-[#26D07C]">
+        <div className="flex items-center gap-2 text-sm text-signal-ink">
           <Check className="w-4 h-4" />
           {sent === "ok" ? "Sent. Cadence advanced."
             : `Logged as ${CHANNEL_META[chan].label} touch. Ball's in their court now.`}
@@ -1589,7 +1589,7 @@ function Composer({ c }: { c: ComposerCtl }) {
             <span className="text-[11px] text-muted-foreground shrink-0">Send from</span>
             <SenderSelect opts={sendOpts} value={fromKey} onChange={setFromKey} />
             {threadAcct.account && !threadAcct.alive && (
-              <span className="text-[11px] text-[#FFD60A]">
+              <span className="text-[11px] text-gold-ink">
                 Original mailbox ({threadAcct.account}) is gone — this sends as a continuation of the same thread.
               </span>
             )}
@@ -1598,7 +1598,7 @@ function Composer({ c }: { c: ComposerCtl }) {
         <div className="flex items-center gap-2 flex-wrap">
           {canSendEmail ? (
             <button onClick={send} disabled={sending || !text.trim() || (sendOpts.length > 0 && !selectedOpt)}
-              className="neon-btn inline-flex items-center gap-2 rounded-lg bg-[#FFD60A] px-4 py-2 text-sm font-semibold text-[#0A0E1A] hover:bg-[#ffdf3a] disabled:opacity-40 transition-colors">
+              className="neon-btn inline-flex items-center gap-2 rounded-lg bg-gold px-4 py-2 text-sm font-semibold text-ink-inverse hover:bg-gold-hi disabled:opacity-40 transition-colors">
               {sending ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending…</>
                 : <><Send className="w-4 h-4" /> {selectedOpt?.via === "gmail" ? `Send from ${selectedOpt.eaccount}` : "Send via Instantly"}</>}
             </button>
@@ -1606,7 +1606,7 @@ function Composer({ c }: { c: ComposerCtl }) {
             <a href={chan === "whatsapp" && d.phone ? (d.wa_link || `https://wa.me/${d.phone.replace(/[^\d]/g, "")}`) : (d.linkedin_url || linkedinSearchUrl(d.name, d.company))}
               target="_blank" rel="noreferrer"
               onClick={() => { navigator.clipboard.writeText(text); logTouch(chan); }}
-              className="inline-flex items-center gap-2 rounded-lg bg-[#FFD60A] px-4 py-2 text-sm font-semibold text-[#0A0E1A] hover:bg-[#ffdf3a] transition-colors">
+              className="inline-flex items-center gap-2 rounded-lg bg-gold px-4 py-2 text-sm font-semibold text-ink-inverse hover:bg-gold-hi transition-colors">
               <Copy className="w-4 h-4" /> Copy & open {CHANNEL_META[chan].label}
             </a>
           ) : null}
@@ -1614,7 +1614,7 @@ function Composer({ c }: { c: ComposerCtl }) {
               they called a second endpoint on a weaker model, so the same request produced a
               different answer depending on which button you happened to press. */}
           {drafting && (
-            <span className="inline-flex items-center gap-1.5 text-sm text-[#FFD60A]">
+            <span className="inline-flex items-center gap-1.5 text-sm text-gold-ink">
               <Loader2 className="w-4 h-4 animate-spin" /> Copilot is writing…
             </span>
           )}
@@ -1631,7 +1631,7 @@ function Composer({ c }: { c: ComposerCtl }) {
         </>
       )}
       {sent?.startsWith("err:") && (
-        <div className="text-xs text-[#ef4444]">Send failed: {sent.slice(4)} · your text is still here.</div>
+        <div className="text-xs text-danger">Send failed: {sent.slice(4)} · your text is still here.</div>
       )}
       </>
       )}
@@ -1675,9 +1675,9 @@ function BuildCard({ d, onChanged, autoOptimize = false }: { d: Detail; onChange
   };
 
   const statusLine = d.build_delivered
-    ? { txt: "Delivered to prospect", cls: "text-[#26D07C]" }
-    : d.build_published ? { txt: "Published · link live", cls: "text-[#FFD60A]" }
-    : { txt: "Built · link not resolving", cls: "text-[#ef4444]" };
+    ? { txt: "Delivered to prospect", cls: "text-signal-ink" }
+    : d.build_published ? { txt: "Published · link live", cls: "text-gold-ink" }
+    : { txt: "Built · link not resolving", cls: "text-danger" };
   // The open signal: THE follow-up trigger. "Opened 20m ago" means they are
   // looking at it right now — reach out while the tab is still warm.
   const opened = d.build_last_opened_at
@@ -1694,7 +1694,7 @@ function BuildCard({ d, onChanged, autoOptimize = false }: { d: Detail; onChange
       </div>
 
       {building ? (
-        <div className="flex items-center gap-2 rounded-xl border border-[#FFD60A]/30 bg-[#FFD60A]/8 px-4 py-3 text-sm text-[#FFD60A]">
+        <div className="flex items-center gap-2 rounded-xl border border-gold/30 bg-gold/8 px-4 py-3 text-sm text-gold-ink">
           <Loader2 className="w-4 h-4 animate-spin" /> Building… sourcing ~50 real leads + copy (about a minute).
         </div>
       ) : d.build_url ? (
@@ -1712,7 +1712,7 @@ function BuildCard({ d, onChanged, autoOptimize = false }: { d: Detail; onChange
             <div className="shrink-0 text-right">
               <span className={`block text-xs ${statusLine.cls}`}>{statusLine.txt}</span>
               {opened && (
-                <span className={`block text-[11px] mt-0.5 ${opened.hot ? "text-[#26D07C] font-medium" : "text-muted-foreground"}`}>
+                <span className={`block text-[11px] mt-0.5 ${opened.hot ? "text-signal-ink font-medium" : "text-muted-foreground"}`}>
                   {opened.hot ? "🔥 " : ""}{opened.txt}
                 </span>
               )}
@@ -1720,7 +1720,7 @@ function BuildCard({ d, onChanged, autoOptimize = false }: { d: Detail; onChange
           </div>
           <div className="flex items-center gap-2">
             <a href={d.build_url} target="_blank" rel="noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-lg bg-[#FFD60A]/10 border border-[#FFD60A]/40 px-3 py-2 text-sm text-[#FFD60A] hover:bg-[#FFD60A]/15 transition-colors">
+              className="inline-flex items-center gap-1.5 rounded-lg bg-gold/10 border border-gold/40 px-3 py-2 text-sm text-gold-ink hover:bg-gold/15 transition-colors">
               Open the Build <ExternalLink className="w-3.5 h-3.5" />
             </a>
             <CopyBtn value={d.build_url} label="Copy link" />
@@ -1739,14 +1739,14 @@ function BuildCard({ d, onChanged, autoOptimize = false }: { d: Detail; onChange
               </div>
               <textarea value={instr} onChange={(e) => setInstr(e.target.value)} rows={3}
                 placeholder="e.g. focus on Series A fintech in the UK, drop agencies…"
-                className="w-full bg-background border border-border rounded-lg p-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-[#FFD60A]/50 resize-y" />
+                className="w-full bg-background border border-border rounded-lg p-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-gold/50 resize-y" />
               <button onClick={() => start(true)}
-                className="inline-flex items-center gap-2 rounded-lg bg-[#FFD60A] px-4 py-2 text-sm font-semibold text-[#0A0E1A] hover:bg-[#ffdf3a] transition-colors">
+                className="inline-flex items-center gap-2 rounded-lg bg-gold px-4 py-2 text-sm font-semibold text-ink-inverse hover:bg-gold-hi transition-colors">
                 <Sparkles className="w-4 h-4" /> Rebuild the Build
               </button>
             </div>
           )}
-          {err && <div className="text-xs text-[#ef4444]">{err}</div>}
+          {err && <div className="text-xs text-danger">{err}</div>}
         </div>
       ) : (
         <div className="bg-card border border-border rounded-xl p-4 space-y-3">
@@ -1760,13 +1760,13 @@ function BuildCard({ d, onChanged, autoOptimize = false }: { d: Detail; onChange
           {showInstr && (
             <textarea value={instr} onChange={(e) => setInstr(e.target.value)} rows={3}
               placeholder="Anything to consider that is not in the emails? e.g. target only US mid-market, avoid competitors…"
-              className="w-full bg-background border border-border rounded-lg p-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-[#FFD60A]/50 resize-y" />
+              className="w-full bg-background border border-border rounded-lg p-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-gold/50 resize-y" />
           )}
           <button onClick={() => start(false)}
-            className="neon-btn w-full inline-flex items-center justify-center gap-2 rounded-lg bg-[#FFD60A] px-4 py-3 text-sm font-semibold text-[#0A0E1A] hover:bg-[#ffdf3a] transition-colors">
+            className="neon-btn w-full inline-flex items-center justify-center gap-2 rounded-lg bg-gold px-4 py-3 text-sm font-semibold text-ink-inverse hover:bg-gold-hi transition-colors">
             🧲 Generate the Build
           </button>
-          {err && <div className="text-xs text-[#ef4444]">{err}</div>}
+          {err && <div className="text-xs text-danger">{err}</div>}
         </div>
       )}
     </div>
@@ -1805,11 +1805,11 @@ function ContactActions({ d, onChanged }: { d: Detail; onChanged: () => void }) 
         value={draftPhone} onChange={(e) => setDraftPhone(e.target.value)} autoFocus
         placeholder="+353 86 796 1664"
         onKeyDown={(e) => { if (e.key === "Enter") savePhone(draftPhone); if (e.key === "Escape") setEditing(false); }}
-        className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground tabular-nums focus:outline-none focus:ring-1 focus:ring-[#FFD60A]/50"
+        className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground tabular-nums focus:outline-none focus:ring-1 focus:ring-gold/50"
       />
       <div className="flex items-center gap-2">
         <button onClick={() => savePhone(draftPhone)} disabled={savingPhone}
-          className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#FFD60A] px-3 py-2 text-sm font-semibold text-[#0A0E1A] hover:bg-[#ffdf3a] disabled:opacity-40 transition-colors">
+          className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-gold px-3 py-2 text-sm font-semibold text-ink-inverse hover:bg-gold-hi disabled:opacity-40 transition-colors">
           {savingPhone ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Save
         </button>
         <button onClick={() => { setEditing(false); setPhoneErr(null); }}
@@ -1818,7 +1818,7 @@ function ContactActions({ d, onChanged }: { d: Detail; onChanged: () => void }) 
         </button>
         {d.phone && (
           <button onClick={() => savePhone("")} title="Remove this number"
-            className="rounded-lg border border-border px-3 py-2 text-sm text-[#ff8a8a] hover:bg-secondary transition-colors">
+            className="rounded-lg border border-border px-3 py-2 text-sm text-danger-soft hover:bg-secondary transition-colors">
             Clear
           </button>
         )}
@@ -1826,7 +1826,7 @@ function ContactActions({ d, onChanged }: { d: Detail; onChanged: () => void }) 
       <div className="text-[11px] text-muted-foreground">
         Any format works. We store it in international format so the dialer can use it.
       </div>
-      {phoneErr && <div className="text-[11px] text-[#ff8a8a]">{phoneErr}</div>}
+      {phoneErr && <div className="text-[11px] text-danger-soft">{phoneErr}</div>}
     </div>
   );
 
@@ -1846,19 +1846,19 @@ function ContactActions({ d, onChanged }: { d: Detail; onChanged: () => void }) 
       {/* LinkedIn */}
       <div className="bg-card border border-border rounded-xl p-3">
         <div className="flex items-center gap-2 text-sm font-medium text-foreground mb-2">
-          <Link2 className="w-4 h-4 text-[#5fd0e0]" /> LinkedIn
+          <Link2 className="w-4 h-4 text-cyan" /> LinkedIn
         </div>
         {d.linkedin_url ? (
           <div className="flex items-center gap-2">
             <a href={d.linkedin_url} target="_blank" rel="noreferrer"
-              className="flex-1 inline-flex items-center gap-2 rounded-lg bg-background border border-border px-3 py-2 text-sm text-foreground hover:text-[#FFD60A] truncate">
+              className="flex-1 inline-flex items-center gap-2 rounded-lg bg-background border border-border px-3 py-2 text-sm text-foreground hover:text-gold-ink truncate">
               Open profile & connect <ExternalLink className="w-3.5 h-3.5 shrink-0" />
             </a>
             <CopyBtn value={d.linkedin_url} />
           </div>
         ) : (
           <a href={linkedinSearchUrl(d.name, d.company)} target="_blank" rel="noreferrer"
-            className="inline-flex items-center gap-2 rounded-lg border border-[#5fd0e0]/40 bg-[#5fd0e0]/10 px-3 py-2 text-sm text-[#5fd0e0] hover:bg-[#5fd0e0]/15 transition-colors">
+            className="inline-flex items-center gap-2 rounded-lg border border-cyan/40 bg-cyan/10 px-3 py-2 text-sm text-cyan hover:bg-cyan/15 transition-colors">
             <Search className="w-3.5 h-3.5" /> Search on LinkedIn to connect <ExternalLink className="w-3.5 h-3.5" />
           </a>
         )}
@@ -1867,21 +1867,21 @@ function ContactActions({ d, onChanged }: { d: Detail; onChanged: () => void }) 
       {/* Phone / WhatsApp / Call */}
       <div className="bg-card border border-border rounded-xl p-3">
         <div className="flex items-center gap-2 text-sm font-medium text-foreground mb-2">
-          <Phone className="w-4 h-4 text-[#f0b45f]" /> Phone · WhatsApp · Call
+          <Phone className="w-4 h-4 text-warn" /> Phone · WhatsApp · Call
         </div>
         {editing ? phoneEditor : d.phone ? (
           <div className="space-y-2">
             <div className="flex items-center gap-2 bg-background border border-border rounded-lg px-3 py-2">
               <span className="flex-1 text-sm text-foreground tabular-nums">{d.phone}</span>
               <button onClick={() => { setDraftPhone(d.phone); setEditing(true); }} title="Edit or remove this number"
-                className="text-muted-foreground hover:text-[#FFD60A] transition-colors">
+                className="text-muted-foreground hover:text-gold-ink transition-colors">
                 <PenLine className="w-3.5 h-3.5" />
               </button>
               <CopyBtn value={d.phone} label="Copy to call" />
             </div>
             <div className="flex items-center gap-2">
               <a href={d.wa_link || `https://wa.me/${d.phone.replace(/[^\d]/g, "")}`} target="_blank" rel="noreferrer"
-                className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg border border-[#26D07C]/40 bg-[#26D07C]/10 px-3 py-2 text-sm text-[#26D07C] hover:bg-[#26D07C]/15 transition-colors">
+                className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg border border-signal/40 bg-signal/10 px-3 py-2 text-sm text-signal-ink hover:bg-signal/15 transition-colors">
                 <MessageCircle className="w-4 h-4" /> WhatsApp
               </a>
               <a href={`tel:${d.phone}`}
@@ -1898,7 +1898,7 @@ function ContactActions({ d, onChanged }: { d: Detail; onChanged: () => void }) 
               <PenLine className="w-4 h-4" /> Add a number
             </button>
             <button onClick={shopClay} disabled={finding}
-              className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-[#f0b45f]/40 bg-[#f0b45f]/10 px-3 py-2 text-sm text-[#f0b45f] hover:bg-[#f0b45f]/15 disabled:opacity-40 transition-colors">
+              className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-warn hover:bg-warn/15 disabled:opacity-40 transition-colors">
               {finding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />} Shop via Clay
             </button>
             {findNote && <div className="text-xs text-muted-foreground">{findNote}</div>}
@@ -1973,7 +1973,7 @@ function IntelPanel({ d }: { d: Detail }) {
               .finally(() => setBusy(false));
           }}
           disabled={busy}
-          className="inline-flex items-center gap-2 rounded-lg border border-[#FFD60A]/40 bg-[#FFD60A]/10 px-3 py-2 text-[12.5px] text-[#FFD60A] hover:bg-[#FFD60A]/15 disabled:opacity-40 transition-colors"
+          className="inline-flex items-center gap-2 rounded-lg border border-gold/40 bg-gold/10 px-3 py-2 text-[12.5px] text-gold-ink hover:bg-gold/15 disabled:opacity-40 transition-colors"
         >
           {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Bot className="w-3.5 h-3.5" />} Research this prospect
         </button>
@@ -1982,15 +1982,15 @@ function IntelPanel({ d }: { d: Detail }) {
     );
   }
   return (
-    <div className="rounded-xl border border-[#FFD60A]/20 bg-card p-4 space-y-3">
-      <div className="flex items-center gap-2 text-sm font-semibold text-[#FFD60A]">
+    <div className="rounded-xl border border-gold/20 bg-card p-4 space-y-3">
+      <div className="flex items-center gap-2 text-sm font-semibold text-gold-ink">
         <Bot className="w-4 h-4" /> Business Intelligence · why they fit
         {d.dossier_status && <span className="ml-auto text-[10px] font-normal text-muted-foreground uppercase">{ffCount}/6 sources</span>}
       </div>
       {/* call notes get top billing when we have them */}
       {d.call_notes && (
-        <div className="rounded-lg border border-[#26D07C]/25 bg-[#26D07C]/5 p-3">
-          <div className="text-[11px] font-semibold text-[#26D07C] mb-1">📞 Call notes (Fireflies){d.call_notes_at ? ` · ${fmtDate(d.call_notes_at)}` : ""}</div>
+        <div className="rounded-lg border border-signal/25 bg-signal/5 p-3">
+          <div className="text-[11px] font-semibold text-signal-ink mb-1">📞 Call notes (Fireflies){d.call_notes_at ? ` · ${fmtDate(d.call_notes_at)}` : ""}</div>
           <p className="text-[11px] leading-relaxed text-muted-foreground whitespace-pre-wrap max-h-48 overflow-y-auto">{d.call_notes}</p>
         </div>
       )}
@@ -2138,14 +2138,14 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
       {/* PULSE — the timing on both sides, unambiguous: ↙ THEY last wrote vs ↗ WE last wrote.
           The side that moved LAST tells you whose court the ball is in; the gap = how cold. */}
       <div className="flex items-stretch rounded-lg border border-border bg-card/40 overflow-hidden">
-        <div className={`flex-1 px-3 py-2 ${owe ? "bg-[#5aa2ff]/[0.06]" : ""}`}>
-          <div className="text-[9px] uppercase tracking-[0.14em] text-[#5aa2ff]/80">↙ They last wrote</div>
-          <div className={`text-[13px] tabular-nums mt-0.5 ${owe ? "text-[#FFD60A]" : "text-foreground"}`}>{timeAgo(d.last_reply_at)}</div>
+        <div className={`flex-1 px-3 py-2 ${owe ? "bg-info/[0.06]" : ""}`}>
+          <div className="text-[9px] uppercase tracking-[0.14em] text-info/80">↙ They last wrote</div>
+          <div className={`text-[13px] tabular-nums mt-0.5 ${owe ? "text-gold-ink" : "text-foreground"}`}>{timeAgo(d.last_reply_at)}</div>
           {fmtExact(d.last_reply_at) && <div className="text-[10px] text-muted-foreground/60 tabular-nums">{fmtExact(d.last_reply_at)}</div>}
         </div>
         <div className="w-px bg-border" />
-        <div className={`flex-1 px-3 py-2 ${!owe && d.waiting_on !== "closed" ? "bg-[#26D07C]/[0.05]" : ""}`}>
-          <div className="text-[9px] uppercase tracking-[0.14em] text-[#26D07C]/80">↗ We last wrote{d.last_channel ? ` · ${chLabel(d.last_channel)}` : ""}</div>
+        <div className={`flex-1 px-3 py-2 ${!owe && d.waiting_on !== "closed" ? "bg-signal/[0.05]" : ""}`}>
+          <div className="text-[9px] uppercase tracking-[0.14em] text-signal-ink/80">↗ We last wrote{d.last_channel ? ` · ${chLabel(d.last_channel)}` : ""}</div>
           <div className="text-[13px] tabular-nums mt-0.5 text-foreground">{d.last_touch_at ? timeAgo(d.last_touch_at) : "—"}</div>
           {fmtExact(d.last_touch_at) && <div className="text-[10px] text-muted-foreground/60 tabular-nums">{fmtExact(d.last_touch_at)}</div>}
         </div>
@@ -2222,30 +2222,30 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
                   onChange={(e) => setAmt(e.target.value)}
                   onBlur={saveAmt}
                   onKeyDown={(e) => { if (e.key === "Enter") saveAmt(); if (e.key === "Escape") { setAmt(d.deal_amount != null ? String(d.deal_amount) : ""); setAmtEdit(false); } }}
-                  className="w-20 bg-background border border-[#FFD60A]/40 rounded px-1.5 py-0.5 text-right text-[12.5px] text-foreground focus:outline-none" />
+                  className="w-20 bg-background border border-gold/40 rounded px-1.5 py-0.5 text-right text-[12.5px] text-foreground focus:outline-none" />
               </span>
             ) : (
-              <button onClick={() => setAmtEdit(true)} className={d.deal_amount != null ? "text-foreground hover:underline decoration-dotted underline-offset-2 tabular-nums" : "text-[#FFD60A] hover:underline decoration-dotted underline-offset-2"}>
+              <button onClick={() => setAmtEdit(true)} className={d.deal_amount != null ? "text-foreground hover:underline decoration-dotted underline-offset-2 tabular-nums" : "text-gold-ink hover:underline decoration-dotted underline-offset-2"}>
                 {d.deal_amount != null ? `$${Number(d.deal_amount).toLocaleString()}` : "set value"}
               </button>
             )
           } />
           <Row k="Next step" v={
-            <button onClick={() => setFuOpen((v) => !v)} className="text-[#FFD60A] hover:underline decoration-dotted underline-offset-2">
+            <button onClick={() => setFuOpen((v) => !v)} className="text-gold-ink hover:underline decoration-dotted underline-offset-2">
               {d.next?.next_touch_at ? `${d.next.next_channel || "email"} · ${fmtDate(d.next.next_touch_at)}` : "set follow-up"}
             </button>
           } />
         </dl>
         {fuOpen && (
-          <div className="mt-3 rounded-lg border border-[#FFD60A]/30 bg-[#FFD60A]/[0.04] p-3 space-y-2">
-            <div className="text-[10px] uppercase tracking-[0.16em] text-[#FFD60A] font-semibold">Set follow-up</div>
+          <div className="mt-3 rounded-lg border border-gold/30 bg-gold/[0.04] p-3 space-y-2">
+            <div className="text-[10px] uppercase tracking-[0.16em] text-gold-ink font-semibold">Set follow-up</div>
             <div className="flex items-center gap-1.5 flex-wrap">
               {([["+2 days", 2], ["+1 week", 7], ["Next Mon", "mon"]] as [string, number | "mon"][]).map(([label, off]) => {
                 const val = presetDate(off);
                 return (
                   <button key={label} onClick={() => setFuDate(val)}
                     className={`rounded-md border px-2 py-1 text-[11px] transition-colors ${
-                      fuDate === val ? "border-[#FFD60A]/50 bg-[#FFD60A]/10 text-[#FFD60A]" : "border-border text-muted-foreground hover:text-[#FFD60A] hover:border-[#FFD60A]/40"}`}>
+                      fuDate === val ? "border-gold/50 bg-gold/10 text-gold-ink" : "border-border text-muted-foreground hover:text-gold-ink hover:border-gold/40"}`}>
                     {label}
                   </button>
                 );
@@ -2253,18 +2253,18 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
             </div>
             <div className="flex items-center gap-2">
               <select value={fuChan} onChange={(e) => setFuChan(e.target.value)}
-                className="bg-background border border-border rounded-lg px-2 py-1.5 text-[12px] text-foreground focus:outline-none focus:ring-1 focus:ring-[#FFD60A]/50">
+                className="bg-background border border-border rounded-lg px-2 py-1.5 text-[12px] text-foreground focus:outline-none focus:ring-1 focus:ring-gold/50">
                 <option value="email">Email</option>
                 <option value="linkedin">LinkedIn</option>
                 <option value="whatsapp">WhatsApp</option>
                 <option value="call">Call</option>
               </select>
               <input type="date" value={fuDate} onChange={(e) => setFuDate(e.target.value)}
-                className="flex-1 bg-background border border-border rounded-lg px-2 py-1.5 text-[12px] text-foreground focus:outline-none focus:ring-1 focus:ring-[#FFD60A]/50" />
+                className="flex-1 bg-background border border-border rounded-lg px-2 py-1.5 text-[12px] text-foreground focus:outline-none focus:ring-1 focus:ring-gold/50" />
             </div>
             <div className="flex items-center gap-2">
               <button onClick={() => saveFu(false)} disabled={fuBusy || !fuDate}
-                className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#FFD60A] px-3 py-1.5 text-[12px] font-semibold text-[#0A0E1A] hover:bg-[#ffdf3a] disabled:opacity-40 transition-colors">
+                className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-gold px-3 py-1.5 text-[12px] font-semibold text-ink-inverse hover:bg-gold-hi disabled:opacity-40 transition-colors">
                 {fuBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CalendarClock className="w-3.5 h-3.5" />} Save reminder
               </button>
               {d.next?.next_touch_at && (
@@ -2288,14 +2288,14 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
         <div className="flex items-center gap-2 mb-2">
           <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70 font-semibold"><span className="text-[13px] mr-1 align-middle">🧲</span> Build · the lead magnet</span>
           {tools && (
-            <button onClick={() => setTools(false)} className="ml-auto text-[11px] text-muted-foreground hover:text-[#FFD60A]">Hide</button>
+            <button onClick={() => setTools(false)} className="ml-auto text-[11px] text-muted-foreground hover:text-gold-ink">Hide</button>
           )}
         </div>
         {build ? (
           <div className="mb-2 space-y-1.5">
             <div className="flex items-center gap-2 text-[12px]">
               <span style={{ color: build.c }}>● {build.t}</span>
-              {d.build_url && <a href={d.build_url} target="_blank" rel="noreferrer" className="ml-auto text-[#FFD60A] hover:underline shrink-0">Open</a>}
+              {d.build_url && <a href={d.build_url} target="_blank" rel="noreferrer" className="ml-auto text-gold-ink hover:underline shrink-0">Open</a>}
             </div>
             {/* The whole link, readable. It is what gets pasted into the reply, so
                 hiding it behind a truncated slug meant opening the Build to read
@@ -2316,14 +2316,14 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
             clicks, because a build spends money and replaces what is there, but the
             first click turns into the confirmation instead of scrolling you away. */}
         {building ? (
-          <div className="flex items-center gap-2 rounded-lg border border-[#FFD60A]/30 bg-[#FFD60A]/[0.06] px-3 py-2 text-[12.5px] text-[#FFD60A]">
+          <div className="flex items-center gap-2 rounded-lg border border-gold/30 bg-gold/[0.06] px-3 py-2 text-[12.5px] text-gold-ink">
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
             Building… researching, sourcing in Clay and writing the copy. Two to four minutes.
           </div>
         ) : confirmBuild ? (
           <div className="flex items-center gap-1.5">
             <button onClick={startBuild}
-              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#26D07C] px-3 py-2 text-[12.5px] font-semibold text-[#0A0E1A] hover:bg-[#3ad98c] transition-colors">
+              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-signal px-3 py-2 text-[12.5px] font-semibold text-ink-inverse hover:bg-signal-hi transition-colors">
               <Sparkles className="w-3.5 h-3.5" /> {d.build_url ? "Yes, rebuild it" : "Yes, build it"}
             </button>
             <button onClick={() => setConfirmBuild(false)}
@@ -2334,17 +2334,17 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
         ) : (
           <div className="flex items-center gap-1.5">
             <button onClick={() => setConfirmBuild(true)}
-              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#FFD60A] px-3 py-2 text-[12.5px] font-semibold text-[#0A0E1A] hover:bg-[#ffdf3a] transition-colors">
+              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-gold px-3 py-2 text-[12.5px] font-semibold text-ink-inverse hover:bg-gold-hi transition-colors">
               <Sparkles className="w-3.5 h-3.5" /> {d.build_url ? "Rebuild it" : "Create the Build"}
             </button>
             <button onClick={() => { setOptimizeMode(true); setTools(true); }}
               title="Say what to change before rebuilding"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-[12.5px] text-foreground hover:border-[#FFD60A]/40 transition-colors">
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-[12.5px] text-foreground hover:border-gold/40 transition-colors">
               Optimize
             </button>
           </div>
         )}
-        {buildErr && <div className="mt-1.5 text-[11px] text-[#ef4444]">{buildErr}</div>}
+        {buildErr && <div className="mt-1.5 text-[11px] text-danger">{buildErr}</div>}
         {tools && <div className="mt-3"><BuildCard d={d} onChanged={both} autoOptimize={optimizeMode} /></div>}
       </div>
       )}
@@ -2353,16 +2353,16 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
       <div>
         <div className="flex items-center gap-2 mb-2">
           <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70 font-semibold">Notes</span>
-          {noteSaved && note === (d.notes || "") && <span className="text-[10px] text-[#26D07C]">saved</span>}
+          {noteSaved && note === (d.notes || "") && <span className="text-[10px] text-signal-ink">saved</span>}
         </div>
         <textarea value={note} onChange={(e) => { setNote(e.target.value); setNoteSaved(false); }}
           onBlur={() => { if (note !== (d.notes || "")) saveNote(); }}
           placeholder="Spoke — wants pricing, follow Tue. Anything that should greet you next time you open this card…"
           rows={Math.min(8, Math.max(3, note.split("\n").length + 1))}
-          className="w-full bg-background border border-border rounded-lg p-2.5 text-[12.5px] text-foreground leading-relaxed focus:outline-none focus:ring-1 focus:ring-[#FFD60A]/40 resize-y" />
+          className="w-full bg-background border border-border rounded-lg p-2.5 text-[12.5px] text-foreground leading-relaxed focus:outline-none focus:ring-1 focus:ring-gold/40 resize-y" />
         <div className="flex items-center gap-2 mt-1.5">
           <button onClick={saveNote} disabled={noteBusy || note === (d.notes || "")}
-            className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:border-[#FFD60A]/40 disabled:opacity-40 transition-colors">
+            className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:border-gold/40 disabled:opacity-40 transition-colors">
             {noteBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />} Save note
           </button>
           <span className="text-[10px] text-muted-foreground/60">auto-saves when you click away</span>
@@ -2380,15 +2380,15 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
         <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70 font-semibold mb-2">Quick actions</div>
         <div className="flex flex-col gap-1.5">
           <button onClick={() => reload(true)}
-            className="text-left text-[12.5px] rounded-lg border border-border bg-card px-3 py-2 text-foreground hover:border-[#FFD60A]/40 transition-colors inline-flex items-center gap-2">
+            className="text-left text-[12.5px] rounded-lg border border-border bg-card px-3 py-2 text-foreground hover:border-gold/40 transition-colors inline-flex items-center gap-2">
             <RefreshCw className="w-3.5 h-3.5" /> Refresh intelligence
           </button>
           <button onClick={() => navigator.clipboard.writeText(d.email)}
-            className="text-left text-[12.5px] rounded-lg border border-border bg-card px-3 py-2 text-foreground hover:border-[#FFD60A]/40 transition-colors inline-flex items-center gap-2">
+            className="text-left text-[12.5px] rounded-lg border border-border bg-card px-3 py-2 text-foreground hover:border-gold/40 transition-colors inline-flex items-center gap-2">
             <Copy className="w-3.5 h-3.5" /> Copy email
           </button>
           <button onClick={() => setFuOpen(true)}
-            className="text-left text-[12.5px] rounded-lg border border-border bg-card px-3 py-2 text-foreground hover:border-[#FFD60A]/40 transition-colors inline-flex items-center gap-2">
+            className="text-left text-[12.5px] rounded-lg border border-border bg-card px-3 py-2 text-foreground hover:border-gold/40 transition-colors inline-flex items-center gap-2">
             <CalendarClock className="w-3.5 h-3.5" /> Set follow-up
           </button>
         </div>
@@ -2471,15 +2471,15 @@ function FunnelStepper({ d, onChanged }: { d: Detail; onChanged: () => void }) {
         const active = !lost && i === curIdx;
         const won = s.key === "won";
         const dot = active
-          ? (won ? "bg-[#26D07C] text-[#0A0E1A]" : "bg-[#FFD60A] text-[#0A0E1A]")
-          : done ? "bg-[#26D07C]/25 text-[#26D07C]" : "bg-secondary text-muted-foreground";
+          ? (won ? "bg-signal text-ink-inverse" : "bg-gold text-ink-inverse")
+          : done ? "bg-signal/25 text-signal-ink" : "bg-secondary text-muted-foreground";
         return (
           <Fragment key={s.key}>
-            {i > 0 && <div className={`h-px w-3 lg:w-7 shrink-0 ${!lost && i <= curIdx ? "bg-[#26D07C]/40" : "bg-border"}`} />}
+            {i > 0 && <div className={`h-px w-3 lg:w-7 shrink-0 ${!lost && i <= curIdx ? "bg-signal/40" : "bg-border"}`} />}
             <button onClick={() => set(s.key)} disabled={busy}
               title={`Move to ${s.label}`}
               className={`shrink-0 inline-flex items-center gap-1.5 rounded-full pl-1 pr-2.5 py-1 text-[11px] font-medium transition-colors disabled:opacity-50 ${
-                active ? (won ? "bg-[#26D07C]/15 text-[#26D07C]" : "bg-[#FFD60A]/12 text-[#FFD60A]") : "text-muted-foreground hover:bg-secondary"}`}>
+                active ? (won ? "bg-signal/15 text-signal-ink" : "bg-gold/12 text-gold-ink") : "text-muted-foreground hover:bg-secondary"}`}>
               <span className={`grid place-items-center w-4 h-4 rounded-full text-[9px] font-bold ${dot}`}>{done ? "✓" : i + 1}</span>
               {s.label}
             </button>
@@ -2489,7 +2489,7 @@ function FunnelStepper({ d, onChanged }: { d: Detail; onChanged: () => void }) {
       <button onClick={() => set("lost")} disabled={busy}
         title="Mark this deal lost or parked"
         className={`shrink-0 ml-auto inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors disabled:opacity-50 ${
-          lost ? "bg-[#ef4444]/12 text-[#ff9b9b]" : "text-muted-foreground/60 hover:bg-secondary hover:text-[#ff9b9b]"}`}>
+          lost ? "bg-danger/12 text-danger-soft" : "text-muted-foreground/60 hover:bg-secondary hover:text-danger-soft"}`}>
         {lost ? "● Lost / Parked" : "Mark lost"}
       </button>
     </div>
@@ -2544,7 +2544,7 @@ function Record({ id, initial, queue, onNavigate, onClose, onChanged }: { id: nu
   // Signal Green means "won / meeting booked" — never decorate a cold or lost prospect with it.
   const closedWon = d?.stage === "won" || d?.stage === "discovery_booked" || d?.stage === "discovery_held" || head?.waiting_on === "closed";
   const avatarCls = closedWon
-    ? "bg-[#26D07C]/12 text-[#26D07C] border border-[#26D07C]/30"
+    ? "bg-signal/12 text-signal-ink border border-signal/30"
     : "bg-secondary text-foreground border border-border";
 
   return (
@@ -2627,23 +2627,23 @@ function ProspectRow({ r, onOpen }: { r: Card; onOpen: (id: number) => void }) {
       </td>
       <td className="px-3 py-3 whitespace-nowrap">
         <div className="text-[11px] text-muted-foreground">replied</div>
-        <div className={`text-sm tabular-nums ${mine ? "text-[#FFD60A]" : "text-foreground"}`}>{timeAgo(r.last_reply_at)}</div>
+        <div className={`text-sm tabular-nums ${mine ? "text-gold-ink" : "text-foreground"}`}>{timeAgo(r.last_reply_at)}</div>
       </td>
       <td className="px-3 py-3">
-        <span className={`inline-block w-2 h-2 rounded-full ${r.build_delivered ? "bg-[#26D07C]" : r.has_build ? "bg-[#FFD60A]" : "bg-muted-foreground/40"}`}
+        <span className={`inline-block w-2 h-2 rounded-full ${r.build_delivered ? "bg-signal" : r.has_build ? "bg-gold" : "bg-muted-foreground/40"}`}
           title={r.build_delivered ? "Build delivered" : r.has_build ? "Build ready" : "No Build"} />
       </td>
       <td className="px-4 py-3 text-right">
         {r.waiting_on === "us" ? (
           <span className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium ${
-            r.wants_meeting ? "bg-[#26D07C]/15 text-[#26D07C]" : "bg-[#FFD60A]/12 text-[#FFD60A]"}`}>
+            r.wants_meeting ? "bg-signal/15 text-signal-ink" : "bg-gold/12 text-gold-ink"}`}>
             {r.wants_meeting ? "Book" : "Reply"}
           </span>
         ) : r.waiting_on === "them" ? (
           <span className="text-xs text-muted-foreground">
             {r.next_channel ? `next: ${r.next_channel} ${isDue(r.next_touch_at) ? "due" : fmtDate(r.next_touch_at)}` : "waiting"}
           </span>
-        ) : <span className="text-xs text-[#26D07C]">booked</span>}
+        ) : <span className="text-xs text-signal-ink">booked</span>}
       </td>
     </tr>
   );
@@ -2656,11 +2656,11 @@ function PipelineSection({ title, hint, rows, onOpen, accent }: {
   return (
     <div className="mb-6">
       <div className="flex items-center gap-2 mb-2">
-        <h2 className={`text-sm font-semibold ${accent ? "text-[#FFD60A]" : "text-foreground"}`}>{title}</h2>
+        <h2 className={`text-sm font-semibold ${accent ? "text-gold-ink" : "text-foreground"}`}>{title}</h2>
         <span className="text-xs text-muted-foreground tabular-nums">{rows.length}</span>
         {hint && <span className="text-xs text-muted-foreground ml-auto">{hint}</span>}
       </div>
-      <div className={`bg-card border rounded-xl overflow-hidden ${accent ? "border-[#FFD60A]/30" : "border-border"}`}>
+      <div className={`bg-card border rounded-xl overflow-hidden ${accent ? "border-gold/30" : "border-border"}`}>
         <div className="overflow-x-auto">
           <table className="w-full text-sm"><tbody>
             {rows.map((r) => <ProspectRow key={r.id} r={r} onOpen={onOpen} />)}
@@ -2701,22 +2701,22 @@ function BoardCard({ r, onOpen }: { r: Card; onOpen: (id: number) => void }) {
   const callClock = r.stage === "discovery_booked"
     ? (r.call_at
         ? (new Date(r.call_at).getTime() < Date.now() && !r.call_held_at
-            ? { text: "call missed · rebook", cls: "text-[#ff9b9b]" }
-            : { text: `call ${fmtDate(r.call_at)}`, cls: "text-[#26D07C]" })
-        : { text: "no date · book it", cls: "text-[#FFD60A]" })
+            ? { text: "call missed · rebook", cls: "text-danger-soft" }
+            : { text: `call ${fmtDate(r.call_at)}`, cls: "text-signal-ink" })
+        : { text: "no date · book it", cls: "text-gold-ink" })
     : null;
   // The footer clock reads differently per column: when the ball is with us it's a
   // "silent for N days" debt (loud past 3d); when it's on them it's the next scheduled
   // nudge; when closed it's the stage. This is the single most action-driving line.
   const clock = callClock ??
     (r.waiting_on === "us"
-      ? { text: owed <= 0 ? "replied today" : `${owed}d silent`, cls: owed >= 7 ? "text-[#ff9b9b]" : owed >= 3 ? "text-[#f0b45f]" : "text-muted-foreground" }
+      ? { text: owed <= 0 ? "replied today" : `${owed}d silent`, cls: owed >= 7 ? "text-danger-soft" : owed >= 3 ? "text-warn" : "text-muted-foreground" }
       : r.waiting_on === "them"
       ? (r.gone_quiet_days
           // We answered, they went silent, nothing is scheduled: without this the
           // card fell out of every queue forever (the Hisham blind spot).
-          ? { text: `quiet ${r.gone_quiet_days}d · nudge due`, cls: "text-[#FFD60A]" }
-          : { text: r.next_touch_at ? (isDue(r.next_touch_at) ? "nudge due" : `next ${fmtDate(r.next_touch_at)}`) : timeAgo(r.last_touch_at), cls: r.next_touch_at && isDue(r.next_touch_at) ? "text-[#FFD60A]" : "text-muted-foreground" })
+          ? { text: `quiet ${r.gone_quiet_days}d · nudge due`, cls: "text-gold-ink" }
+          : { text: r.next_touch_at ? (isDue(r.next_touch_at) ? "nudge due" : `next ${fmtDate(r.next_touch_at)}`) : timeAgo(r.last_touch_at), cls: r.next_touch_at && isDue(r.next_touch_at) ? "text-gold-ink" : "text-muted-foreground" })
       : { text: r.stage_label || r.status_label, cls: "text-muted-foreground" });
   return (
     <div role="button" tabIndex={0} draggable
@@ -2724,7 +2724,7 @@ function BoardCard({ r, onOpen }: { r: Card; onOpen: (id: number) => void }) {
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(r.id); } }}
       onMouseEnter={() => loadDetail(r.id)}
       onDragStart={(e) => e.dataTransfer.setData("text/plain", String(r.id))}
-      className={`w-full text-left bg-card border border-border rounded-xl p-[18px] hover:border-[#FFD60A]/50 focus:outline-none focus:ring-1 focus:ring-[#FFD60A]/40 cursor-pointer transition-colors ${rotEdge(r)}`}>
+      className={`w-full text-left bg-card border border-border rounded-xl p-[18px] hover:border-gold/50 focus:outline-none focus:ring-1 focus:ring-gold/40 cursor-pointer transition-colors ${rotEdge(r)}`}>
       {/* logo + COMPANY (primary) · person · title — heat + NEW top-right */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-start gap-2.5 min-w-0">
@@ -2742,7 +2742,7 @@ function BoardCard({ r, onOpen }: { r: Card; onOpen: (id: number) => void }) {
         </div>
         <div className="flex items-center gap-1 shrink-0">
           {isNew && (
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-[#FFD60A] text-[#0A0E1A]" title="Fresh reply — came in within the last 24h">NEW</span>
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-gold text-ink-inverse" title="Fresh reply — came in within the last 24h">NEW</span>
           )}
           {r.waiting_on !== "closed" && (
             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${h.cls}`} title={`Heat ${r.heat}${r.heat_reason ? " · " + r.heat_reason : ""}`}>
@@ -2754,7 +2754,7 @@ function BoardCard({ r, onOpen }: { r: Card; onOpen: (id: number) => void }) {
 
       {/* their actual words — the context that makes this a cockpit, not a list */}
       {cleanSnippet(r.reply_snippet) && (
-        <p className="mt-2.5 text-[12px] leading-snug text-muted-foreground/90 line-clamp-2 border-l-2 border-[#FFD60A]/25 pl-2.5">
+        <p className="mt-2.5 text-[12px] leading-snug text-muted-foreground/90 line-clamp-2 border-l-2 border-gold/25 pl-2.5">
           {cleanSnippet(r.reply_snippet)}
         </p>
       )}
@@ -2762,21 +2762,21 @@ function BoardCard({ r, onOpen }: { r: Card; onOpen: (id: number) => void }) {
       {/* meta: country · value · the action-driving clock (the column already tells the stage) */}
       <div className="flex items-center gap-1.5 mt-3 text-[11px]">
         {r.country && <span className="text-muted-foreground/70 truncate max-w-[7rem]">{countryFlag(r.country) && <span className="mr-1">{countryFlag(r.country)}</span>}{r.country}</span>}
-        {r.deal_amount != null && <span className="text-[#26D07C] font-semibold tabular-nums">${Number(r.deal_amount).toLocaleString()}</span>}
+        {r.deal_amount != null && <span className="text-signal-ink font-semibold tabular-nums">${Number(r.deal_amount).toLocaleString()}</span>}
         <span className={`ml-auto tabular-nums ${clock.cls}`}>{clock.text}</span>
       </div>
 
       {/* pulse — who moved last, with direction: ↙ they replied · ↗ we sent (+channel) */}
       <div className="flex items-center gap-2.5 mt-1.5 text-[10px]">
-        <span title="Last time THEY wrote to us" className="text-[#5aa2ff]/85">↙ they replied <span className="tabular-nums">{agoShort(r.last_reply_at)}</span></span>
+        <span title="Last time THEY wrote to us" className="text-info/85">↙ they replied <span className="tabular-nums">{agoShort(r.last_reply_at)}</span></span>
         {/* EMAIL clock only — a call or WhatsApp never paints this line (email decides the turn) */}
-        <span title="Last EMAIL we sent them" className="text-[#26D07C]/80">↗ we sent <span className="tabular-nums">{agoShort(r.last_email_touch_at ?? r.last_touch_at)}</span>{r.last_email_touch_at ? " · Email" : (r.last_channel ? ` · ${chLabel(r.last_channel)}` : "")}</span>
+        <span title="Last EMAIL we sent them" className="text-signal-ink/80">↗ we sent <span className="tabular-nums">{agoShort(r.last_email_touch_at ?? r.last_touch_at)}</span>{r.last_email_touch_at ? " · Email" : (r.last_channel ? ` · ${chLabel(r.last_channel)}` : "")}</span>
       </div>
 
       {/* channels — reachability at a glance + one-click open (email / call / WhatsApp / LinkedIn / Build) */}
       <div className="flex items-center gap-0.5 mt-1.5 -ml-1 pt-1.5 border-t border-border/40">
         {wantsMeet && (
-          <span title="Asked to meet — send times / book" className="grid place-items-center w-6 h-6 text-[#FFD60A] shrink-0">
+          <span title="Asked to meet — send times / book" className="grid place-items-center w-6 h-6 text-gold-ink shrink-0">
             <CalendarClock className="w-3.5 h-3.5" />
           </span>
         )}
@@ -2785,7 +2785,7 @@ function BoardCard({ r, onOpen }: { r: Card; onOpen: (id: number) => void }) {
         <TileAction href={waHref} active={!!r.phone} title="WhatsApp" color="#25D366"><MessageCircle className="w-3.5 h-3.5" /></TileAction>
         <TileAction href={r.linkedin_url || liHref} active={!!r.has_linkedin} title="LinkedIn profile" color="#0A66C2"><Link2 className="w-3.5 h-3.5" /></TileAction>
         <TileAction href={r.build_url || undefined} active={!!r.build_url} title={r.build_delivered ? "Build delivered — open" : "Build ready — open"} color={r.build_delivered ? "#26D07C" : "#FFD60A"}><Magnet className="w-3.5 h-3.5" /></TileAction>
-        {r.build_delivered && <span className="text-[9px] text-[#26D07C] ml-0.5" title="Build delivered to prospect">sent</span>}
+        {r.build_delivered && <span className="text-[9px] text-signal-ink ml-0.5" title="Build delivered to prospect">sent</span>}
       </div>
     </div>
   );
@@ -2823,11 +2823,11 @@ function TodoRow({ r, onOpen, onChanged }: { r: Card; onOpen: (id: number) => vo
             {r.company || r.email} <span className="text-muted-foreground font-normal">· {r.name}</span>
           </div>
           <div className="text-[11px] text-muted-foreground truncate">
-            <span className={owe || due ? "text-[#FFD60A]" : ""}>{label}</span>{r.job_title ? ` · ${r.job_title}` : ""}
+            <span className={owe || due ? "text-gold-ink" : ""}>{label}</span>{r.job_title ? ` · ${r.job_title}` : ""}
           </div>
         </div>
       </button>
-      <span className={`text-[11px] tabular-nums shrink-0 hidden sm:block ${owe || due ? "text-[#FFD60A]" : "text-muted-foreground"}`}>{when}</span>
+      <span className={`text-[11px] tabular-nums shrink-0 hidden sm:block ${owe || due ? "text-gold-ink" : "text-muted-foreground"}`}>{when}</span>
       <div className="flex items-center gap-0.5 shrink-0">
         <TileAction href={`mailto:${r.email}`} active={!!r.email} title="Email" color="#EA4335"><Mail className="w-3.5 h-3.5" /></TileAction>
         <TileAction href={r.phone ? `tel:${r.phone.replace(/[^\d+]/g, "")}` : undefined} active={!!r.phone} title="Call" color="#e6e6e6"><Phone className="w-3.5 h-3.5" /></TileAction>
@@ -2836,7 +2836,7 @@ function TodoRow({ r, onOpen, onChanged }: { r: Card; onOpen: (id: number) => vo
         <TileAction href={r.build_url || undefined} active={!!r.build_url} title="Build" color={r.build_delivered ? "#26D07C" : "#FFD60A"}><Magnet className="w-3.5 h-3.5" /></TileAction>
       </div>
       <button onClick={done} disabled={busy} title="Mark this step done — logs the touch and passes the ball to them"
-        className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-[#26D07C]/40 px-2.5 py-1.5 text-xs text-[#26D07C] hover:bg-[#26D07C]/10 disabled:opacity-40 transition-colors">
+        className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-signal/40 px-2.5 py-1.5 text-xs text-signal-ink hover:bg-signal/10 disabled:opacity-40 transition-colors">
         {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} Done
       </button>
     </div>
@@ -2850,11 +2850,11 @@ function TodoSection({ title, hint, rows, accent, onOpen, onChanged }: {
   return (
     <div>
       <div className="flex items-center gap-2 mb-2">
-        <h2 className={`text-sm font-semibold ${accent ? "text-[#FFD60A]" : "text-foreground"}`}>{title}</h2>
+        <h2 className={`text-sm font-semibold ${accent ? "text-gold-ink" : "text-foreground"}`}>{title}</h2>
         <span className="text-xs text-muted-foreground tabular-nums">{rows.length}</span>
         {hint && <span className="text-xs text-muted-foreground ml-auto">{hint}</span>}
       </div>
-      <div className={`bg-card border rounded-xl overflow-hidden ${accent ? "border-[#FFD60A]/30" : "border-border"}`}>
+      <div className={`bg-card border rounded-xl overflow-hidden ${accent ? "border-gold/30" : "border-border"}`}>
         {rows.map((r) => <TodoRow key={r.id} r={r} onOpen={onOpen} onChanged={onChanged} />)}
       </div>
     </div>
@@ -2879,8 +2879,8 @@ function BoardColumn({ title, hint, accent, tone, rows, onOpen, onDrop }: {
   rows: Card[]; onOpen: (id: number) => void; onDrop?: (id: number) => void;
 }) {
   const [over, setOver] = useState(false);
-  const ring = tone === "green" ? "bg-[#26D07C]/8 ring-1 ring-[#26D07C]/40"
-    : tone === "muted" ? "bg-muted/20 ring-1 ring-border" : "bg-[#FFD60A]/6 ring-1 ring-[#FFD60A]/40";
+  const ring = tone === "green" ? "bg-signal/8 ring-1 ring-signal/40"
+    : tone === "muted" ? "bg-muted/20 ring-1 ring-border" : "bg-gold/6 ring-1 ring-gold/40";
   return (
     <div
       onDragOver={onDrop ? (e) => { e.preventDefault(); setOver(true); } : undefined}
@@ -2889,7 +2889,7 @@ function BoardColumn({ title, hint, accent, tone, rows, onOpen, onDrop }: {
       className={`shrink-0 w-[24.5rem] rounded-2xl p-2.5 border transition-colors ${over ? ring : "bg-white/[0.018] border-white/[0.055]"}`}>
       <div className="px-2 py-1.5 mb-1 border-b border-border/60">
         <div className="flex items-center gap-2">
-          <h3 className={`text-xs font-semibold uppercase tracking-wide ${accent ? "text-[#FFD60A]" : tone === "green" ? "text-[#26D07C]" : "text-foreground"}`}>{title}</h3>
+          <h3 className={`text-xs font-semibold uppercase tracking-wide ${accent ? "text-gold-ink" : tone === "green" ? "text-signal-ink" : "text-foreground"}`}>{title}</h3>
           <span className="text-xs text-muted-foreground tabular-nums ml-auto">{rows.length}</span>
         </div>
         {hint && <p className="text-[10px] text-muted-foreground/70 mt-0.5">{hint}</p>}
@@ -3125,19 +3125,19 @@ export function CrmBoard({ workspace, basePath = "/crm", live = true, canBuild =
         <div className="relative flex-1 min-w-[180px] max-w-md">
           <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, company, email…"
-            className="w-full bg-card border border-border rounded-lg pl-9 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-[#FFD60A]/50" />
+            className="w-full bg-card border border-border rounded-lg pl-9 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-gold/50" />
         </div>
         <div className="flex items-center bg-card border border-border rounded-lg p-0.5 shrink-0">
           <button onClick={() => setView("board")}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${view === "board" ? "bg-[#FFD60A]/12 text-[#FFD60A]" : "text-muted-foreground"}`}>
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${view === "board" ? "bg-gold/12 text-gold-ink" : "text-muted-foreground"}`}>
             <LayoutGrid className="w-4 h-4" /> Board
           </button>
           <button onClick={() => setView("queue")}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${view === "queue" ? "bg-[#FFD60A]/12 text-[#FFD60A]" : "text-muted-foreground"}`}>
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${view === "queue" ? "bg-gold/12 text-gold-ink" : "text-muted-foreground"}`}>
             <List className="w-4 h-4" /> Queue
           </button>
           <button onClick={() => setView("todos")}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${view === "todos" ? "bg-[#FFD60A]/12 text-[#FFD60A]" : "text-muted-foreground"}`}>
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${view === "todos" ? "bg-gold/12 text-gold-ink" : "text-muted-foreground"}`}>
             <Check className="w-4 h-4" /> To-dos
           </button>
         </div>
@@ -3152,8 +3152,8 @@ export function CrmBoard({ workspace, basePath = "/crm", live = true, canBuild =
       {funnel && (
         <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-4">
           <Tile label="⚡ Your turn" value={funnel.waiting_us} accent active={filters.has("us")} onClick={() => toggleFilter("us")} />
-          <Tile label="⏰ Due" value={funnel.due_now} icon={funnel.due_now > 0 ? <CalendarClock className="w-4 h-4 text-[#FFD60A]" /> : undefined} active={filters.has("nudge")} onClick={() => toggleFilter("nudge")} />
-          <Tile label="Hot now" value={funnel.hot_now} icon={<Flame className="w-4 h-4 text-[#ff9b9b]" />} active={filters.has("hot")} onClick={() => toggleFilter("hot")} />
+          <Tile label="⏰ Due" value={funnel.due_now} icon={funnel.due_now > 0 ? <CalendarClock className="w-4 h-4 text-gold-ink" /> : undefined} active={filters.has("nudge")} onClick={() => toggleFilter("nudge")} />
+          <Tile label="Hot now" value={funnel.hot_now} icon={<Flame className="w-4 h-4 text-danger-soft" />} active={filters.has("hot")} onClick={() => toggleFilter("hot")} />
           <Tile label="Want to meet" value={funnel.wants_meeting} active={filters.has("wants")} onClick={() => toggleFilter("wants")} />
           <Tile label="Waiting on them" value={funnel.waiting_them} active={filters.has("them")} onClick={() => toggleFilter("them")} />
           <Tile label="Meetings" value={funnel.by_status?.meeting_booked?.count || 0} active={filters.has("meetings")} onClick={() => toggleFilter("meetings")} />
@@ -3165,7 +3165,7 @@ export function CrmBoard({ workspace, basePath = "/crm", live = true, canBuild =
       <div className="flex items-center gap-1.5 flex-wrap mb-3">
         <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortKey)}
           title="Sort each column"
-          className="bg-card border border-border rounded-full px-2.5 py-1 text-[11px] text-muted-foreground hover:text-foreground focus:outline-none focus:ring-1 focus:ring-[#FFD60A]/40 cursor-pointer shrink-0">
+          className="bg-card border border-border rounded-full px-2.5 py-1 text-[11px] text-muted-foreground hover:text-foreground focus:outline-none focus:ring-1 focus:ring-gold/40 cursor-pointer shrink-0">
           {SORT_OPTIONS.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
         </select>
         <span className="w-px h-4 bg-border mx-1" />
@@ -3173,14 +3173,14 @@ export function CrmBoard({ workspace, basePath = "/crm", live = true, canBuild =
           const on = filters.has(f.key);
           return (
             <button key={f.key} onClick={() => toggleFilter(f.key)} title={f.group}
-              className={`text-[11px] rounded-full border px-2.5 py-1 transition-colors ${on ? "bg-[#FFD60A]/15 border-[#FFD60A]/50 text-[#FFD60A] font-medium" : "border-border text-muted-foreground hover:text-foreground hover:border-[#FFD60A]/30"}`}>
+              className={`text-[11px] rounded-full border px-2.5 py-1 transition-colors ${on ? "bg-gold/15 border-gold/50 text-gold-ink font-medium" : "border-border text-muted-foreground hover:text-foreground hover:border-gold/30"}`}>
               {f.label}
             </button>
           );
         })}
         {filters.size > 0 && (
           <button onClick={() => setFilters(new Set())}
-            className="text-[11px] rounded-full border border-border px-2.5 py-1 text-muted-foreground hover:text-[#ff9b9b] hover:border-[#ff9b9b]/40 inline-flex items-center gap-1 transition-colors">
+            className="text-[11px] rounded-full border border-border px-2.5 py-1 text-muted-foreground hover:text-danger-soft hover:border-danger-soft/40 inline-flex items-center gap-1 transition-colors">
             Clear all ({filters.size}) <X className="w-3 h-3" />
           </button>
         )}

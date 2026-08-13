@@ -29,16 +29,16 @@ function fmtDate(iso: string): string {
 function Marker({ status }: { status: RoadmapStatus }) {
   if (status === "done") {
     return (
-      <span className="absolute left-0 top-1 grid place-items-center w-4 h-4 rounded-full bg-[#26D07C] shadow-[0_0_8px_rgba(38,208,124,0.45)]">
-        <Check className="w-2.5 h-2.5 text-[#0A0E1A]" strokeWidth={3.5} />
+      <span className="absolute left-0 top-1 grid place-items-center w-4 h-4 rounded-full bg-signal shadow-[0_0_8px_rgba(38,208,124,0.45)]">
+        <Check className="w-2.5 h-2.5 text-ink-inverse" strokeWidth={3.5} />
       </span>
     );
   }
   if (status === "in_progress") {
     return (
       <span className="absolute left-0 top-1 grid place-items-center w-4 h-4">
-        <span className="absolute inset-0 rounded-full bg-[#FFD60A]/30 animate-ping" />
-        <span className="relative w-2.5 h-2.5 rounded-full bg-[#FFD60A] shadow-[0_0_10px_rgba(255,214,10,0.7)]" />
+        <span className="absolute inset-0 rounded-full bg-gold/30 animate-ping" />
+        <span className="relative w-2.5 h-2.5 rounded-full bg-gold shadow-[0_0_10px_rgba(255,214,10,0.7)]" />
       </span>
     );
   }
@@ -75,14 +75,14 @@ export function RoadmapView({ wsName, items }: { wsName: string; items: RoadmapI
         }
         actions={
           <span className="inline-flex items-center gap-2 text-[11px] text-muted-foreground">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#26D07C] shadow-[0_0_6px_#26D07C] animate-pulse" /> live
+            <span className="w-1.5 h-1.5 rounded-full bg-signal shadow-[0_0_6px_var(--glow-signal)] animate-pulse" /> live
           </span>
         }
       />
 
       {items.length === 0 ? (
         <Panel className="p-8 flex flex-col items-center gap-2 text-center">
-          <span className="grid place-items-center w-10 h-10 rounded-lg bg-[#FFD60A]/10 text-[#FFD60A] border border-[#FFD60A]/20">
+          <span className="grid place-items-center w-10 h-10 rounded-lg bg-gold/10 text-gold-ink border border-gold/20">
             <Route className="w-5 h-5" />
           </span>
           <div className="text-[14px] font-semibold text-foreground mt-1">Nothing here yet</div>
@@ -104,11 +104,11 @@ export function RoadmapView({ wsName, items }: { wsName: string; items: RoadmapI
                 <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
                   Delivery progress
                 </span>
-                <span className="text-[11px] tabular-nums font-semibold text-[#26D07C]">{pct}%</span>
+                <span className="text-[11px] tabular-nums font-semibold text-signal-ink">{pct}%</span>
               </div>
               <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
                 <div
-                  className="h-full rounded-full bg-[#26D07C] shadow-[0_0_8px_rgba(38,208,124,0.5)]"
+                  className="h-full rounded-full bg-signal shadow-[0_0_8px_rgba(38,208,124,0.5)]"
                   style={{ width: `${pct}%` }}
                 />
               </div>
@@ -130,14 +130,14 @@ export function RoadmapView({ wsName, items }: { wsName: string; items: RoadmapI
                           className={cn(
                             "absolute left-[7px] top-6 -bottom-7 w-px",
                             item.status === "done" && items[i + 1].status === "done"
-                              ? "bg-[#26D07C]/30"
+                              ? "bg-signal/30"
                               : "bg-border"
                           )}
                         />
                       )}
                       <Marker status={item.status} />
                       {i === upNextIdx && (
-                        <SectionLabel className="mb-2 text-[#FFD60A]">Up next</SectionLabel>
+                        <SectionLabel className="mb-2 text-gold-ink">Up next</SectionLabel>
                       )}
                       <div className="flex items-center gap-2.5 flex-wrap">
                         <span className="text-[11px] tabular-nums text-muted-foreground">
