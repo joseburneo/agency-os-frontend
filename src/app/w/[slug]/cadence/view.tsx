@@ -19,7 +19,7 @@ function Heading({ h }: { h: { pre: string; accent: string; post: string } }) {
   return (
     <h2 className="text-lg md:text-xl font-bold tracking-tight text-foreground">
       {h.pre}
-      <span className="text-[#FFD60A]">{h.accent}</span>
+      <span className="text-gold-ink">{h.accent}</span>
       {h.post}
     </h2>
   );
@@ -28,7 +28,7 @@ function Heading({ h }: { h: { pre: string; accent: string; post: string } }) {
 // Gold-tinted footnote box, used for the closing rationale of each section.
 function Note({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border border-[#FFD60A]/25 bg-[#FFD60A]/[0.06] p-4 text-[13px] leading-relaxed text-foreground/90">
+    <div className="rounded-lg border border-gold/25 bg-gold/[0.06] p-4 text-[13px] leading-relaxed text-foreground/90">
       {children}
     </div>
   );
@@ -82,7 +82,7 @@ export function CadenceView({ wsName, content }: { wsName: string; content: Cade
           desc={`The full journey for every ${wsName} prospect, and exactly when and how much we send.`}
         />
         <Panel className="p-8 flex flex-col items-center gap-2 text-center">
-          <span className="grid place-items-center w-10 h-10 rounded-lg bg-[#FFD60A]/10 text-[#FFD60A] border border-[#FFD60A]/20">
+          <span className="grid place-items-center w-10 h-10 rounded-lg bg-gold/10 text-gold-ink border border-gold/20">
             <CalendarClock className="w-5 h-5" />
           </span>
           <div className="text-[14px] font-semibold text-foreground mt-1">Nothing here yet</div>

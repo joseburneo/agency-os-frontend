@@ -53,12 +53,12 @@ export default async function ProposalPage({ params }: { params: Promise<{ slug:
 
       {/* ── The pipeline, stage by stage ─────────────────────────────── */}
       <Panel className="p-5">
-        <div className="text-[13px] font-bold tracking-wide text-[#FFD60A] mb-1">{"// EL_PIPELINE · DE LA LISTA A LA REUNIÓN"}</div>
+        <div className="text-[13px] font-bold tracking-wide text-gold-ink mb-1">{"// EL_PIPELINE · DE LA LISTA A LA REUNIÓN"}</div>
         <p className="text-sm text-muted-foreground mb-4">Ocho etapas. Cada una con su herramienta, cada herramienta ya integrada. Vosotros veis el resultado; la plataforma opera el resto.</p>
         <div className="divide-y divide-border">
           {STAGES.map((s) => (
             <div key={s.n} className="py-3 grid grid-cols-1 md:grid-cols-[44px_1fr_auto] gap-2 md:gap-4 items-start">
-              <div className="text-[#FFD60A] font-bold text-sm pt-0.5">{s.n}</div>
+              <div className="text-gold-ink font-bold text-sm pt-0.5">{s.n}</div>
               <div>
                 <div className="font-semibold text-foreground text-sm">{s.title}</div>
                 <div className="text-[13px] text-muted-foreground leading-relaxed">{s.what}</div>
@@ -75,7 +75,7 @@ export default async function ProposalPage({ params }: { params: Promise<{ slug:
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Panel className="p-5">
           <div className="flex items-center gap-2 mb-2">
-            <Server className="h-4 w-4 text-[#FFD60A]" />
+            <Server className="h-4 w-4 text-gold-ink" />
             <span className="text-sm font-bold text-foreground">Dominios de envío</span>
           </div>
           <p className="text-[13px] text-muted-foreground mb-3">Comprados a precio de registrador, sin margen (≈ $10–12 al año por dominio). Con dominios de reserva para la rotación: si un spam house lista uno, otro entra a trabajar.</p>
@@ -87,7 +87,7 @@ export default async function ProposalPage({ params }: { params: Promise<{ slug:
         </Panel>
         <Panel className="p-5">
           <div className="flex items-center gap-2 mb-2">
-            <Server className="h-4 w-4 text-[#FFD60A]" />
+            <Server className="h-4 w-4 text-gold-ink" />
             <span className="text-sm font-bold text-foreground">Cuentas de correo</span>
           </div>
           <p className="text-[13px] text-muted-foreground mb-3">Cuentas certificadas (≈ $3–4 al mes por buzón), mitad Google y mitad Microsoft: así el correo llega bien a los dos mundos. Siempre calentándose, enviando como personas.</p>
@@ -98,7 +98,7 @@ export default async function ProposalPage({ params }: { params: Promise<{ slug:
         </Panel>
         <Panel className="p-5">
           <div className="flex items-center gap-2 mb-2">
-            <ShieldCheck className="h-4 w-4 text-[#26D07C]" />
+            <ShieldCheck className="h-4 w-4 text-signal-ink" />
             <span className="text-sm font-bold text-foreground">Vigilancia de deliverability</span>
           </div>
           <p className="text-[13px] text-muted-foreground mb-3">Vuestros ~10 dominios y los nuevos, monitoreados contra los spam houses con alertas por webhook. Si uno cae en una lista, lo sabemos ese día, no cuando la campaña muere.</p>
@@ -109,7 +109,7 @@ export default async function ProposalPage({ params }: { params: Promise<{ slug:
         </Panel>
         <Panel className="p-5">
           <div className="flex items-center gap-2 mb-2">
-            <ShieldCheck className="h-4 w-4 text-[#26D07C]" />
+            <ShieldCheck className="h-4 w-4 text-signal-ink" />
             <span className="text-sm font-bold text-foreground">GDPR</span>
           </div>
           <p className="text-[13px] text-muted-foreground mb-3">Política de privacidad e interés legítimo publicada online, footer de cumplimiento en cada correo, y supresión inmediata de quien pida no recibir más. Vender a Europa exige esto; viene incluido.</p>
@@ -122,8 +122,8 @@ export default async function ProposalPage({ params }: { params: Promise<{ slug:
       {/* ── Models ───────────────────────────────────────────────────── */}
       <Panel className="p-5">
         <div className="flex items-center gap-2 mb-1">
-          <Cpu className="h-4 w-4 text-[#FFD60A]" />
-          <span className="text-[13px] font-bold tracking-wide text-[#FFD60A]">{"// LOS_MODELOS · QUIÉN HACE QUÉ"}</span>
+          <Cpu className="h-4 w-4 text-gold-ink" />
+          <span className="text-[13px] font-bold tracking-wide text-gold-ink">{"// LOS_MODELOS · QUIÉN HACE QUÉ"}</span>
         </div>
         <p className="text-sm text-muted-foreground mb-4">La regla: el mejor modelo donde el texto lo lee un humano que importa; agentes en paralelo donde es volumen. Millones de tokens por campaña.</p>
         <div className="divide-y divide-border">
@@ -138,7 +138,7 @@ export default async function ProposalPage({ params }: { params: Promise<{ slug:
 
       {/* ── The prospect card, live example ──────────────────────────── */}
       <Panel className="p-5">
-        <div className="text-[13px] font-bold tracking-wide text-[#FFD60A] mb-1">{"// LA_FICHA · ASÍ SE VE CADA CONTACTO QUE RESPONDE"}</div>
+        <div className="text-[13px] font-bold tracking-wide text-gold-ink mb-1">{"// LA_FICHA · ASÍ SE VE CADA CONTACTO QUE RESPONDE"}</div>
         <p className="text-sm text-muted-foreground mb-4">Ejemplo real de vuestra propia lista. Cuando alguien responde, esta ficha ya existe: el contexto no se busca, ya está.</p>
         <div className="rounded-lg border border-border bg-white/[0.02] p-4 grid grid-cols-1 lg:grid-cols-[1fr_1.1fr] gap-4">
           <div>
@@ -146,13 +146,13 @@ export default async function ProposalPage({ params }: { params: Promise<{ slug:
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={fav("gustoworld.com")} alt="" width={28} height={28} style={{ borderRadius: 6 }} />
               <div>
-                <div className="font-semibold text-foreground text-sm">Christophe Heynen <span className="ml-2 rounded-full border border-[#26D07C]/50 bg-[#0F3D2A] px-2 py-0.5 text-[10px] text-[#26D07C]">Warm</span></div>
+                <div className="font-semibold text-foreground text-sm">Christophe Heynen <span className="ml-2 rounded-full border border-signal/50 bg-signal-dim px-2 py-0.5 text-[10px] text-signal-ink">Warm</span></div>
                 <div className="text-xs text-muted-foreground">Owner · Master of Wine · Gustoworld</div>
               </div>
             </div>
             <div className="flex gap-1 mb-4">
               {["MQL", "SQL", "Discovery", "Proposal", "Won"].map((st, i) => (
-                <span key={st} className={`rounded px-2 py-0.5 text-[10px] ${i === 0 ? "bg-[#FFD60A] text-black font-bold" : "border border-border text-muted-foreground"}`}>{st}</span>
+                <span key={st} className={`rounded px-2 py-0.5 text-[10px] ${i === 0 ? "bg-gold text-black font-bold" : "border border-border text-muted-foreground"}`}>{st}</span>
               ))}
             </div>
             <div className="space-y-1.5 text-[12px] text-muted-foreground">
@@ -162,7 +162,7 @@ export default async function ProposalPage({ params }: { params: Promise<{ slug:
             </div>
           </div>
           <div className="rounded-md border border-border bg-white/[0.02] p-3">
-            <div className="text-[11px] font-bold tracking-widest text-[#FFD60A] mb-2">BUSINESS INTELLIGENCE · POR QUÉ ENCAJA</div>
+            <div className="text-[11px] font-bold tracking-widest text-gold-ink mb-2">BUSINESS INTELLIGENCE · POR QUÉ ENCAJA</div>
             <div className="space-y-2 text-[12px] leading-relaxed">
               <div><span className="text-muted-foreground font-semibold">MEJOR ÁNGULO · </span><span className="text-foreground">Master of Wine al frente de un importador high-end (BE/LUX/FR): el gancho es de candidato a MW a MW, con una selección corta de parcelas, no el porfolio completo.</span></div>
               <div><span className="text-muted-foreground font-semibold">QUÉ VENDEN · </span><span className="text-foreground">Importación y distribución de vino de alta gama para clientes exigentes en Bélgica y Luxemburgo.</span></div>
@@ -176,10 +176,10 @@ export default async function ProposalPage({ params }: { params: Promise<{ slug:
       {/* ── Footer ───────────────────────────────────────────────────── */}
       <Panel className="p-5 flex flex-wrap items-center justify-between gap-3">
         <div className="text-sm text-foreground">
-          <span className="font-bold text-[#FFD60A]">$1,750/mes</span> · todo lo de arriba, operado por nosotros, visible aquí.
+          <span className="font-bold text-gold-ink">$1,750/mes</span> · todo lo de arriba, operado por nosotros, visible aquí.
           <span className="text-muted-foreground"> El cuándo está en el Client Success Roadmap.</span>
         </div>
-        <a href="https://www.luxvance.com/book" className="rounded-md bg-[#FFD60A] px-4 py-2 text-sm font-bold text-black hover:opacity-90 transition-opacity">Agendar la segunda llamada</a>
+        <a href="https://www.luxvance.com/book" className="rounded-md bg-gold px-4 py-2 text-sm font-bold text-black hover:opacity-90 transition-opacity">Agendar la segunda llamada</a>
       </Panel>
     </div>
   );

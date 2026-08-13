@@ -23,7 +23,7 @@ function renderPersonalized(body: string, firstName: string, company: string) {
     out.push(
       <span
         key={i++}
-        className="underline decoration-[#FFD60A]/70 decoration-2 underline-offset-2 text-[#FFD60A]"
+        className="underline decoration-gold-ink/70 decoration-2 underline-offset-2 text-gold-ink"
       >
         {m[0]}
       </span>
@@ -329,7 +329,7 @@ export function TargetListsView({
               href="https://www.luxvance.com/book"
               target="_blank"
               rel="noopener noreferrer"
-              className="shrink-0 inline-flex items-center justify-center gap-2 rounded-lg bg-[#26D07C] px-4 py-2.5 text-[13px] font-semibold text-[#0A0E1A] hover:bg-[#3ad98c] transition-colors"
+              className="shrink-0 inline-flex items-center justify-center gap-2 rounded-lg bg-signal px-4 py-2.5 text-[13px] font-semibold text-ink-inverse hover:bg-signal-hi transition-colors"
             >
               Book the 15 minutes <ExternalLink className="w-3.5 h-3.5" />
             </a>
@@ -348,12 +348,12 @@ export function TargetListsView({
               className={cn(
                 "inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-[13px] transition-colors",
                 active
-                  ? "border-[#FFD60A]/40 bg-[#FFD60A]/10 text-[#FFD60A]"
+                  ? "border-gold/40 bg-gold/10 text-gold-ink"
                   : "border-border bg-card text-muted-foreground hover:text-foreground hover:border-white/20"
               )}
             >
               {l.name}
-              <span className={cn("tabular-nums text-[11px] rounded-md px-1.5 py-0.5", active ? "bg-[#FFD60A]/15" : "bg-white/5")}>
+              <span className={cn("tabular-nums text-[11px] rounded-md px-1.5 py-0.5", active ? "bg-gold/15" : "bg-white/5")}>
                 {l.count.toLocaleString()}
               </span>
             </button>
@@ -379,9 +379,9 @@ export function TargetListsView({
           are excluded from the automated sequence and worked personally, in order:
           email first, then the LinkedIn invite, then the call. */}
       {isVip && (
-        <Panel className="p-4 border-[#FFD60A]/25 bg-[#FFD60A]/[0.03]">
+        <Panel className="p-4 border-gold/25 bg-gold/[0.03]">
           <div className="flex items-center gap-2 mb-2">
-            <Star className="w-4 h-4 text-[#FFD60A]" />
+            <Star className="w-4 h-4 text-gold-ink" />
             <span className="text-sm font-semibold text-foreground">How to action each VIP</span>
             <Pill tone="gold">white-glove</Pill>
           </div>
@@ -420,7 +420,7 @@ export function TargetListsView({
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search name, company, sector…"
-            className="w-full h-10 rounded-lg border border-border bg-input pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-[#FFD60A]/40"
+            className="w-full h-10 rounded-lg border border-border bg-input pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-gold/40"
           />
         </div>
         <span className="text-[11px] text-muted-foreground tabular-nums whitespace-nowrap">
@@ -572,7 +572,7 @@ export function TargetListsView({
                             }
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 rounded-md border border-[#26D07C]/25 bg-[#26D07C]/10 px-2.5 py-1.5 text-[12px] font-medium text-[#26D07C] hover:bg-[#26D07C]/15 transition-colors"
+                            className="inline-flex items-center gap-1.5 rounded-md border border-signal/25 bg-signal/10 px-2.5 py-1.5 text-[12px] font-medium text-signal-ink hover:bg-signal/15 transition-colors"
                           >
                             <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
                           </a>
@@ -588,7 +588,7 @@ export function TargetListsView({
                             className={cn(
                               "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[12px] font-mono transition-colors",
                               copied === `ph-${l.id}`
-                                ? "border-[#26D07C]/30 bg-[#26D07C]/10 text-[#26D07C]"
+                                ? "border-signal/30 bg-signal/10 text-signal-ink"
                                 : "border-border bg-card text-muted-foreground hover:text-foreground hover:border-white/20"
                             )}
                           >
@@ -614,7 +614,7 @@ export function TargetListsView({
                         <button
                           type="button"
                           onClick={() => openCompose(l)}
-                          className="inline-flex items-center gap-1.5 rounded-md border border-[#FFD60A]/25 bg-[#FFD60A]/10 px-2.5 py-1.5 text-[12px] font-medium text-[#FFD60A] hover:bg-[#FFD60A]/15 transition-colors"
+                          className="inline-flex items-center gap-1.5 rounded-md border border-gold/25 bg-gold/10 px-2.5 py-1.5 text-[12px] font-medium text-gold-ink hover:bg-gold/15 transition-colors"
                           title={`Opens your mail app to ${l.hasEmail ? l.emailDisplay : "the lead"}, ready to send`}
                         >
                           <Send className="w-3.5 h-3.5" /> Send
@@ -640,7 +640,7 @@ export function TargetListsView({
                           className={cn(
                             "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors",
                             magnet
-                              ? "border border-[#FFD60A]/25 bg-[#FFD60A]/10 text-[#FFD60A] hover:bg-[#FFD60A]/15"
+                              ? "border border-gold/25 bg-gold/10 text-gold-ink hover:bg-gold/15"
                               : "border border-border bg-card text-foreground hover:border-white/20"
                           )}
                         >
@@ -733,7 +733,7 @@ export function TargetListsView({
                         onClick={() => setPreviewStep(n)}
                         className={`rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors ${
                           active
-                            ? "border border-[#FFD60A]/30 bg-[#FFD60A]/10 text-[#FFD60A]"
+                            ? "border border-gold/30 bg-gold/10 text-gold-ink"
                             : "border border-border bg-card text-muted-foreground hover:text-foreground hover:border-white/20"
                         }`}
                       >
@@ -747,7 +747,7 @@ export function TargetListsView({
                       onClick={() => setPreviewStep(0)}
                       className={`rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors ${
                         previewStep === 0
-                          ? "border border-[#5aa2ff]/40 bg-[#5aa2ff]/10 text-[#8ec2ff]"
+                          ? "border border-info/40 bg-info/10 text-info"
                           : "border border-border bg-card text-muted-foreground hover:text-foreground hover:border-white/20"
                       }`}
                     >
@@ -779,7 +779,7 @@ export function TargetListsView({
                   <div className="flex items-center justify-between mb-1">
                     <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Message</div>
                     <div className="text-[10px] text-muted-foreground">
-                      <span className="underline decoration-[#FFD60A]/70 decoration-2 underline-offset-2 text-[#FFD60A]">underlined</span> = personalized to this lead
+                      <span className="underline decoration-gold-ink/70 decoration-2 underline-offset-2 text-gold-ink">underlined</span> = personalized to this lead
                     </div>
                   </div>
                   <div className="rounded-lg border border-border bg-input p-4 text-[13px] leading-relaxed text-foreground whitespace-pre-wrap">
@@ -812,8 +812,8 @@ export function TargetListsView({
                       className={cn(
                         "inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-[13px] font-semibold transition-colors",
                         copied === "drawer-note"
-                          ? "border-[#26D07C]/30 bg-[#26D07C]/10 text-[#26D07C]"
-                          : "border-[#5aa2ff]/40 bg-[#5aa2ff]/10 text-[#8ec2ff] hover:bg-[#5aa2ff]/15"
+                          ? "border-signal/30 bg-signal/10 text-signal-ink"
+                          : "border-info/40 bg-info/10 text-info hover:bg-info/15"
                       )}
                     >
                       {copied === "drawer-note" ? (<><Check className="w-4 h-4" /> Copied</>) : (<><Copy className="w-4 h-4" /> Copy note</>)}
@@ -829,7 +829,7 @@ export function TargetListsView({
                     <button
                       type="button"
                       onClick={() => openCompose(preview, previewStep)}
-                      className="inline-flex items-center gap-2 rounded-lg border border-[#FFD60A]/30 bg-[#FFD60A]/10 px-4 py-2 text-[13px] font-semibold text-[#FFD60A] hover:bg-[#FFD60A]/15 transition-colors"
+                      className="inline-flex items-center gap-2 rounded-lg border border-gold/30 bg-gold/10 px-4 py-2 text-[13px] font-semibold text-gold-ink hover:bg-gold/15 transition-colors"
                     >
                       <Send className="w-4 h-4" /> Send Email {previewStep}
                     </button>

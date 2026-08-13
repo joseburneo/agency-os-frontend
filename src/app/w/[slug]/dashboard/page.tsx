@@ -78,7 +78,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
         desc={`Everything happening in ${ws.name}, at a glance.`}
         actions={
           <span className="inline-flex items-center gap-2 text-[11px] text-muted-foreground">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#26D07C] shadow-[0_0_6px_#26D07C]" /> live
+            <span className="w-1.5 h-1.5 rounded-full bg-signal shadow-[0_0_6px_var(--glow-signal)]" /> live
           </span>
         }
       />
@@ -94,7 +94,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
         <Panel className="p-5">
           <div className="flex items-center justify-between">
             <SectionLabel>Targeted Cold Leads</SectionLabel>
-            <Link href={`/w/${slug}/target-lists`} className="inline-flex items-center gap-1 text-[11px] text-[#FFD60A] hover:gap-2 transition-all">
+            <Link href={`/w/${slug}/target-lists`} className="inline-flex items-center gap-1 text-[11px] text-gold-ink hover:gap-2 transition-all">
               Open Targeted Cold Leads <ArrowRight className="w-3 h-3" />
             </Link>
           </div>
@@ -122,7 +122,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
                 <div key={l.id} className="py-3 flex items-center gap-4">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#FFD60A] shrink-0" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-gold shrink-0" />
                       <span className="text-[13px] font-semibold text-foreground truncate">{l.name}</span>
                       <ChannelDots channels={l.channels} size={12} />
                     </div>
@@ -134,7 +134,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
                       <span className="tabular-nums text-foreground">{pct}%</span>
                     </div>
                     <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
-                      <div className="h-full rounded-full bg-[#26D07C]" style={{ width: `${pct}%` }} />
+                      <div className="h-full rounded-full bg-signal" style={{ width: `${pct}%` }} />
                     </div>
                     <div className="mt-1 text-[10px] text-muted-foreground tabular-nums">
                       {l.email.toLocaleString()} email · {l.li.toLocaleString()} LinkedIn
@@ -158,7 +158,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
             <Panel className="lg:col-span-3 p-5">
               <div className="flex items-center justify-between">
                 <SectionLabel>Pipeline snapshot</SectionLabel>
-                <Link href={`/w/${slug}/crm`} className="inline-flex items-center gap-1 text-[11px] text-[#FFD60A] hover:gap-2 transition-all">
+                <Link href={`/w/${slug}/crm`} className="inline-flex items-center gap-1 text-[11px] text-gold-ink hover:gap-2 transition-all">
                   Open Live Deals <ArrowRight className="w-3 h-3" />
                 </Link>
               </div>
@@ -168,7 +168,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
                     <div className="w-20 text-[11px] uppercase tracking-wider text-muted-foreground shrink-0">{s.label}</div>
                     <div className="flex-1 h-6 rounded-md bg-white/[0.03] border border-border overflow-hidden">
                       <div
-                        className="h-full rounded-md flex items-center px-2 text-[11px] font-bold text-[#0A0E1A]"
+                        className="h-full rounded-md flex items-center px-2 text-[11px] font-bold text-ink-inverse"
                         style={{
                           width: `${Math.max(8, (s.n / maxStage) * 100)}%`,
                           background: s.key === "won" ? "#26D07C" : "linear-gradient(90deg,#FFD60A,rgba(255,214,10,0.35))",

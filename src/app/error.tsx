@@ -7,20 +7,20 @@
 
 export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   return (
-    <div className="min-h-screen grid place-items-center bg-[#0A0E1A] px-6 font-mono">
+    <div className="min-h-screen grid place-items-center bg-background px-6 font-mono">
       <div className="max-w-md text-center">
-        <div className="text-[11px] uppercase tracking-[0.28em] text-[#8A93A6]">Luxvance</div>
-        <h1 className="mt-3 text-lg font-bold text-[#EDEFF2]">This screen hit an error</h1>
-        <p className="mt-2 text-[13px] leading-relaxed text-[#8A93A6]">
+        <div className="text-[11px] uppercase tracking-[0.28em] text-muted-foreground">Luxvance</div>
+        <h1 className="mt-3 text-lg font-bold text-foreground">This screen hit an error</h1>
+        <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
           Nothing was lost. Try again, and if it keeps happening the details are in the
           browser console.
         </p>
         {error?.digest && (
-          <p className="mt-2 text-[11px] text-[#8A93A6]/70">Reference: {error.digest}</p>
+          <p className="mt-2 text-[11px] text-muted-foreground/70">Reference: {error.digest}</p>
         )}
         <button
           onClick={reset}
-          className="mt-6 h-11 rounded-lg bg-[#FFD60A] px-6 text-sm font-bold text-[#0A0E1A] transition-colors hover:bg-[#ffdf3a]"
+          className="mt-6 h-11 rounded-lg bg-gold px-6 text-sm font-bold text-ink-inverse transition-colors hover:bg-gold-hi"
         >
           Try again
         </button>

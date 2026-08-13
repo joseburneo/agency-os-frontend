@@ -43,7 +43,7 @@ export default async function SettingsPage({
 
       {/* Signed-in state */}
       <Panel className="p-5 flex items-center gap-3">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[#26D07C]/10 text-[#26D07C] border border-[#26D07C]/20">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-signal/10 text-signal-ink border border-signal/20">
           <ShieldCheck className="h-4 w-4" />
         </span>
         <div className="min-w-0 flex-1">
@@ -62,17 +62,17 @@ export default async function SettingsPage({
       {/* Change password */}
       <Panel className="p-5 flex flex-col gap-4">
         <div className="flex items-center gap-2">
-          <KeyRound className="h-4 w-4 text-[#FFD60A]" />
+          <KeyRound className="h-4 w-4 text-gold-ink" />
           <SectionLabel>Change password</SectionLabel>
         </div>
 
         {!ownPassword && (
-          <div className="rounded-lg border border-[#FFD60A]/25 bg-[#FFD60A]/[0.06] px-3.5 py-2.5 text-[12px] text-foreground">
+          <div className="rounded-lg border border-gold/25 bg-gold/[0.06] px-3.5 py-2.5 text-[12px] text-foreground">
             You are using a temporary password. Set your own below to secure your workspace.
           </div>
         )}
         {ok && (
-          <div className="rounded-lg border border-[#26D07C]/25 bg-[#26D07C]/[0.06] px-3.5 py-2.5 text-[12px] text-[#26D07C]">
+          <div className="rounded-lg border border-signal/25 bg-signal/[0.06] px-3.5 py-2.5 text-[12px] text-signal-ink">
             Password updated.
           </div>
         )}
@@ -94,7 +94,7 @@ export default async function SettingsPage({
                 name="current"
                 required
                 autoComplete="current-password"
-                className="h-11 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm text-foreground outline-none focus:border-[#FFD60A]/50"
+                className="h-11 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm text-foreground outline-none focus:border-gold/50"
               />
             </label>
           )}
@@ -106,12 +106,12 @@ export default async function SettingsPage({
               required
               minLength={6}
               autoComplete="new-password"
-              className="h-11 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm text-foreground outline-none focus:border-[#FFD60A]/50"
+              className="h-11 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm text-foreground outline-none focus:border-gold/50"
             />
           </label>
           <button
             type="submit"
-            className="mt-1 h-11 rounded-lg bg-[#FFD60A] text-sm font-bold text-[#0A0E1A] transition-colors hover:bg-[#ffdf3a] self-start px-6"
+            className="mt-1 h-11 rounded-lg bg-gold text-sm font-bold text-ink-inverse transition-colors hover:bg-gold-hi self-start px-6"
           >
             Update password
           </button>

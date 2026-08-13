@@ -33,8 +33,8 @@ const FORMAT_TONE: Record<ContentPost["format"], "muted" | "gold" | "green" | "b
 const CARD_ACCENT: Record<ContentStatus, string> = {
   idea: "border-l-white/10",
   draft: "border-l-white/10",
-  scheduled: "border-l-[#FFD60A]/70",
-  published: "border-l-[#26D07C]/70",
+  scheduled: "border-l-gold/70",
+  published: "border-l-signal/70",
 };
 
 function PostCard({ post }: { post: ContentPost }) {

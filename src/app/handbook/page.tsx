@@ -60,10 +60,10 @@ export default async function HandbookPage() {
               >
                 <Panel className="p-5 h-full flex flex-col gap-3 transition-colors hover:border-white/20">
                   <div className="flex items-start justify-between gap-3">
-                    <span className="grid place-items-center w-10 h-10 rounded-lg bg-[#FFD60A]/10 text-[#FFD60A] border border-[#FFD60A]/20 shrink-0">
+                    <span className="grid place-items-center w-10 h-10 rounded-lg bg-gold/10 text-gold-ink border border-gold/20 shrink-0">
                       <Icon className="w-5 h-5" />
                     </span>
-                    <ArrowUpRight className="w-4 h-4 text-muted-foreground group-hover:text-[#FFD60A] transition-colors" />
+                    <ArrowUpRight className="w-4 h-4 text-muted-foreground group-hover:text-gold-ink transition-colors" />
                   </div>
                   <div className="text-[16px] font-semibold text-foreground">{d.title}</div>
                   <p className="text-[13px] text-muted-foreground leading-relaxed flex-1">{d.desc}</p>
@@ -80,7 +80,7 @@ export default async function HandbookPage() {
       </div>
 
       <Panel className="p-4 flex items-start gap-3">
-        <span className="grid place-items-center w-8 h-8 rounded-lg bg-[#26D07C]/10 text-[#26D07C] border border-[#26D07C]/20 shrink-0">
+        <span className="grid place-items-center w-8 h-8 rounded-lg bg-signal/10 text-signal-ink border border-signal/20 shrink-0">
           <Lock className="w-4 h-4" />
         </span>
         <p className="text-[13px] text-muted-foreground leading-relaxed">

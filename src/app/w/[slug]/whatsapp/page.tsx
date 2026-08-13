@@ -27,7 +27,7 @@ const OUTCOME_LABEL: Record<TouchOutcome, string> = {
 function TouchIcon({ touch }: { touch: PhoneTouch }) {
   if (touch.channel === "whatsapp") {
     return (
-      <span className="grid place-items-center w-8 h-8 rounded-lg bg-[#26D07C]/10 border border-[#26D07C]/20 shrink-0">
+      <span className="grid place-items-center w-8 h-8 rounded-lg bg-signal/10 border border-signal/20 shrink-0">
         <MessageCircle className="w-4 h-4" style={{ color: "#26D07C" }} />
       </span>
     );
@@ -84,7 +84,7 @@ export default async function WhatsappPage({ params }: { params: Promise<{ slug:
         <div className="flex items-center justify-between">
           <SectionLabel>Touch feed</SectionLabel>
           <span className="inline-flex items-center gap-2 text-[11px] text-muted-foreground">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#26D07C] shadow-[0_0_6px_#26D07C]" /> live
+            <span className="w-1.5 h-1.5 rounded-full bg-signal shadow-[0_0_6px_var(--glow-signal)]" /> live
           </span>
         </div>
         <div className="mt-3 flex flex-col">

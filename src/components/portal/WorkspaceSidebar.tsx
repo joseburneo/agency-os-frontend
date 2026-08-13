@@ -4,13 +4,13 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useState, useEffect } from "react";
 import {
-  LayoutDashboard, Target, Mail, MessageCircle,
-  CalendarDays, CalendarClock, KanbanSquare, Brain, ChevronsUpDown, ArrowLeft, Check,
+  LayoutDashboard, Target, Mail, Brain, ChevronsUpDown, ArrowLeft, Check,
   Settings, LogOut, PanelLeftClose, PanelLeftOpen, ShieldBan, Route, Menu, X,
-  Megaphone, Flame, FileText,
+  Flame, FileText,
 } from "lucide-react";
 import { cn, Linkedin } from "./ui";
 import { CompanyMark } from "./CompanyMark";
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import type { Workspace } from "@/lib/portal/types";
 import { visibleModules } from "@/lib/portal/modules";
 
@@ -34,11 +34,17 @@ function shortListLabel(name: string): string {
 
 // Counts come live from the parent layout; hide a badge at 0 so an empty
 // workspace (e.g. Luxvance before its leads land) reads clean, not "0".
-// Layout (Jose 2026-07-16): the three "whole-workspace" views sit at the very top
-// with no header (Dashboard · the client's Brain · Client Success Roadmap), then
-// the funnel sections follow: Targeted lists → Cold outreach → Ads → CRM, with the
-// Blocklist as a standalone guard at the bottom. A group with group:"" renders its
-// items without a section header.
+//
+// Layout (Jose, 2026-08-13): Opportunities is the star of the product, so it sits
+// second, right under Dashboard, instead of near the bottom under a "CRM" header
+// where the empty tabs had pushed it. It was called "Hot Leads"; a lead that
+// answered and is being worked is an opportunity, and that is the word a client
+// uses when they talk about their own pipeline.
+//
+// Then the rest: the whole-workspace views (Brain · Roadmap · Proposal), Targeted
+// lists, Cold outreach, and the Blocklist as a standalone guard at the bottom. The
+// Ads section and the empty outreach tabs are gone — see RETIRED in modules.ts.
+// A group with group:"" renders its items without a section header.
 function buildNav(w: Workspace | null, enabled: Set<string>, slug: string, lists: ListLite[]): NavGroup[] {
   // Each target list is its own menu item under the "Targeted lists" header, so Paul
   // reaches List 1 / List 2 / List 3 / VIP in one click. They deep-link into the one
@@ -56,6 +62,7 @@ function buildNav(w: Workspace | null, enabled: Set<string>, slug: string, lists
       group: "",
       items: [
         { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+        { key: "crm", label: "Opportunities", icon: Flame, badge: w && w.warmLeads > 0 ? String(w.warmLeads) : undefined },
         // "<Client> Brain" — the client's name owns the module (Jose, 2026-07-25):
         // Arco Irish Brain, Kcal Brain. The agent's editable memory, not a "library".
         { key: "library", label: w?.name ? `${w.name} Brain` : "Brain", icon: Brain },
@@ -75,21 +82,7 @@ function buildNav(w: Workspace | null, enabled: Set<string>, slug: string, lists
       items: [
         { key: "email", label: "Email Campaigns", icon: Mail },
         { key: "linkedin", label: "LinkedIn Campaigns", icon: Linkedin },
-        { key: "cadence", label: "Sequence & Schedule", icon: CalendarClock },
-        { key: "whatsapp", label: "WhatsApp & Phone", icon: MessageCircle },
-        { key: "content", label: "Content Calendar", icon: CalendarDays },
       ],
-    },
-    {
-      group: "Ads",
-      items: [
-        { key: "linkedin-ads", label: "LinkedIn Ads", icon: Linkedin },
-        { key: "meta-ads", label: "Meta Ads", icon: Megaphone },
-      ],
-    },
-    {
-      group: "CRM",
-      items: [{ key: "crm", label: "Hot Leads", icon: Flame, badge: w && w.warmLeads > 0 ? String(w.warmLeads) : undefined }],
     },
     {
       group: "",
@@ -211,7 +204,7 @@ export function WorkspaceSidebar({ slug, ws, workspaces, lists = [], demo = fals
                 >
                   <CompanyMark name={wsl.name} domain={wsl.domain} size={24} />
                   <span className="text-sm text-foreground flex-1 truncate">{wsl.name}</span>
-                  {wsl.slug === slug && <Check className="w-3.5 h-3.5 text-[#FFD60A]" />}
+                  {wsl.slug === slug && <Check className="w-3.5 h-3.5 text-gold-ink" />}
                 </Link>
               );
               const heading = (t: string, n: number) => (
@@ -286,12 +279,12 @@ export function WorkspaceSidebar({ slug, ws, workspaces, lists = [], demo = fals
                   isCollapsed ? "justify-center py-2.5" : "gap-2.5 px-2.5 py-2",
                   !isCollapsed && indent && "ml-3.5 pl-2 border-l border-border",
                   active
-                    ? "bg-[#FFD60A]/10 text-[#FFD60A]"
+                    ? "bg-gold/10 text-gold-ink"
                     : "text-muted-foreground hover:bg-secondary hover:text-foreground"
                 )}
               >
                 {indent ? (
-                  <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", active ? "bg-[#FFD60A]" : "bg-muted-foreground/40")} />
+                  <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", active ? "bg-gold" : "bg-muted-foreground/40")} />
                 ) : (
                   <Icon className="w-[17px] h-[17px] shrink-0" />
                 )}
@@ -300,14 +293,14 @@ export function WorkspaceSidebar({ slug, ws, workspaces, lists = [], demo = fals
                   <span
                     className={cn(
                       "text-[10px] tabular-nums rounded-md px-1.5 py-0.5",
-                      active ? "bg-[#FFD60A]/15 text-[#FFD60A]" : "bg-white/5 text-muted-foreground"
+                      active ? "bg-gold/15 text-gold-ink" : "bg-white/5 text-muted-foreground"
                     )}
                   >
                     {badge}
                   </span>
                 )}
                 {isCollapsed && badge && (
-                  <span className="absolute top-1.5 right-2 w-1.5 h-1.5 rounded-full bg-[#FFD60A]" />
+                  <span className="absolute top-1.5 right-2 w-1.5 h-1.5 rounded-full bg-gold" />
                 )}
                 {isCollapsed && <Tip>{label}</Tip>}
               </Link>
@@ -330,7 +323,7 @@ export function WorkspaceSidebar({ slug, ws, workspaces, lists = [], demo = fals
             "group relative flex items-center rounded-lg text-sm transition-colors",
             isCollapsed ? "justify-center py-2.5" : "gap-2.5 px-2.5 py-2",
             pathname === `/w/${slug}/settings`
-              ? "bg-[#FFD60A]/10 text-[#FFD60A]"
+              ? "bg-gold/10 text-gold-ink"
               : "text-muted-foreground hover:bg-secondary hover:text-foreground"
           )}
         >
@@ -361,9 +354,18 @@ export function WorkspaceSidebar({ slug, ws, workspaces, lists = [], demo = fals
       </div>
     );
 
+  // Theme sits outside the account block on purpose: that block is hidden for demo
+  // prospects, and a prospect reading their Build on a bright screen should still be able
+  // to switch. `mt-auto` when there is no account block keeps it pinned to the bottom.
+  const renderTheme = (isCollapsed: boolean) => (
+    <div className={cn("flex", isCollapsed ? "justify-center" : "px-0.5", demo ? "mt-auto pt-4" : "pt-3")}>
+      <ThemeToggle compact={isCollapsed} className={cn(isCollapsed && "flex-col", !isCollapsed && "w-full justify-between")} />
+    </div>
+  );
+
   const liveFooter = (
-    <div className={cn("flex items-center gap-2 text-[11px] text-muted-foreground", demo ? "mt-auto pt-4" : "pt-1")}>
-      <span className="w-1.5 h-1.5 rounded-full bg-[#26D07C] shadow-[0_0_6px_#26D07C]" />
+    <div className={cn("flex items-center gap-2 text-[11px] text-muted-foreground", "pt-3")}>
+      <span className="w-1.5 h-1.5 rounded-full bg-signal shadow-[0_0_6px_var(--glow-signal)]" />
       Living workspace · updates in real time
     </div>
   );
@@ -431,6 +433,7 @@ export function WorkspaceSidebar({ slug, ws, workspaces, lists = [], demo = fals
         {renderSwitcher(false)}
         {renderNav(false, closeMobile)}
         {renderAccount(false, closeMobile)}
+        {renderTheme(false)}
         {liveFooter}
       </aside>
 
@@ -468,6 +471,7 @@ export function WorkspaceSidebar({ slug, ws, workspaces, lists = [], demo = fals
         {renderNav(collapsed)}
 
         {renderAccount(collapsed)}
+        {renderTheme(collapsed)}
 
         {!collapsed && liveFooter}
       </aside>
