@@ -122,7 +122,7 @@ function MetaPills({ meta }: { meta: Record<string, string> }) {
 type EditorState = { id: string | null; kind: IntelligenceKind; title: string; body: string };
 
 const inputCls =
-  "w-full rounded-lg border border-border bg-white/[0.03] px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-gold/40 focus:outline-none";
+  "w-full rounded-lg border border-border bg-white/[0.03] px-3 py-2 text-sm text-foreground placeholder:text-subtle focus:border-gold/40 focus:outline-none";
 
 export function IntelligenceView({
   slug,
@@ -550,7 +550,7 @@ export function IntelligenceView({
                 "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors",
                 has
                   ? "border-gold/25 bg-gold/5 text-foreground hover:border-gold/50"
-                  : "border-border/60 text-muted-foreground/50 hover:text-muted-foreground"
+                  : "border-border/60 text-subtle hover:text-muted-foreground"
               )}
             >
               <GIcon className={cn("w-3 h-3", has ? "text-gold-ink" : "")} />
@@ -607,7 +607,7 @@ export function IntelligenceView({
                   <Icon className="w-3.5 h-3.5 text-muted-foreground" />
                 </div>
                 <div className="rounded-xl border border-dashed border-border/70 px-4 py-3 flex items-center gap-3">
-                  <p className="text-[12.5px] italic text-muted-foreground/60 flex-1">
+                  <p className="text-[12.5px] italic text-subtle flex-1">
                     Nothing here yet — the agent works without it until someone adds what it should know.
                   </p>
                   {editable && (
@@ -880,7 +880,7 @@ function BrainOpsPanel({ slug, ops, editable }: { slug: string; ops: BrainOps; e
                   </button>
                 )}
               </div>
-              <p className="text-[11px] text-muted-foreground/80 leading-relaxed">{f.hint}</p>
+              <p className="text-[11px] text-subtle leading-relaxed">{f.hint}</p>
 
               {isEditing ? (
                 <div className="flex flex-col gap-2">
@@ -938,7 +938,7 @@ function BrainOpsPanel({ slug, ops, editable }: { slug: string; ops: BrainOps; e
                   <p className="text-[13px] text-foreground/90 whitespace-pre-line leading-relaxed">{value}</p>
                 )
               ) : (
-                <p className="text-[12.5px] italic text-muted-foreground/60">
+                <p className="text-[12.5px] italic text-subtle">
                   Not set yet — the agent works without it until someone fills it in.
                 </p>
               )}

@@ -16,7 +16,7 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
           browser console.
         </p>
         {error?.digest && (
-          <p className="mt-2 text-[11px] text-muted-foreground/70">Reference: {error.digest}</p>
+          <p className="mt-2 text-[11px] text-subtle">Reference: {error.digest}</p>
         )}
         <button
           onClick={reset}

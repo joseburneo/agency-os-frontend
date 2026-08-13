@@ -108,8 +108,8 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
             ].map((m) => (
               <div key={m.label} className="rounded-lg border border-dashed border-border px-3 py-2.5">
                 <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">{m.label}</div>
-                <div className="mt-0.5 text-lg font-bold text-muted-foreground/50 tabular-nums">—</div>
-                <div className="text-[10px] text-muted-foreground/70">{m.sub}</div>
+                <div className="mt-0.5 text-lg font-bold text-subtle tabular-nums">—</div>
+                <div className="text-[10px] text-subtle">{m.sub}</div>
               </div>
             ))}
           </div>

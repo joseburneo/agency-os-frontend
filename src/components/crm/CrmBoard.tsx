@@ -698,7 +698,7 @@ function ConvoBlock({ c, themName, defaultOpen }: { c: Convo; themName: string; 
         </div>
         {c.replied
           ? <span className="shrink-0 text-[10px] font-medium text-signal-ink">{c.reply_count} repl{c.reply_count > 1 ? "ies" : "y"}</span>
-          : <span className="shrink-0 text-[10px] text-muted-foreground/80">no reply</span>}
+          : <span className="shrink-0 text-[10px] text-subtle">no reply</span>}
         <span className="shrink-0 text-[10px] text-muted-foreground tabular-nums">{c.sent_count} sent</span>
         <span className="shrink-0 text-[10px] text-muted-foreground tabular-nums">{timeAgo(c.last_at)}</span>
         <span className="shrink-0 text-[10px] text-muted-foreground w-3 text-center">{open ? "▾" : "▸"}</span>
@@ -721,7 +721,7 @@ function ConvoBlock({ c, themName, defaultOpen }: { c: Convo; themName: string; 
                 {newDay && (
                   <div className="flex items-center gap-3 py-2">
                     <span className="flex-1 h-px bg-border/60" />
-                    <span className="text-[9.5px] uppercase tracking-[0.14em] text-muted-foreground/70">{dayLabel(m.at)}</span>
+                    <span className="text-[9.5px] uppercase tracking-[0.14em] text-subtle">{dayLabel(m.at)}</span>
                     <span className="flex-1 h-px bg-border/60" />
                   </div>
                 )}
@@ -765,7 +765,7 @@ function ConvoBlock({ c, themName, defaultOpen }: { c: Convo; themName: string; 
                       </div>
                     )}
                     {/* meta line UNDER the bubble: hour · via · route — never competing with the text */}
-                    <div className={`mt-1 px-1 flex items-center gap-1.5 text-[10px] text-muted-foreground/80 ${m.from_me ? "flex-row-reverse" : ""}`}
+                    <div className={`mt-1 px-1 flex items-center gap-1.5 text-[10px] text-subtle ${m.from_me ? "flex-row-reverse" : ""}`}
                       title={m.at ? new Date(m.at).toLocaleString("en-GB") : undefined}>
                       <span className="tabular-nums">{clock(m.at)}</span>
                       {m.from_me && <span style={{ color: src.bar }}>via {src.name} ✓</span>}
@@ -824,10 +824,10 @@ function Conversation({ id, themName, fallback, refreshKey }: { id: number; them
   const repliedCount = convos.filter((c) => c.replied).length;
   return (
     <div className="space-y-2.5">
-      <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.12em] text-gold-ink/65">
+      <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.12em] text-gold-ink">
         <span>// CONVERSATIONS · {convos.length}</span>
-        {repliedCount > 0 && <span className="text-signal-ink/70 normal-case tracking-normal">{repliedCount} replied</span>}
-        {convos.length - repliedCount > 0 && <span className="text-muted-foreground/60 normal-case tracking-normal">{convos.length - repliedCount} cold campaign{convos.length - repliedCount > 1 ? "s" : ""}</span>}
+        {repliedCount > 0 && <span className="text-signal-ink normal-case tracking-normal">{repliedCount} replied</span>}
+        {convos.length - repliedCount > 0 && <span className="text-subtle normal-case tracking-normal">{convos.length - repliedCount} cold campaign{convos.length - repliedCount > 1 ? "s" : ""}</span>}
         {uniboxUrl && (
           <a href={uniboxUrl} target="_blank" rel="noopener noreferrer"
             className="ml-auto normal-case tracking-normal text-[10.5px] text-muted-foreground hover:text-gold-ink transition-colors">
@@ -1173,7 +1173,7 @@ function CtxChip({ on, label, title }: { on: boolean; label: string; title: stri
     <span title={title}
       className={`text-[10px] rounded-full px-1.5 py-0.5 border ${on
         ? "border-signal/40 bg-signal/10 text-signal-ink"
-        : "border-border bg-transparent text-muted-foreground/50 line-through"}`}>
+        : "border-border bg-transparent text-subtle line-through"}`}>
       {label}
     </span>
   );
@@ -1241,7 +1241,7 @@ function Copilot({ c }: { c: ComposerCtl }) {
           missing (migration 015 not applied) the save fails and this says so, rather than
           letting a conversation vanish and look like a bug. */}
       {!coSaved && (
-        <div className="text-[10px] text-gold-ink/80 leading-snug">
+        <div className="text-[10px] text-gold-ink leading-snug">
           This chat is not being saved. Run migration 015 (`copilot_chat`) and it will persist with the prospect.
         </div>
       )}
@@ -1328,7 +1328,7 @@ function Copilot({ c }: { c: ComposerCtl }) {
           {coBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
         </button>
       </div>
-      <p className="text-[10px] text-muted-foreground/70">When it writes a message, it drops straight into the composer on the left.</p>
+      <p className="text-[10px] text-subtle">When it writes a message, it drops straight into the composer on the left.</p>
 
       {/* The research it is reading, one click away. Same panel as before, folded in here
           instead of sitting beside the copilot repeating its context back at you. */}
@@ -1458,7 +1458,7 @@ function Composer({ c }: { c: ComposerCtl }) {
 
   return (
     <div className="border border-border rounded-xl bg-popover/95 p-4 space-y-2.5">
-      <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70 font-semibold">Compose · pick a channel</div>
+      <div className="text-[10px] uppercase tracking-[0.16em] text-subtle font-semibold">Compose · pick a channel</div>
       {/* channel tabs + how it sends */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1">
@@ -1507,7 +1507,7 @@ function Composer({ c }: { c: ComposerCtl }) {
               }
             }}
             placeholder="+ CC…"
-            className="w-24 bg-transparent border-b border-border/60 text-[11px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-gold/50 px-1 py-0.5"
+            className="w-24 bg-transparent border-b border-border/60 text-[11px] text-foreground placeholder:text-subtle focus:outline-none focus:border-gold/50 px-1 py-0.5"
           />
           {/* One-click CC to the client owner's real inbox (clients.notify_email).
               Manual by design — never pre-added (the auto-CC bridge is dead). */}
@@ -1998,7 +1998,7 @@ function IntelPanel({ d }: { d: Detail }) {
         <dl className="space-y-1.5">
           {facts.map(([label, val]) => (
             <div key={label} className="text-xs">
-              <dt className="text-muted-foreground/70 text-[10px] uppercase tracking-wide">{label}</dt>
+              <dt className="text-subtle text-[10px] uppercase tracking-wide">{label}</dt>
               <dd className="text-foreground/90 leading-snug">{val}</dd>
             </div>
           ))}
@@ -2006,7 +2006,7 @@ function IntelPanel({ d }: { d: Detail }) {
       )}
       {research.length > 0 && (
         <div className="space-y-1.5 pt-1">
-          <div className="text-[10px] uppercase tracking-wide text-muted-foreground/60">Raw research</div>
+          <div className="text-[10px] uppercase tracking-wide text-subtle">Raw research</div>
           {research.map(([label, text]) => <Expandable key={label} label={label} text={text} />)}
         </div>
       )}
@@ -2141,13 +2141,13 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
         <div className={`flex-1 px-3 py-2 ${owe ? "bg-info/[0.06]" : ""}`}>
           <div className="text-[9px] uppercase tracking-[0.14em] text-info/80">↙ They last wrote</div>
           <div className={`text-[13px] tabular-nums mt-0.5 ${owe ? "text-gold-ink" : "text-foreground"}`}>{timeAgo(d.last_reply_at)}</div>
-          {fmtExact(d.last_reply_at) && <div className="text-[10px] text-muted-foreground/60 tabular-nums">{fmtExact(d.last_reply_at)}</div>}
+          {fmtExact(d.last_reply_at) && <div className="text-[10px] text-subtle tabular-nums">{fmtExact(d.last_reply_at)}</div>}
         </div>
         <div className="w-px bg-border" />
         <div className={`flex-1 px-3 py-2 ${!owe && d.waiting_on !== "closed" ? "bg-signal/[0.05]" : ""}`}>
-          <div className="text-[9px] uppercase tracking-[0.14em] text-signal-ink/80">↗ We last wrote{d.last_channel ? ` · ${chLabel(d.last_channel)}` : ""}</div>
+          <div className="text-[9px] uppercase tracking-[0.14em] text-signal-ink">↗ We last wrote{d.last_channel ? ` · ${chLabel(d.last_channel)}` : ""}</div>
           <div className="text-[13px] tabular-nums mt-0.5 text-foreground">{d.last_touch_at ? timeAgo(d.last_touch_at) : "—"}</div>
-          {fmtExact(d.last_touch_at) && <div className="text-[10px] text-muted-foreground/60 tabular-nums">{fmtExact(d.last_touch_at)}</div>}
+          {fmtExact(d.last_touch_at) && <div className="text-[10px] text-subtle tabular-nums">{fmtExact(d.last_touch_at)}</div>}
         </div>
       </div>
 
@@ -2156,12 +2156,12 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
           handles you copy into a call, a CRM or a search. Reaching them lives
           further down; this is for reading and copying. */}
       <div>
-        <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70 font-semibold mb-2">Contact</div>
+        <div className="text-[10px] uppercase tracking-[0.16em] text-subtle font-semibold mb-2">Contact</div>
         <div className="rounded-lg border border-border bg-card px-3 py-2.5 space-y-1.5">
           <div className="text-[13.5px] font-semibold text-foreground leading-tight">{d.name || "—"}</div>
           <div className="text-[12px] text-muted-foreground leading-snug">
             {[d.job_title, d.company].filter(Boolean).join(" · ") || "—"}
-            {d.country ? <span className="text-muted-foreground/60"> · {d.country}</span> : null}
+            {d.country ? <span className="text-subtle"> · {d.country}</span> : null}
           </div>
           <div className="pt-1 space-y-1">
             {d.email && (
@@ -2188,7 +2188,7 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
                 the account's other people, straight from the conversation. */}
             {(d.contacts ?? []).length > 0 && (
               <div className="pt-1.5 mt-1 border-t border-border/60">
-                <div className="text-[9.5px] uppercase tracking-[0.14em] text-muted-foreground/70 mb-1">Also on this thread</div>
+                <div className="text-[9.5px] uppercase tracking-[0.14em] text-subtle mb-1">Also on this thread</div>
                 {(d.contacts ?? []).map((ct) => (
                   <div key={ct.email} className="flex items-center gap-1 text-[12px]">
                     <span className="truncate text-foreground/90" title={ct.email}>{ct.email}</span>
@@ -2210,7 +2210,7 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
       </div>
 
       <div>
-        <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70 font-semibold mb-2">Deal</div>
+        <div className="text-[10px] uppercase tracking-[0.16em] text-subtle font-semibold mb-2">Deal</div>
         <dl className="space-y-2 text-[12.5px]">
           <Row k="Source" v={d.reply_campaign || "Cold outbound"} />
           <Row k="Segment" v={d.category || "—"} />
@@ -2286,7 +2286,7 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
       {canBuild && (
       <div>
         <div className="flex items-center gap-2 mb-2">
-          <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70 font-semibold"><span className="text-[13px] mr-1 align-middle">🧲</span> Build · the lead magnet</span>
+          <span className="text-[10px] uppercase tracking-[0.16em] text-subtle font-semibold"><span className="text-[13px] mr-1 align-middle">🧲</span> Build · the lead magnet</span>
           {tools && (
             <button onClick={() => setTools(false)} className="ml-auto text-[11px] text-muted-foreground hover:text-gold-ink">Hide</button>
           )}
@@ -2352,7 +2352,7 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
       {/* NOTES — call outcomes / next-step context that must survive a re-open */}
       <div>
         <div className="flex items-center gap-2 mb-2">
-          <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70 font-semibold">Notes</span>
+          <span className="text-[10px] uppercase tracking-[0.16em] text-subtle font-semibold">Notes</span>
           {noteSaved && note === (d.notes || "") && <span className="text-[10px] text-signal-ink">saved</span>}
         </div>
         <textarea value={note} onChange={(e) => { setNote(e.target.value); setNoteSaved(false); }}
@@ -2365,19 +2365,19 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
             className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:border-gold/40 disabled:opacity-40 transition-colors">
             {noteBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />} Save note
           </button>
-          <span className="text-[10px] text-muted-foreground/60">auto-saves when you click away</span>
+          <span className="text-[10px] text-subtle">auto-saves when you click away</span>
         </div>
       </div>
 
       {/* REACH THEM — always visible so Jose can call / WhatsApp / LinkedIn / email right now */}
       <div>
-        <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70 font-semibold mb-2">Reach them</div>
+        <div className="text-[10px] uppercase tracking-[0.16em] text-subtle font-semibold mb-2">Reach them</div>
         <ContactActions d={d} onChanged={() => reload(true)} />
       </div>
 
       {/* QUICK ACTIONS */}
       <div>
-        <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70 font-semibold mb-2">Quick actions</div>
+        <div className="text-[10px] uppercase tracking-[0.16em] text-subtle font-semibold mb-2">Quick actions</div>
         <div className="flex flex-col gap-1.5">
           <button onClick={() => reload(true)}
             className="text-left text-[12.5px] rounded-lg border border-border bg-card px-3 py-2 text-foreground hover:border-gold/40 transition-colors inline-flex items-center gap-2">
@@ -2489,7 +2489,7 @@ function FunnelStepper({ d, onChanged }: { d: Detail; onChanged: () => void }) {
       <button onClick={() => set("lost")} disabled={busy}
         title="Mark this deal lost or parked"
         className={`shrink-0 ml-auto inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors disabled:opacity-50 ${
-          lost ? "bg-danger/12 text-danger-soft" : "text-muted-foreground/60 hover:bg-secondary hover:text-danger-soft"}`}>
+          lost ? "bg-danger/12 text-danger-soft" : "text-subtle hover:bg-secondary hover:text-danger-soft"}`}>
         {lost ? "● Lost / Parked" : "Mark lost"}
       </button>
     </div>
@@ -2679,7 +2679,7 @@ function TileAction({ href, active, title, color, children }: {
 }) {
   const base = "grid place-items-center w-6 h-6 rounded-md transition-colors shrink-0";
   if (!active || !href)
-    return <span title={`${title} · not on file`} className={`${base} text-muted-foreground/20`}>{children}</span>;
+    return <span title={`${title} · not on file`} className={`${base} text-subtle/50`}>{children}</span>;
   return (
     <a href={href} target="_blank" rel="noreferrer" title={title}
       onClick={(e) => e.stopPropagation()}
@@ -2754,14 +2754,14 @@ function BoardCard({ r, onOpen }: { r: Card; onOpen: (id: number) => void }) {
 
       {/* their actual words — the context that makes this a cockpit, not a list */}
       {cleanSnippet(r.reply_snippet) && (
-        <p className="mt-2.5 text-[12px] leading-snug text-muted-foreground/90 line-clamp-2 border-l-2 border-gold/25 pl-2.5">
+        <p className="mt-2.5 text-[12px] leading-snug text-muted-foreground line-clamp-2 border-l-2 border-gold/25 pl-2.5">
           {cleanSnippet(r.reply_snippet)}
         </p>
       )}
 
       {/* meta: country · value · the action-driving clock (the column already tells the stage) */}
       <div className="flex items-center gap-1.5 mt-3 text-[11px]">
-        {r.country && <span className="text-muted-foreground/70 truncate max-w-[7rem]">{countryFlag(r.country) && <span className="mr-1">{countryFlag(r.country)}</span>}{r.country}</span>}
+        {r.country && <span className="text-subtle truncate max-w-[7rem]">{countryFlag(r.country) && <span className="mr-1">{countryFlag(r.country)}</span>}{r.country}</span>}
         {r.deal_amount != null && <span className="text-signal-ink font-semibold tabular-nums">${Number(r.deal_amount).toLocaleString()}</span>}
         <span className={`ml-auto tabular-nums ${clock.cls}`}>{clock.text}</span>
       </div>
@@ -2770,7 +2770,7 @@ function BoardCard({ r, onOpen }: { r: Card; onOpen: (id: number) => void }) {
       <div className="flex items-center gap-2.5 mt-1.5 text-[10px]">
         <span title="Last time THEY wrote to us" className="text-info/85">↙ they replied <span className="tabular-nums">{agoShort(r.last_reply_at)}</span></span>
         {/* EMAIL clock only — a call or WhatsApp never paints this line (email decides the turn) */}
-        <span title="Last EMAIL we sent them" className="text-signal-ink/80">↗ we sent <span className="tabular-nums">{agoShort(r.last_email_touch_at ?? r.last_touch_at)}</span>{r.last_email_touch_at ? " · Email" : (r.last_channel ? ` · ${chLabel(r.last_channel)}` : "")}</span>
+        <span title="Last EMAIL we sent them" className="text-signal-ink">↗ we sent <span className="tabular-nums">{agoShort(r.last_email_touch_at ?? r.last_touch_at)}</span>{r.last_email_touch_at ? " · Email" : (r.last_channel ? ` · ${chLabel(r.last_channel)}` : "")}</span>
       </div>
 
       {/* channels — reachability at a glance + one-click open (email / call / WhatsApp / LinkedIn / Build) */}
@@ -2892,11 +2892,11 @@ function BoardColumn({ title, hint, accent, tone, rows, onOpen, onDrop }: {
           <h3 className={`text-xs font-semibold uppercase tracking-wide ${accent ? "text-gold-ink" : tone === "green" ? "text-signal-ink" : "text-foreground"}`}>{title}</h3>
           <span className="text-xs text-muted-foreground tabular-nums ml-auto">{rows.length}</span>
         </div>
-        {hint && <p className="text-[10px] text-muted-foreground/70 mt-0.5">{hint}</p>}
+        {hint && <p className="text-[10px] text-subtle mt-0.5">{hint}</p>}
       </div>
       <div className="space-y-2 max-h-[calc(100vh-13rem)] overflow-y-auto pr-1 pt-1">
         {rows.map((r) => <BoardCard key={r.id} r={r} onOpen={onOpen} />)}
-        {rows.length === 0 && <div className="text-[11px] text-muted-foreground/50 px-2 py-6 text-center border border-dashed border-border/50 rounded-lg">drop here</div>}
+        {rows.length === 0 && <div className="text-[11px] text-subtle px-2 py-6 text-center border border-dashed border-border/50 rounded-lg">drop here</div>}
       </div>
     </div>
   );

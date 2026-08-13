@@ -69,7 +69,7 @@ export default async function GatePage({
                 autoComplete="username"
                 placeholder="you@company.com"
                 aria-invalid={error ? true : undefined}
-                className="h-11 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/40"
+                className="h-11 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm text-foreground placeholder:text-subtle outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/40"
               />
             </>
           )}
@@ -84,7 +84,7 @@ export default async function GatePage({
             autoComplete={withEmail ? "current-password" : "off"}
             placeholder="••••••••••••"
             aria-invalid={error ? true : undefined}
-            className="h-11 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/40"
+            className="h-11 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm text-foreground placeholder:text-subtle outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/40"
           />
           {error === "rate" ? (
             <p className="text-[12px] text-red-400">Too many attempts. Wait a few minutes.</p>
@@ -101,7 +101,7 @@ export default async function GatePage({
           </button>
         </form>
 
-        <p className="mt-6 text-center text-[11px] text-muted-foreground/70">
+        <p className="mt-6 text-center text-[11px] text-subtle">
           Precision Leads. Engineered by Intelligence.
         </p>
       </div>
