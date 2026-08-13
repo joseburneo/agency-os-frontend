@@ -18,6 +18,14 @@ type Row = Record<string, unknown>;
 type Filters = Record<string, unknown>;
 type Source = "people" | "companies";
 
+type ExportJob = {
+  id: string;
+  state: "running" | "done" | "error";
+  total: number; found: number; verified: number; written: number;
+  charged: number; skipped: number; reused: number; error?: string;
+  credits?: { remaining: number; allowance: number };
+};
+
 // The filters a salesperson actually reaches for, in the order they think of
 // them. Everything else the schema reports is real and usable, it just lives
 // behind "All filters" so the first screen is a decision and not an inventory.
@@ -208,6 +216,8 @@ export function ProspectingView({ slug, canExport }: { slug: string; canExport: 
   const [error, setError] = useState("");
   const [showAll, setShowAll] = useState(false);
   const [wall, setWall] = useState(false);
+  const [credits, setCredits] = useState<{ remaining: number; allowance: number } | null>(null);
+  const [job, setJob] = useState<ExportJob | null>(null);
 
   const schema = fields[source];
   const byName = useMemo(() => Object.fromEntries(schema.map((f) => [f.name, f])), [schema]);
@@ -245,6 +255,53 @@ export function ProspectingView({ slug, canExport }: { slug: string; canExport: 
     }, 450);
     return () => { if (countTimer.current) clearTimeout(countTimer.current); };
   }, [filters]);
+
+  // The seat's remaining credits. Read from the server on mount and refreshed
+  // after every export, because the balance is derived from the rows exported
+  // this month rather than from a counter the browser could drift away from.
+  useEffect(() => {
+    if (!canExport) return;
+    let live = true;
+    (async () => {
+      try {
+        const d = await (await fetch("/api/prospecting/context")).json();
+        if (live && d?.credits) setCredits(d.credits);
+      } catch { /* the meter simply does not render */ }
+    })();
+    return () => { live = false; };
+  }, [canExport]);
+
+  async function startExport(rows: Row[], picked: Set<string>) {
+    const chosen = rows.filter((r, i) => picked.has(rowKey(r, i)));
+    if (!chosen.length) return;
+    setError("");
+    try {
+      const r = await fetch("/api/prospecting/export", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows: chosen, list_name: "Find Prospects" }),
+      });
+      const d = await r.json();
+      if (r.status === 403) { setWall(true); return; }
+      if (!r.ok) throw new Error(d?.detail?.message || d?.detail || d?.error || "Export failed");
+      setJob({ id: d.job_id, state: "running", total: d.accepted, found: 0,
+               verified: 0, written: 0, charged: 0, skipped: 0, reused: 0 });
+      poll(d.job_id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Export failed");
+    }
+  }
+
+  function poll(id: string) {
+    const tick = async () => {
+      try {
+        const d: ExportJob = await (await fetch(`/api/prospecting/export/${id}`)).json();
+        setJob(d);
+        if (d.credits) setCredits(d.credits);
+        if (d.state === "running") setTimeout(tick, 2500);
+      } catch { setTimeout(tick, 4000); }
+    };
+    setTimeout(tick, 2000);
+  }
 
   const setFilter = useCallback((name: string, v: unknown) => {
     setFilters((prev) => {
@@ -388,6 +445,15 @@ export function ProspectingView({ slug, canExport }: { slug: string; canExport: 
                 </span>
               </div>
             </div>
+            {credits && (
+              <div className="text-right">
+                <div className="text-[11px] uppercase tracking-[0.18em] text-subtle">Credits left</div>
+                <div className="text-lg font-semibold tabular-nums text-foreground">
+                  {credits.remaining.toLocaleString()}
+                  <span className="text-[11px] font-normal text-subtle"> / {credits.allowance.toLocaleString()}</span>
+                </div>
+              </div>
+            )}
             <button type="button" onClick={runSearch} disabled={searching || activeCount === 0}
                     className="inline-flex items-center gap-2 rounded-lg bg-gold px-4 py-2 text-[13px] font-medium text-ink-inverse disabled:opacity-40 transition-opacity">
               {searching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
@@ -397,6 +463,42 @@ export function ProspectingView({ slug, canExport }: { slug: string; canExport: 
 
           {error && (
             <Panel className="border-red-500/40 p-3 text-[12px] text-red-500">{error}</Panel>
+          )}
+
+          {job && (
+            <Panel className="p-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-[13px]">
+                  {job.state === "running" && <Loader2 className="h-3.5 w-3.5 animate-spin text-gold-ink" />}
+                  {job.state === "done" && <Check className="h-3.5 w-3.5 text-gold-ink" />}
+                  <span className="font-medium text-foreground">
+                    {job.state === "running" && `Buying and verifying ${job.total} contacts`}
+                    {job.state === "done" && `${job.written} contacts are in your list`}
+                    {job.state === "error" && "The export stopped"}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-muted-foreground tabular-nums">
+                  <span>found <b className="text-foreground">{job.found}</b></span>
+                  <span>verified <b className="text-foreground">{job.verified}</b></span>
+                  {job.reused > 0 && <span>reused free <b className="text-foreground">{job.reused}</b></span>}
+                  <span>charged <b className="text-foreground">{job.charged}</b></span>
+                </div>
+              </div>
+              {job.state === "error" && job.error && (
+                <p className="mt-2 text-[12px] text-red-500">{job.error}</p>
+              )}
+              {job.state === "done" && (
+                <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">
+                  {job.skipped > 0 && (
+                    <>
+                      {job.skipped} were left out: no address found, or it did not clear
+                      verification. You were not charged for those.{" "}
+                    </>
+                  )}
+                  Open Targeted Cold Leads to write the outreach.
+                </p>
+              )}
+            </Panel>
           )}
 
           {wall && (
@@ -424,14 +526,20 @@ export function ProspectingView({ slug, canExport }: { slug: string; canExport: 
                     {selected.size === rows.length ? "Clear" : "Select all"}
                   </button>
                   <button
-                    type="button" disabled={selected.size === 0}
-                    onClick={() => { if (!canExport) setWall(true); }}
+                    type="button"
+                    disabled={selected.size === 0 || job?.state === "running"}
+                    onClick={() => { canExport ? startExport(rows, selected) : setWall(true); }}
                     title={canExport ? undefined : "Exporting contacts comes with a seat"}
                     className="inline-flex items-center gap-1.5 rounded-lg bg-gold px-3 py-1.5 text-[12px] font-medium text-ink-inverse disabled:opacity-40 transition-opacity"
                   >
-                    {canExport ? <Download className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
+                    {job?.state === "running"
+                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      : canExport ? <Download className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
                     Export to pipeline
-                    {selected.size > 0 && <span>· {selected.size} credits</span>}
+                    {/* "up to" is the honest word: a contact whose address is
+                        never found, or never clears the waterfall, is not
+                        charged for. */}
+                    {selected.size > 0 && <span>· up to {selected.size} credits</span>}
                   </button>
                 </div>
               </div>
