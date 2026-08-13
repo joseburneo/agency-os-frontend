@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import { Target, Download, Search, ExternalLink, Eye, X, Send, Copy, Check, Phone, MessageCircle, Star, Lock } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Target, Download, Search, ExternalLink, Eye, X, Send, Copy, Check, Phone, MessageCircle, Star, Lock, PenLine, Loader2 } from "lucide-react";
 import type { Workspace, WorkspaceData, Lead } from "@/lib/portal/types";
 import { ModuleHeader, Panel, Pill, CompanyMark, ChannelDots, cn } from "@/components/portal/ui";
 
@@ -139,6 +139,55 @@ function openCompose(l: Lead, step = 1) {
 // the server-only data module. Maps "List 2 · Has senior HR" -> "list-2-has-senior-hr".
 const listKey = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
+/** "Write the outreach": fills email 1, the two follow-ups and the LinkedIn note
+ *  for every lead on this list, from the workspace's own Brain.
+ *
+ *  Costs model tokens, not credits: a credit buys a verified address, and this
+ *  is not that. Runs in the background because thirty-seven leads take about a
+ *  minute and a half, so the page reloads itself when the job reports done. */
+function WriteOutreach({ listId, pending }: { listId: string; pending: number }) {
+  const router = useRouter();
+  const [state, setState] = useState<"idle" | "running" | "error">("idle");
+  const [msg, setMsg] = useState("");
+
+  async function start() {
+    setState("running"); setMsg("");
+    try {
+      const r = await fetch("/api/prospecting/copy", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ list_id: listId }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d?.detail?.message || d?.detail || "Could not start");
+      const tick = async () => {
+        const j = await (await fetch(`/api/prospecting/copy/${d.job_id}`)).json();
+        if (j.state === "running") { setMsg(`${j.written}/${j.total || "…"}`); setTimeout(tick, 3000); return; }
+        if (j.state === "error") { setState("error"); setMsg(j.error || "It stopped"); return; }
+        setState("idle"); setMsg("");
+        router.refresh();        // the drafts are in the database; re-read them
+      };
+      setTimeout(tick, 3000);
+    } catch (e) {
+      setState("error");
+      setMsg(e instanceof Error ? e.message : "Could not start");
+    }
+  }
+
+  if (pending === 0 && state === "idle") return null;
+  return (
+    <div className="flex items-center gap-2">
+      {state === "error" && <span className="text-[11px] text-red-500">{msg}</span>}
+      <button
+        type="button" onClick={start} disabled={state === "running"}
+        className="inline-flex items-center gap-1.5 rounded-lg bg-gold px-3 py-1.5 text-[12px] font-medium text-ink-inverse disabled:opacity-40 transition-opacity"
+      >
+        {state === "running" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PenLine className="h-3.5 w-3.5" />}
+        {state === "running" ? `Writing ${msg}` : `Write the outreach · ${pending}`}
+      </button>
+    </div>
+  );
+}
+
 export function TargetListsView({
   ws,
   data,
@@ -179,6 +228,12 @@ export function TargetListsView({
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const list = data.lists.find((l) => l.id === activeList) ?? data.lists[0];
+  // Leads on this list with no copy yet. Drives the button's count, and hides
+  // it entirely once every lead has a draft.
+  const draftsPending = useMemo(
+    () => data.leads.filter((l) => l.listId === (list?.id ?? activeList) && !l.hasDraft).length,
+    [data.leads, list?.id, activeList]
+  );
   // The VIP list gets the white-glove columns (Why VIP, LinkedIn note, Phone).
   // Detected from the unfiltered rows so an empty search never flips the layout.
   const isVip = useMemo(
@@ -369,6 +424,7 @@ export function TargetListsView({
             <p className="text-[13px] text-muted-foreground mt-1 max-w-2xl">{list.note}</p>
           </div>
           <div className="flex items-center gap-3 shrink-0">
+            {canExport && <WriteOutreach listId={list.id} pending={draftsPending} />}
             <span className="text-[11px] text-muted-foreground">Activated on</span>
             <ChannelDots channels={list.channels} size={16} />
           </div>
