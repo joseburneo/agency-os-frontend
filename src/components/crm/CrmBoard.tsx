@@ -840,8 +840,9 @@ function Conversation({ id, themName, fallback, refreshKey }: { id: number; them
   );
 }
 
-// ── reply composer: channel tabs + draft + send + copilot ────────────
-type DraftResp = { channel: string; step: number; goal: string; draft: string; can_send: boolean; gmail_live: boolean };
+// ── reply composer: channel tabs + draft + send ──────────────────────
+// Generation lives entirely in the copilot below; this component only holds the message and
+// sends it. (The old GET /prospect/{id}/draft response type went with the button.)
 // One way this reply can leave: on-thread via an alive Instantly account, or a
 // thread-resurrection send from the work mailbox (new email, In-Reply-To the stored
 // Message-ID, real history quoted) — that one survives any cancelled account.
@@ -895,7 +896,32 @@ function SenderSelect({ opts, value, onChange }: {
   );
 }
 type Chan = "email" | "linkedin" | "whatsapp" | "call";
-type CoLog = { role: "you" | "copilot"; content: string };
+// A copilot turn. `mode` is the backend's declared intent for the turn: it either answers,
+// asks ONE question before guessing, offers 2-3 moves to pick from, or hands over a draft.
+// `options` render as buttons, so a clarifying question is one click, not more typing.
+type CoMode = "answer" | "question" | "options" | "draft";
+type CoLog = {
+  role: "you" | "copilot";
+  content: string;
+  mode?: CoMode;
+  options?: string[];
+  hasDraft?: boolean;
+};
+// What the copilot actually loaded for this prospect. Rendered as chips in its header, so
+// "knows this prospect · the thread · the Build" stops being a promise and becomes a receipt:
+// a workspace with no Intelligence Library shows a grey Brain chip instead of quietly
+// answering as if it had one.
+type CoContext = {
+  brain?: boolean;
+  brain_sections?: number;
+  dossier_facts?: number;
+  sources?: number;
+  thread_msgs?: number;
+  build_leads?: number;
+  notes?: boolean;
+  call_notes?: boolean;
+  booking_link?: boolean;
+};
 
 function useComposer(d: Detail, onSent: () => void) {
   const id = d.id;
@@ -907,6 +933,7 @@ function useComposer(d: Detail, onSent: () => void) {
   const [co, setCo] = useState("");
   const [coBusy, setCoBusy] = useState(false);
   const [coLog, setCoLog] = useState<CoLog[]>([]);
+  const [coCtx, setCoCtx] = useState<CoContext | null>(null);
   const [threadKey, setThreadKey] = useState(0);   // bump to force the thread to reload after a send
   // Sender selector: which mailbox this reply leaves from. Options come from the
   // backend (alive accounts in the client's workspace + the Gmail resurrection path).
@@ -952,29 +979,10 @@ function useComposer(d: Detail, onSent: () => void) {
   };
   const text = drafts[chan];
 
-  const gen = (intent?: "book") => {
-    setDrafting(true); setSent(null);
-    const q = intent ? `?channel=${chan}&intent=${intent}` : `?channel=${chan}`;
-    fetch(`${API}/api/crm/prospect/${id}/draft${q}`)
-      .then(async (r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return (await r.json()) as DraftResp;
-      })
-      // Only ever REPLACE the composer with a real draft. A 500 returns valid JSON
-      // ({"detail": …}) whose .draft is undefined, and writing that wiped whatever
-      // Jose had typed. An empty answer leaves his text alone and says so.
-      .then((j) => {
-        if (j.draft && j.draft.trim()) setDraft(chan, j.draft);
-        else setSent("err:the drafter returned nothing");
-      })
-      .catch((e) => setSent(`err:${e instanceof Error ? e.message : "draft failed"}`))
-      .finally(() => setDrafting(false));
-  };
-
   // No auto-draft on card open (Jose, 2026-07-24). It burned a model call on
   // every card just browsing the board, and a draft nobody asked for sitting in
-  // the composer reads as the system being pushy. The draft is one click away:
-  // "Draft with AI" or a copilot chip, both of which now run the flagship path.
+  // the composer reads as the system being pushy. The draft is one click away,
+  // through the copilot — the single AI surface on the card since 2026-08-13.
 
   const send = () => {
     setSending(true);
@@ -1003,13 +1011,21 @@ function useComposer(d: Detail, onSent: () => void) {
     }).then((r) => { if (r.ok) { setSent("touched"); onSent(); } }).catch(() => {});
   };
 
+  // The ONE generation call on the card. The old `Draft with AI` button hit a second
+  // endpoint on a weaker model, so the same words produced two different qualities and
+  // you could not tell which you had pressed. Everything routes here now.
   const askCopilot = (override?: string) => {
     const instruction = (override ?? co).trim();
     if (!instruction) return;
-    setCoBusy(true); setCoLog((l) => [...l, { role: "you", content: instruction }]); setCo("");
+    const wantsDraft = /\b(draft|write|rewrite|shorten|reply|redacta|escribe)\b/i.test(instruction);
+    setCoBusy(true); if (wantsDraft) { setDrafting(true); setSent(null); }
+    setCoLog((l) => [...l, { role: "you", content: instruction }]); setCo("");
     fetch(`${API}/api/crm/prospect/${id}/copilot`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: instruction, draft: drafts[chan], target: chan, history: coLog.map((x) => ({ role: x.role === "you" ? "user" : "assistant", content: x.content })) }),
+      body: JSON.stringify({
+        message: instruction, draft: drafts[chan], target: chan,
+        history: coLog.map((x) => ({ role: x.role === "you" ? "user" : "assistant", content: x.content })),
+      }),
     })
       .then(async (r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -1018,58 +1034,178 @@ function useComposer(d: Detail, onSent: () => void) {
       // "Updated the draft." was printed even on a 500, whose JSON has no .reply —
       // the copilot claimed success while nothing had changed.
       .then((j) => {
-        if (j.draft) setDraft(chan, j.draft);
-        const said = j.reply || (j.draft ? "Updated the draft." : "No answer came back. Try again.");
-        setCoLog((l) => [...l, { role: "copilot", content: said }]);
+        const mode: CoMode = j.mode || (j.draft ? "draft" : "answer");
+        // Only a real draft turn touches the composer. In question/options mode the
+        // backend echoes the current draft back, and writing it would clobber whatever
+        // was being typed while the copilot was thinking.
+        const landed = mode === "draft" && j.draft && j.draft.trim() && j.draft !== drafts[chan];
+        if (landed) setDraft(chan, j.draft);
+        if (j.context) setCoCtx(j.context as CoContext);
+        const said = j.reply || (landed ? "Updated the draft." : "No answer came back. Try again.");
+        setCoLog((l) => [...l, {
+          role: "copilot", content: said, mode,
+          options: Array.isArray(j.options) ? j.options : [],
+          hasDraft: !!landed,
+        }]);
       })
       .catch((e) => setCoLog((l) => [...l, {
-        role: "copilot",
+        role: "copilot", mode: "answer",
         content: `Copilot failed (${e instanceof Error ? e.message : "unknown"}). Your draft is untouched.`,
       }]))
-      .finally(() => setCoBusy(false));
+      .finally(() => { setCoBusy(false); setDrafting(false); });
   };
 
   const canSendEmail = chan === "email" && (sendOpts.length > 0 || d.can_send_email);
   const gmailLive = d.live_channel === "gmail";
-  const draftLabel = chan === "email" ? "Draft with AI" : chan === "linkedin" ? "Draft LinkedIn" : chan === "whatsapp" ? "Draft WhatsApp" : "Talking points";
-  return { d, chan, setChan, text, setDraft, gen, send, logTouch, refresh: onSent, askCopilot, drafting, sending, sent, setSent, co, setCo, coBusy, coLog, canSendEmail, gmailLive, draftLabel, threadKey, sendOpts, fromKey, setFromKey, selectedOpt, threadAcct, routeTo, routeCc, setRouteCc, ccAdd, setCcAdd, clientCc, sigInfo };
+  return { d, chan, setChan, text, setDraft, send, logTouch, refresh: onSent, askCopilot, drafting, sending, sent, setSent, co, setCo, coBusy, coLog, coCtx, canSendEmail, gmailLive, threadKey, sendOpts, fromKey, setFromKey, selectedOpt, threadAcct, routeTo, routeCc, setRouteCc, ccAdd, setCcAdd, clientCc, sigInfo };
 }
 type ComposerCtl = ReturnType<typeof useComposer>;
 
-// Copilot chat-to-edit — lifted out of the composer so it can sit in the right rail (per
-// the redesign) while still editing the composer's draft, which lives in the shared state.
-const COPILOT_PROMPTS = ["What's the best next move?", "Draft the reply", "What are they really asking?", "How do I handle the price question?"];
+// ── the copilot: the ONE AI surface on the card ──────────────────────
+// It used to sit beside a separate "Draft with AI" button that called a different endpoint
+// on a weaker model, and beside a Business Intelligence panel showing the very research the
+// copilot was reading. Three surfaces, one job. They are one thing now: the chat drafts, the
+// research folds in behind it, and the header shows exactly what got loaded.
+
+// Openers, chosen by what the prospect actually did. The old list was four fixed strings for
+// every card, which is how you get "How do I handle the price question?" on a prospect who
+// never mentioned price.
+const COPILOT_SUGGESTIONS: Record<string, string[]> = {
+  wants_meeting: ["Draft the reply with two time slots", "Are they actually ready, or being polite?", "What should I ask before the call?"],
+  meeting_already_set: ["Draft a short confirmation", "What should I prepare for this call?"],
+  positive: ["Draft the reply", "What is the best next move?", "What are they really asking?"],
+  question: ["Answer their question", "What are they really asking?", "Draft the reply"],
+  referral: ["Draft a reply asking for the intro", "Who should I be talking to here?"],
+  not_interested: ["Is this worth keeping warm?", "Draft a short, no-pressure close"],
+  using_competitor: ["How do I answer the competitor point?", "Draft a reply that leaves the door open"],
+};
+const COPILOT_FALLBACK = ["What is the best next move?", "Draft the reply", "What are they really asking?"];
+
+function copilotChips(d: Detail, chan: Chan): string[] {
+  if (chan === "call") return ["Give me talking points", "What are they worried about?", "What do I ask to qualify?"];
+  const base = COPILOT_SUGGESTIONS[d.intent_label] || COPILOT_FALLBACK;
+  if (chan === "linkedin") return ["Draft a short LinkedIn note", ...base.filter((s) => !/draft/i.test(s))].slice(0, 3);
+  if (chan === "whatsapp") return ["Draft a WhatsApp nudge", ...base.filter((s) => !/draft/i.test(s))].slice(0, 3);
+  return base;
+}
+
+// The receipt. Green = loaded, grey = genuinely absent, so an empty Intelligence Library
+// is visible BEFORE you read a generic answer and wonder why it sounds like nobody.
+function CtxChip({ on, label, title }: { on: boolean; label: string; title: string }) {
+  return (
+    <span title={title}
+      className={`text-[10px] rounded-full px-1.5 py-0.5 border ${on
+        ? "border-[#26D07C]/40 bg-[#26D07C]/10 text-[#26D07C]"
+        : "border-border bg-transparent text-muted-foreground/50 line-through"}`}>
+      {label}
+    </span>
+  );
+}
+
+function ContextChips({ ctx, d }: { ctx: CoContext | null; d: Detail }) {
+  // Before the first turn the backend has not answered yet, so fall back to what the card
+  // itself already knows. Same shape either way, so the row never pops in.
+  const factCount = Object.values(d.dossier_facts || {}).filter(Boolean).length;
+  const researchCount = Object.values(d.research || {}).filter((v) => (v || "").trim()).length;
+  const c = ctx || {
+    brain: undefined, dossier_facts: factCount, sources: researchCount,
+    thread_msgs: undefined, build_leads: d.build_leads, notes: !!(d.notes || "").trim(),
+    call_notes: !!d.call_notes,
+  };
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      {c.brain !== undefined && (
+        <CtxChip on={!!c.brain} label={c.brain ? `Brain ${c.brain_sections || ""}`.trim() : "Brain"}
+          title={c.brain ? "The workspace's own Intelligence Library is loaded" : "This workspace has no Intelligence Library yet, so the copilot writes without its voice and rules"} />
+      )}
+      <CtxChip on={(c.dossier_facts || 0) > 0} label={`Research ${c.dossier_facts || 0}/8`}
+        title="Distilled why-they-fit facts from the dossier" />
+      <CtxChip on={(c.sources || 0) > 0} label={`Sources ${c.sources || 0}`}
+        title="Raw research behind the summary: site, LinkedIn, web search, call" />
+      {c.thread_msgs !== undefined && (
+        <CtxChip on={(c.thread_msgs || 0) > 0} label={`Thread ${c.thread_msgs}`} title="Messages of the real conversation in context" />
+      )}
+      <CtxChip on={(c.build_leads || 0) > 0} label={c.build_leads ? `Build ${c.build_leads}` : "Build"}
+        title="Their Build and the sample leads inside it" />
+      <CtxChip on={!!c.notes} label="Notes" title="Your handwritten notes on this deal" />
+      {c.call_notes && <CtxChip on label="Call" title="What was said on the discovery call" />}
+    </div>
+  );
+}
 
 function Copilot({ c }: { c: ComposerCtl }) {
-  const { co, setCo, askCopilot, coBusy, coLog } = c;
+  const { d, co, setCo, askCopilot, coBusy, coLog, coCtx, chan, text, send, sending, canSendEmail } = c;
   const logRef = useRef<HTMLDivElement>(null);
+  const [showIntel, setShowIntel] = useState(false);
   useEffect(() => { logRef.current?.scrollTo({ top: logRef.current.scrollHeight }); }, [coLog, coBusy]);
+
+  const opening = actNow(d);
+  const last = coLog[coLog.length - 1];
+  // Chips come from the last copilot turn when it offered any (a question's likely answers,
+  // or the moves it proposed); otherwise from what the prospect did.
+  const chips = last?.role === "copilot" && last.options?.length ? last.options : (coLog.length === 0 ? copilotChips(d, chan) : []);
+  const draftReady = !!text.trim();
+
   return (
     <div className="rounded-xl border border-[#FFD60A]/30 bg-[#FFD60A]/[0.05] p-3.5 space-y-2.5">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <Bot className="w-4 h-4 text-[#FFD60A]" />
         <span className="text-[11px] uppercase tracking-wider text-[#FFD60A] font-semibold">Copilot</span>
-        <span className="text-[10px] text-muted-foreground">knows this prospect · the thread · the Build</span>
+        <span className="text-[10px] text-muted-foreground">it drafts, it asks, it never sends by itself</span>
+      </div>
+      <ContextChips ctx={coCtx} d={d} />
+
+      <div ref={logRef} className="space-y-2.5 max-h-[26rem] overflow-y-auto text-[12.5px] leading-relaxed pr-1">
+        {/* Opening turn — the intent read the card already computed and cached, rendered as
+            the copilot's first message. Costs nothing extra and means the panel is never a
+            blank box waiting to be prompted. */}
+        <div>
+          <span className="font-semibold text-[#FFD60A] inline-flex items-center gap-1.5">
+            <Zap className="w-3.5 h-3.5" /> {opening.title}
+          </span>
+          <div className="text-foreground">{opening.detail}</div>
+        </div>
+
+        {coLog.map((l, i) => (
+          <div key={i}>
+            <span className={`font-semibold ${l.role === "you" ? "text-foreground" : "text-[#FFD60A]"}`}>
+              {l.role === "you" ? "You" : "Copilot"}
+              {l.role === "copilot" && l.mode === "question" && <span className="ml-1.5 text-[10px] font-normal text-muted-foreground">needs one thing</span>}
+              {l.role === "copilot" && l.hasDraft && <span className="ml-1.5 text-[10px] font-normal text-[#26D07C]">draft in the composer</span>}
+            </span>
+            <div className={`whitespace-pre-wrap ${l.role === "you" ? "text-muted-foreground" : "text-foreground"}`}>{l.content}</div>
+          </div>
+        ))}
+        {coBusy && <div className="flex items-center gap-1.5 text-[#FFD60A] text-xs"><Loader2 className="w-3.5 h-3.5 animate-spin" /> thinking…</div>}
       </div>
 
-      {coLog.length === 0 ? (
+      {chips.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
-          {COPILOT_PROMPTS.map((p) => (
+          {chips.map((p) => (
             <button key={p} onClick={() => askCopilot(p)} disabled={coBusy}
               className="text-[11px] rounded-full border border-[#FFD60A]/30 px-2.5 py-1 text-muted-foreground hover:text-[#FFD60A] hover:border-[#FFD60A]/50 disabled:opacity-40 transition-colors">
               {p}
             </button>
           ))}
         </div>
-      ) : (
-        <div ref={logRef} className="space-y-2 max-h-72 overflow-y-auto text-[12.5px] leading-relaxed pr-1">
-          {coLog.map((l, i) => (
-            <div key={i} className={l.role === "you" ? "" : ""}>
-              <span className={`font-semibold ${l.role === "you" ? "text-foreground" : "text-[#FFD60A]"}`}>{l.role === "you" ? "You" : "Copilot"}</span>
-              <div className={`whitespace-pre-wrap ${l.role === "you" ? "text-muted-foreground" : "text-foreground"}`}>{l.content}</div>
-            </div>
+      )}
+
+      {/* Act on the draft without leaving the panel. Send is the same call the composer
+          makes, with the same sender and routing — this is a second door, not a second path. */}
+      {draftReady && (
+        <div className="flex flex-wrap items-center gap-1.5 border-t border-[#FFD60A]/15 pt-2.5">
+          {chan === "email" && canSendEmail && (
+            <button onClick={send} disabled={sending || coBusy}
+              className="neon-btn inline-flex items-center gap-1.5 rounded-lg bg-[#FFD60A] px-3 py-1.5 text-[12px] font-semibold text-[#0A0E1A] hover:bg-[#ffdf3a] disabled:opacity-40 transition-colors">
+              {sending ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Sending…</> : <><Send className="w-3.5 h-3.5" /> Send it</>}
+            </button>
+          )}
+          {["Make it shorter", "More direct", "Warmer"].map((p) => (
+            <button key={p} onClick={() => askCopilot(p)} disabled={coBusy}
+              className="text-[11px] rounded-full border border-border px-2.5 py-1 text-muted-foreground hover:text-foreground hover:border-[#FFD60A]/40 disabled:opacity-40 transition-colors">
+              {p}
+            </button>
           ))}
-          {coBusy && <div className="flex items-center gap-1.5 text-[#FFD60A] text-xs"><Loader2 className="w-3.5 h-3.5 animate-spin" /> thinking…</div>}
         </div>
       )}
 
@@ -1087,6 +1223,17 @@ function Copilot({ c }: { c: ComposerCtl }) {
         </button>
       </div>
       <p className="text-[10px] text-muted-foreground/70">When it writes a message, it drops straight into the composer on the left.</p>
+
+      {/* The research it is reading, one click away. Same panel as before, folded in here
+          instead of sitting beside the copilot repeating its context back at you. */}
+      <div className="pt-1">
+        <button onClick={() => setShowIntel((s) => !s)}
+          className="w-full flex items-center justify-between text-[11px] text-muted-foreground hover:text-[#FFD60A] transition-colors">
+          <span className="uppercase tracking-wider font-semibold">What it knows · the research</span>
+          <ChevronRight className={`w-3.5 h-3.5 transition-transform ${showIntel ? "rotate-90" : ""}`} />
+        </button>
+        {showIntel && <div className="mt-2"><IntelPanel d={d} /></div>}
+      </div>
     </div>
   );
 }
@@ -1194,7 +1341,7 @@ function CallPanel({ d, onTouched }: { d: Detail; onTouched: () => void }) {
 }
 
 function Composer({ c }: { c: ComposerCtl }) {
-  const { d, chan, setChan, text, setDraft, gen, send, logTouch, drafting, sending, sent, setSent, canSendEmail, gmailLive, draftLabel, sendOpts, fromKey, setFromKey, selectedOpt, threadAcct, routeTo, routeCc, setRouteCc, ccAdd, setCcAdd, clientCc } = c;
+  const { d, chan, setChan, text, setDraft, send, logTouch, drafting, sending, sent, setSent, canSendEmail, gmailLive, sendOpts, fromKey, setFromKey, selectedOpt, threadAcct, routeTo, routeCc, setRouteCc, ccAdd, setCcAdd, clientCc } = c;
   // Compact by default so an empty composer never steals the conversation's space; it opens
   // on click or as soon as there's a draft (incl. one the copilot / Draft-with-AI wrote).
   const [open, setOpen] = useState(false);
@@ -1282,11 +1429,13 @@ function Composer({ c }: { c: ComposerCtl }) {
         </button>
       ) : (
       <>
-      {/* reply box — drag the bottom-right corner to resize while writing */}
+      {/* reply box — drag the bottom-right corner to resize while writing. It opens taller
+          now that the AI buttons moved into the copilot: the space they took belongs to the
+          message, which is the only thing this column is for. */}
       <textarea
         value={text} onChange={(e) => setDraft(chan, e.target.value)} autoFocus
-        placeholder={`Write your ${CHANNEL_META[chan].label} message, or ask the copilot…`}
-        rows={Math.min(14, Math.max(3, text.split("\n").length + 1))}
+        placeholder={`Write your ${CHANNEL_META[chan].label} message, or ask the copilot on the right…`}
+        rows={Math.min(20, Math.max(8, text.split("\n").length + 2))}
         className="w-full bg-background border border-border rounded-lg p-3 text-sm text-foreground leading-relaxed focus:outline-none focus:ring-1 focus:ring-[#FFD60A]/50 resize-y"
       />
 
@@ -1355,18 +1504,13 @@ function Composer({ c }: { c: ComposerCtl }) {
               <Copy className="w-4 h-4" /> Copy & open {CHANNEL_META[chan].label}
             </a>
           ) : null}
-          <button onClick={() => gen()} disabled={drafting}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[#FFD60A]/40 px-3 py-2 text-sm text-[#FFD60A] hover:bg-[#FFD60A]/10 disabled:opacity-40 transition-colors">
-            {drafting ? <Loader2 className="w-4 h-4 animate-spin" /> : <PenLine className="w-4 h-4" />} {draftLabel}
-          </button>
-          {chan === "email" && (
-            <button onClick={() => gen("book")} disabled={drafting}
-              className={d.wants_meeting && !text.trim()
-                ? "neon-btn inline-flex items-center gap-1.5 rounded-lg bg-[#26D07C] px-4 py-2 text-sm font-semibold text-[#0A0E1A] hover:bg-[#3ce08e] disabled:opacity-40 transition-colors"
-                : "inline-flex items-center gap-1.5 rounded-lg border border-[#26D07C]/40 px-3 py-2 text-sm text-[#26D07C] hover:bg-[#26D07C]/10 disabled:opacity-40 transition-colors"}
-              title="Draft a booking message with the calendar link">
-              <CalendarClock className="w-4 h-4" /> {d.wants_meeting && !text.trim() ? "Draft booking message" : "Book"}
-            </button>
+          {/* "Draft with AI" and "Book" used to live here. Both are the copilot's job now —
+              they called a second endpoint on a weaker model, so the same request produced a
+              different answer depending on which button you happened to press. */}
+          {drafting && (
+            <span className="inline-flex items-center gap-1.5 text-sm text-[#FFD60A]">
+              <Loader2 className="w-4 h-4 animate-spin" /> Copilot is writing…
+            </span>
           )}
           <button onClick={() => { navigator.clipboard.writeText(text); }} disabled={!text.trim()}
             className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary disabled:opacity-40 transition-colors">
@@ -2151,9 +2295,6 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
 // Copilot share one draft. Keyed by prospect id so switching cards resets the draft.
 function RecordBody({ d, id, themName, reload, both }: { d: Detail; id: number; themName: string; reload: (f?: boolean) => void; both: () => void }) {
   const c = useComposer(d, both);
-  const a = actNow(d);
-  const tone = a.tone === "green" ? "border-[#26D07C]/40 bg-[#26D07C]/8 text-[#26D07C]"
-    : a.tone === "gold" ? "border-[#FFD60A]/40 bg-[#FFD60A]/8 text-[#FFD60A]" : "border-border bg-card text-foreground";
   return (
     <div className="flex-1 min-h-0 overflow-y-auto lg:overflow-hidden grid grid-cols-1 lg:grid-cols-[23%_1fr_30%]">
       {/* LEFT rail */}
@@ -2170,25 +2311,20 @@ function RecordBody({ d, id, themName, reload, both }: { d: Detail; id: number; 
           <Composer c={c} />
         </div>
 
-        {/* 2 · what to do now — one-line action banner */}
-        <div className="px-4 lg:px-5 pt-3">
-          <div className={`rounded-xl border px-3.5 py-2.5 ${tone}`}>
-            <div className="flex items-center gap-2 text-sm font-semibold"><Zap className="w-4 h-4" /> {a.title}</div>
-            <p className="text-[12.5px] text-muted-foreground mt-0.5">{a.detail}</p>
-          </div>
-        </div>
-
-        {/* 3 · conversation — flows in the same scroll, right under the composer */}
+        {/* 2 · conversation — flows in the same scroll, right under the composer. The
+            "what to do now" banner that used to sit between them is the copilot's opening
+            turn now, so the center column is only ever the message and the thread. */}
         <div className="p-4 lg:p-5 space-y-3">
           <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">// CONVERSATION · NEWEST_FIRST</div>
           <Conversation id={id} themName={themName} fallback={d.reply_text} refreshKey={c.threadKey} />
         </div>
       </div>
 
-      {/* RIGHT: copilot up top (always in view) + the intelligence dossier below */}
-      <div className="lg:overflow-y-auto p-4 lg:p-5 space-y-4">
+      {/* RIGHT: the copilot, and nothing else. The Business Intelligence panel folds inside
+          it — one column that is the brain of this card, instead of a chat next to a panel
+          showing the same research the chat was already reading. */}
+      <div className="lg:overflow-y-auto p-4 lg:p-5">
         <Copilot c={c} />
-        <IntelPanel d={d} />
       </div>
     </div>
   );
