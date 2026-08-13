@@ -298,16 +298,20 @@ function domainOf(email?: string): string {
   return d && !FREE_MAIL.has(d) ? d : "";
 }
 
-// A small logo from a domain's favicon (Google's service). Falls back to a monogram tile
-// if the icon fails, so a missing favicon never leaves a broken image.
-function Favicon({ domain, label, size = 20, className = "" }: {
-  domain: string; label?: string; size?: number; className?: string;
+// A small logo, tried in order: our own artwork (`src`), then the domain's favicon
+// (Google's service), then a monogram tile. Each URL remembers its own failure, so a
+// missing asset or favicon degrades one step instead of leaving a broken image.
+function Favicon({ src, domain, label, size = 20, className = "" }: {
+  src?: string; domain?: string; label?: string; size?: number; className?: string;
 }) {
-  const [ok, setOk] = useState(true);
-  if (domain && ok) {
+  const [bad, setBad] = useState<string[]>([]);
+  const chain = [src, domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=64` : ""]
+    .filter(Boolean) as string[];
+  const url = chain.find((u) => !bad.includes(u));
+  if (url) {
     return (
-      <img src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`}
-        width={size} height={size} alt={label || domain} onError={() => setOk(false)}
+      <img src={url} width={size} height={size} alt={label || domain || ""}
+        onError={() => setBad((b) => [...b, url])}
         className={`rounded-[4px] shrink-0 ${className}`} style={{ width: size, height: size }} />
     );
   }
@@ -315,6 +319,55 @@ function Favicon({ domain, label, size = 20, className = "" }: {
     <span className={`inline-grid place-items-center rounded-[4px] bg-secondary text-muted-foreground shrink-0 ${className}`}
       style={{ width: size, height: size, fontSize: size * 0.5 }}>
       {(label || domain || "?").slice(0, 1).toUpperCase()}
+    </span>
+  );
+}
+
+// ── who is speaking: company identity in the thread ──────────────────────────
+// A cold thread is one COMPANY talking to another, so the message circle carries the
+// company logo (AudioStack, Arco Irish, Luxvance) and never a person's initials or the
+// pipe the mail came through. The channel is not lost: it rides as a 10px badge in the
+// corner of the avatar, and still labels the conversation header above.
+
+// Our side of the thread, per workspace. Supabase `workspaces` (slug, name, domain) is
+// the truth; this is its render-time mirror, so an unknown workspace falls back to an
+// honest monogram instead of borrowing another company's logo. `logo` is a local asset
+// (our own artwork beats a 16px favicon); `domain` is the automatic fallback. To brand a
+// new client, drop /brand/<slug>.png in public and add the row.
+const WS_BRAND: Record<string, { name: string; logo?: string; domain?: string }> = {
+  luxvance: { name: "Luxvance", logo: "/brand/luxvance.png", domain: "luxvance.com" },
+  "arco-irish": { name: "Arco Irish", domain: "arcoirish.com" },
+  "connect-resources": { name: "Connect Resources", domain: "connectresources.ae" },
+  kcal: { name: "Kcal", domain: "kcallife.com" },
+  "global-food-ventures": { name: "Global Food Ventures" },
+};
+// The agency cockpit runs with no slug: that board IS Luxvance's own pipeline.
+function wsBrand(slug?: string): { name: string; logo?: string; domain?: string } {
+  const key = (slug || "luxvance").toLowerCase();
+  return WS_BRAND[key] || { name: key.replace(/-/g, " ").replace(/\b\w/g, (m) => m.toUpperCase()) };
+}
+// Which workspace this board is scoped to, so a message bubble deep in the tree knows
+// whose logo to draw on our side without threading the slug through six components.
+const WorkspaceCtx = createContext<string | undefined>(undefined);
+
+// The message avatar: company logo, with the channel as a corner badge.
+function CompanyAvatar({ logo, domain, label, channelLogo, channelName, tint, size = 32 }: {
+  logo?: string; domain?: string; label?: string;
+  channelLogo?: string; channelName?: string; tint?: string; size?: number;
+}) {
+  const badge = Math.round(size * 0.42);
+  return (
+    <span className="relative shrink-0 block" style={{ width: size, height: size }} title={label}>
+      <span className="block rounded-full overflow-hidden grid place-items-center w-full h-full"
+        style={{ background: tint || "rgba(255,255,255,.06)" }}>
+        <Favicon src={logo} domain={domain} label={label} size={Math.round(size * 0.62)} />
+      </span>
+      {channelLogo && (
+        <span className="absolute -bottom-0.5 -right-0.5 rounded-full grid place-items-center bg-background"
+          style={{ width: badge, height: badge, padding: 1 }} title={channelName}>
+          <Favicon domain={channelLogo} label={channelName} size={badge - 3} className="rounded-full" />
+        </span>
+      )}
     </span>
   );
 }
@@ -675,9 +728,13 @@ type Convo = {
 // A single campaign thread: a labeled, collapsible block. The burner + a REPLIED/no-reply
 // badge sit in the header so Jose knows at a glance which mailbox ran it and whether the
 // prospect ever answered. Open by default only for the primary (most-recent replied) one.
-function ConvoBlock({ c, themName, defaultOpen }: { c: Convo; themName: string; defaultOpen: boolean }) {
+function ConvoBlock({ c, themName, themCompany, themDomain, defaultOpen }: {
+  c: Convo; themName: string; themCompany: string; themDomain: string; defaultOpen: boolean;
+}) {
   const [open, setOpen] = useState(defaultOpen);
   const src = SRC[convoSource(c)];
+  // Our half of the thread is the workspace's company, never the person who typed it.
+  const us = wsBrand(useContext(WorkspaceCtx));
   const routeShow = c.messages.map((m, i) => i === 0 || routeKey(m) !== routeKey(c.messages[i - 1]));
   const ordered = [...c.messages].reverse(); // newest first inside the block
   return (
@@ -726,10 +783,13 @@ function ConvoBlock({ c, themName, defaultOpen }: { c: Convo; themName: string; 
                   </div>
                 )}
                 <div className={`flex gap-2.5 ${m.from_me ? "flex-row-reverse" : ""}`}>
-                  <div className="shrink-0 w-8 h-8 rounded-full grid place-items-center text-[11px] font-semibold overflow-hidden"
-                    style={m.from_me ? { background: "rgba(255,214,10,.15)", color: "#FFD60A" } : { background: src.tint }}>
-                    {m.from_me ? "JB" : <Favicon domain={src.logo} label={src.name} size={16} />}
-                  </div>
+                  {m.from_me ? (
+                    <CompanyAvatar logo={us.logo} domain={us.domain} label={us.name}
+                      channelLogo={src.logo} channelName={src.name} tint="rgba(255,214,10,.15)" />
+                  ) : (
+                    <CompanyAvatar domain={themDomain} label={themCompany || themName}
+                      channelLogo={src.logo} channelName={src.name} tint={src.tint} />
+                  )}
                   <div className={`${m.html ? "max-w-[min(94%,640px)] w-full" : "max-w-[min(82%,60ch)]"} flex flex-col ${m.from_me ? "items-end" : "items-start"}`}>
                     {m.html ? (
                       // Original HTML, rendered like the real inbox rendered it —
@@ -783,7 +843,9 @@ function ConvoBlock({ c, themName, defaultOpen }: { c: Convo; themName: string; 
   );
 }
 
-function Conversation({ id, themName, fallback, refreshKey }: { id: number; themName: string; fallback?: string; refreshKey?: number }) {
+function Conversation({ id, themName, themCompany = "", themDomain = "", fallback, refreshKey }: {
+  id: number; themName: string; themCompany?: string; themDomain?: string; fallback?: string; refreshKey?: number;
+}) {
   const [convos, setConvos] = useState<Convo[] | null>(null);
   const [uniboxUrl, setUniboxUrl] = useState<string>("");
   const [failed, setFailed] = useState(false);
@@ -836,7 +898,8 @@ function Conversation({ id, themName, fallback, refreshKey }: { id: number; them
         )}
       </div>
       {convos.map((c, i) => (
-        <ConvoBlock key={c.eaccount} c={c} themName={themName} defaultOpen={i === 0} />
+        <ConvoBlock key={c.eaccount} c={c} themName={themName} themCompany={themCompany}
+          themDomain={themDomain} defaultOpen={i === 0} />
       ))}
     </div>
   );
@@ -2422,7 +2485,8 @@ function RecordBody({ d, id, themName, reload, both }: { d: Detail; id: number; 
             turn now, so the center column is only ever the message and the thread. */}
         <div className="p-4 lg:p-5 space-y-3">
           <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">// CONVERSATION · NEWEST_FIRST</div>
-          <Conversation id={id} themName={themName} fallback={d.reply_text} refreshKey={c.threadKey} />
+          <Conversation id={id} themName={themName} themCompany={d.company}
+            themDomain={domainOf(d.email)} fallback={d.reply_text} refreshKey={c.threadKey} />
         </div>
       </div>
 
@@ -3117,6 +3181,7 @@ export function CrmBoard({ workspace, basePath = "/crm", live = true, canBuild =
 
   return (
     <CanBuildCtx.Provider value={canBuild}>
+    <WorkspaceCtx.Provider value={workspace}>
     <div className="w-full">
       <div className="crm-ambient" aria-hidden />
       {/* one compact command bar: identity · search · view · sort · refresh */}
@@ -3214,6 +3279,7 @@ export function CrmBoard({ workspace, basePath = "/crm", live = true, canBuild =
 
       {openId !== null && <Record id={openId} initial={rows.find((r) => r.id === openId)} queue={queueIds} onNavigate={openRecord} onClose={() => openRecord(null)} onChanged={load} />}
     </div>
+    </WorkspaceCtx.Provider>
     </CanBuildCtx.Provider>
   );
 }
