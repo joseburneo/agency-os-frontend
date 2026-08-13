@@ -98,7 +98,7 @@ export function MagnetOverview({
             <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
               {facts.map(([k, v]) => (
                 <div key={k}>
-                  <dt className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground/70">{k}</dt>
+                  <dt className="text-[10px] uppercase tracking-[0.14em] text-subtle">{k}</dt>
                   <dd className="text-[13.5px] text-foreground/90 leading-snug mt-0.5">{v}</dd>
                 </div>
               ))}

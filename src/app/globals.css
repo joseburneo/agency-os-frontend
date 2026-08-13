@@ -37,6 +37,11 @@
 
   --muted: rgba(26, 26, 26, 0.04);
   --muted-foreground: #5F6875;         /* 5.6:1 on white */
+  /* The third level of grey, for the small labels that were written as
+     `text-muted-foreground/60`. An opacity modifier is a dark-theme device: over white it
+     blends TOWARDS the background and destroys the text (/50 measured 2.09:1). One token
+     that is legible in both, and the hierarchy comes from size and weight instead. */
+  --subtle: #667080;                   /* 5.0:1 on white */
 
   --accent: rgba(201, 168, 76, 0.16);
   --accent-foreground: #8A6D1F;
@@ -53,7 +58,7 @@
 
   /* Brand accents, by role */
   --gold: #C9A84C;        /* fills, borders, rings */
-  --gold-ink: #8A6D1F;    /* accent TEXT — 5.9:1 on white */
+  --gold-ink: #806419;    /* accent TEXT — 5.6:1 on white */
   --gold-hi: #B8963C;     /* the brighter hover state of a gold fill */
   --signal: #0F8A4F;      /* live / positive / go */
   --signal-ink: #0B6B3D;  /* 5.4:1 on white */
@@ -73,9 +78,12 @@
   --cyan: #0E7490;
 
   /* Chrome */
-  --hairline: rgba(26, 26, 26, 0.10);
+  --hairline: rgba(26, 26, 26, 0.14);  /* panels have to read as panels on white */
   --scrollbar: rgba(26, 26, 26, 0.16);
   --scrollbar-hover: rgba(26, 26, 26, 0.28);
+  /* The modal scrim. 60% black is right over near-black and turns a white page into mud,
+     which is what made the lead panel unpleasant to read. Light needs a lighter veil. */
+  --overlay: rgba(26, 26, 26, 0.38);
   /* The neon glow is a dark-theme device. On white it reads as a printing error, so it
      is switched off by making its colour transparent rather than by forking the rules. */
   --glow-gold: rgba(201, 168, 76, 0);
@@ -109,6 +117,7 @@
 
   --muted: rgba(255, 255, 255, 0.05);
   --muted-foreground: #8A93A6;
+  --subtle: #5F6675;                   /* what /60-/70 already looked like here */
 
   --accent: rgba(255, 214, 10, 0.12);
   --accent-foreground: #FFD60A;
@@ -141,6 +150,7 @@
   --cyan: #5FD0E0;
 
   --hairline: rgba(255, 255, 255, 0.07);
+  --overlay: rgba(0, 0, 0, 0.60);
   --scrollbar: rgba(255, 255, 255, 0.09);
   --scrollbar-hover: rgba(255, 255, 255, 0.18);
   --glow-gold: rgba(255, 214, 10, 0.40);
@@ -166,6 +176,8 @@
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
+  --color-subtle: var(--subtle);
+  --color-overlay: var(--overlay);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-border: var(--border);

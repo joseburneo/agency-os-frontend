@@ -216,7 +216,7 @@ function Field({ label, value, onChange, placeholder }: { label: string; value: 
         value={value}
         onChange={(ev) => onChange(ev.target.value)}
         placeholder={placeholder}
-        className="rounded-lg border border-border bg-white/[0.03] px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-gold/40 focus:outline-none"
+        className="rounded-lg border border-border bg-white/[0.03] px-3 py-2 text-sm text-foreground placeholder:text-subtle focus:border-gold/40 focus:outline-none"
       />
     </label>
   );

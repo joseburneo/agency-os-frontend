@@ -209,8 +209,8 @@ export function WorkspaceSidebar({ slug, ws, workspaces, lists = [], demo = fals
               );
               const heading = (t: string, n: number) => (
                 <div className="flex items-center gap-2 px-3 pt-2.5 pb-1">
-                  <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70 font-semibold">{t}</span>
-                  <span className="text-[10px] text-muted-foreground/50 tabular-nums">{n}</span>
+                  <span className="text-[10px] uppercase tracking-[0.16em] text-subtle font-semibold">{t}</span>
+                  <span className="text-[10px] text-subtle tabular-nums">{n}</span>
                 </div>
               );
               return (
@@ -248,7 +248,7 @@ export function WorkspaceSidebar({ slug, ws, workspaces, lists = [], demo = fals
       {nav.map((grp, gi) => (
         <div key={gi} className="flex flex-col gap-0.5">
           {!isCollapsed && grp.group && (
-            <div className="px-2 pb-1 text-[10px] uppercase tracking-[0.18em] text-muted-foreground/70">{grp.group}</div>
+            <div className="px-2 pb-1 text-[10px] uppercase tracking-[0.18em] text-subtle">{grp.group}</div>
           )}
           {grp.items.map(({ key, label, icon: Icon, badge, href: explicitHref, indent }) => {
             // Collapsed rail shows icons only; the list sub-items fold into their parent.
@@ -330,7 +330,7 @@ export function WorkspaceSidebar({ slug, ws, workspaces, lists = [], demo = fals
           <Settings className="w-[17px] h-[17px] shrink-0" />
           {!isCollapsed && <span className="flex-1 truncate">Settings</span>}
           {!isCollapsed && (
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground/60">
+            <span className="text-[10px] uppercase tracking-wider text-subtle">
               {mode === "agency" ? "agency" : "client"}
             </span>
           )}
@@ -395,7 +395,7 @@ export function WorkspaceSidebar({ slug, ws, workspaces, lists = [], demo = fals
       {/* ---- Mobile drawer + backdrop (below lg) ---- */}
       <div
         className={cn(
-          "lg:hidden fixed inset-0 z-50 bg-black/60 transition-opacity duration-200",
+          "lg:hidden fixed inset-0 z-50 bg-overlay transition-opacity duration-200",
           mobileOpen ? "opacity-100" : "pointer-events-none opacity-0"
         )}
         onClick={closeMobile}

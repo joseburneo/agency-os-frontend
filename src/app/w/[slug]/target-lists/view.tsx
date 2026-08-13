@@ -623,7 +623,7 @@ export function TargetListsView({
                         <span className="text-[11px] text-muted-foreground">draft pending</span>
                       ) : magnet ? (
                         <span
-                          className="inline-flex items-center gap-1 text-[11px] text-muted-foreground/70"
+                          className="inline-flex items-center gap-1 text-[11px] text-subtle"
                           title="Verified addresses are delivered with the refined list after your 15-minute call"
                         >
                           <Lock className="w-3 h-3" /> unlocks on the call
@@ -647,7 +647,7 @@ export function TargetListsView({
                           <Eye className="w-3.5 h-3.5" /> Email draft
                         </button>
                       ) : (
-                        <span className="inline-flex items-center gap-1.5 rounded-md border border-border/50 px-2.5 py-1.5 text-[12px] text-muted-foreground/50">
+                        <span className="inline-flex items-center gap-1.5 rounded-md border border-border/50 px-2.5 py-1.5 text-[12px] text-subtle">
                           <Eye className="w-3.5 h-3.5" /> Email draft
                         </span>
                       )}
@@ -678,7 +678,7 @@ export function TargetListsView({
           <button
             aria-label="Close preview"
             onClick={() => setPreview(null)}
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-overlay backdrop-blur-sm"
           />
           <div className="relative w-full max-w-xl h-full bg-card border-l border-border shadow-2xl flex flex-col animate-in slide-in-from-right">
             <div className="flex items-start justify-between gap-4 p-5 border-b border-border">

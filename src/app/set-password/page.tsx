@@ -34,15 +34,15 @@ export default async function SetPasswordPage({
         <input
           type="password" name="password" autoFocus required minLength={MIN_PASSWORD}
           autoComplete="new-password" placeholder="••••••••"
-          className="h-11 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/40"
+          className="h-11 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm text-foreground placeholder:text-subtle outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/40"
         />
         <label className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Repeat it</label>
         <input
           type="password" name="confirm" required minLength={MIN_PASSWORD}
           autoComplete="new-password" placeholder="••••••••"
-          className="h-11 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/40"
+          className="h-11 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm text-foreground placeholder:text-subtle outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/40"
         />
-        <p className="text-[11px] text-muted-foreground/80">At least {MIN_PASSWORD} characters.</p>
+        <p className="text-[11px] text-subtle">At least {MIN_PASSWORD} characters.</p>
         {error && <p className="text-[12px] text-red-400">{decodeURIComponent(error)}</p>}
         <button type="submit"
           className="mt-1 h-11 rounded-lg bg-gold text-sm font-bold text-ink-inverse transition-colors hover:bg-gold-hi">
@@ -68,7 +68,7 @@ function Shell({ title, blurb, children }: { title: string; blurb: string; child
           <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">{blurb}</p>
         </div>
         <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">{children}</div>
-        <p className="mt-6 text-center text-[11px] text-muted-foreground/70">
+        <p className="mt-6 text-center text-[11px] text-subtle">
           Precision Leads. Engineered by Intelligence.
         </p>
       </div>
