@@ -10,8 +10,20 @@ export type ThemePref = "system" | "light" | "dark";
 
 export const THEME_KEY = "lv-theme";
 
+/**
+ * What someone who has never chosen gets.
+ *
+ * "system" is the better answer and where this should land. It ships as "dark" because
+ * light mode has not been looked at by a human on every page yet, and "system" would have
+ * flipped every client whose laptop is on light — Paul opening his portal to a theme
+ * nobody had reviewed. Opt-in first, default second. Change this one word to "system"
+ * once light has been walked through, and everyone who never touched the toggle follows
+ * their OS from then on.
+ */
+export const DEFAULT_THEME: ThemePref = "dark";
+
 /** Runs before first paint, inlined in <head>. See the note in layout.tsx for why. */
-export const THEME_BOOT_SCRIPT = `(function(){try{var p=localStorage.getItem('${THEME_KEY}')||'system';var d=p==='dark'||(p==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);var e=document.documentElement;e.classList.toggle('dark',d);e.style.colorScheme=d?'dark':'light';}catch(e){}})();`;
+export const THEME_BOOT_SCRIPT = `(function(){try{var p=localStorage.getItem('${THEME_KEY}')||'${DEFAULT_THEME}';var d=p==='dark'||(p==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);var e=document.documentElement;e.classList.toggle('dark',d);e.style.colorScheme=d?'dark':'light';}catch(e){}})();`;
 
 function resolve(pref: ThemePref): boolean {
   if (pref === "dark") return true;
@@ -34,21 +46,21 @@ function paint(pref: ThemePref) {
 
 /** Read the stored preference, apply it, and keep following the OS while on "system". */
 export function useTheme(): [ThemePref, (p: ThemePref) => void] {
-  const [pref, setPref] = useState<ThemePref>("system");
+  const [pref, setPref] = useState<ThemePref>(DEFAULT_THEME);
 
   useEffect(() => {
-    const stored = (localStorage.getItem(THEME_KEY) as ThemePref) || "system";
+    const stored = (localStorage.getItem(THEME_KEY) as ThemePref) || DEFAULT_THEME;
     setPref(stored);
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const onOs = () => {
-      if (((localStorage.getItem(THEME_KEY) as ThemePref) || "system") === "system") {
+      if (((localStorage.getItem(THEME_KEY) as ThemePref) || DEFAULT_THEME) === "system") {
         paint("system");
       }
     };
     mq.addEventListener("change", onOs);
     // Another tab changed the preference: follow it rather than drifting apart.
     const onStorage = (e: StorageEvent) => {
-      if (e.key === THEME_KEY) { const v = (e.newValue as ThemePref) || "system"; setPref(v); paint(v); }
+      if (e.key === THEME_KEY) { const v = (e.newValue as ThemePref) || DEFAULT_THEME; setPref(v); paint(v); }
     };
     window.addEventListener("storage", onStorage);
     return () => { mq.removeEventListener("change", onOs); window.removeEventListener("storage", onStorage); };
@@ -72,9 +84,9 @@ const OPTIONS: { key: ThemePref; icon: typeof Sun; label: string }[] = [
 /**
  * The segmented control. `compact` drops the labels for a collapsed sidebar rail.
  *
- * Rendering note: before the effect has read localStorage the component believes the
- * preference is "system". Showing a highlight then would flash the wrong segment on
- * every load, so nothing is marked active until `ready`.
+ * Rendering note: before the effect has read localStorage the component only knows
+ * DEFAULT_THEME. Showing a highlight then would flash the wrong segment on every load for
+ * anyone who has chosen otherwise, so nothing is marked active until `ready`.
  */
 export function ThemeToggle({ compact = false, className = "" }: { compact?: boolean; className?: string }) {
   const [pref, choose] = useTheme();
