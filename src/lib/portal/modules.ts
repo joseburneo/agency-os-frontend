@@ -8,17 +8,27 @@ import type { ModuleKey } from "./types";
 // and LinkedIn touch with its copy) plus sending windows and daily limits.
 export const CADENCE_MODULE: ModuleKey = "cadence";
 
+// Retired from the menu on 2026-08-13 (Jose). Each of these was a real tab with
+// nothing behind it and no roadmap to fill it, and a sidebar of empty rooms reads
+// as an unfinished product rather than an ambitious one:
+//
+//   cadence       Sequence & Schedule — belongs INSIDE Email Campaigns when that
+//                 module is built, not as a peer to it
+//   whatsapp      WhatsApp & Phone
+//   content       Content Calendar
+//   linkedin-ads  the whole Ads section
+//   meta-ads
+//
+// The keys and their routes still exist, so nothing 404s for anyone holding a
+// link and putting one back is a one-line change. They are simply not offered.
+const RETIRED: ModuleKey[] = ["cadence", "whatsapp", "content", "linkedin-ads", "meta-ads"];
+
 export const ALL_MODULES: ModuleKey[] = [
   "dashboard",
+  "crm",
   "target-lists",
   "email",
   "linkedin",
-  CADENCE_MODULE,
-  "whatsapp",
-  "content",
-  "linkedin-ads",
-  "meta-ads",
-  "crm",
   "library",
   "blocklist",
   "roadmap",
@@ -32,18 +42,21 @@ const OVERRIDES: Record<string, ModuleKey[]> = {
   // from the VIP lists (no LinkedIn sequencer running), so the LinkedIn Campaigns
   // module stays hidden until one exists — an empty tab reads as a broken product
   // (Jose, 2026-08-03).
-  "arco-irish": ["dashboard", "target-lists", "email", CADENCE_MODULE, "crm", "library", "blocklist", "roadmap"],
+  "arco-irish": ["dashboard", "crm", "target-lists", "email", "library", "blocklist", "roadmap"],
 
   // Kcal and Connect Resources — email-led outbound. Same shape as Arco but without
   // LinkedIn: both ran on email only, and an empty LinkedIn tab reads as a broken
   // product rather than a channel they have not switched on. Add "linkedin" back the
   // day either one starts a LinkedIn sequence.
-  "kcal": ["dashboard", "target-lists", "email", CADENCE_MODULE, "crm", "library", "blocklist", "roadmap"],
-  "connect-resources": ["dashboard", "target-lists", "email", CADENCE_MODULE, "crm", "library", "blocklist", "roadmap"],
+  "kcal": ["dashboard", "crm", "target-lists", "email", "library", "blocklist", "roadmap"],
+  "connect-resources": ["dashboard", "crm", "target-lists", "email", "library", "blocklist", "roadmap"],
 };
 
 export function enabledModules(slug: string): ModuleKey[] {
-  return OVERRIDES[slug] ?? ALL_MODULES;
+  // RETIRED is filtered here rather than trusted to be absent from every list, so an
+  // override written before 2026-08-13 (or pasted from an old one) cannot quietly
+  // bring an empty tab back.
+  return (OVERRIDES[slug] ?? ALL_MODULES).filter((m) => !RETIRED.includes(m));
 }
 
 export function isModuleEnabled(slug: string, key: ModuleKey): boolean {
