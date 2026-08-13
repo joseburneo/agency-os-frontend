@@ -20,10 +20,19 @@
 
 :root {
   /* ── LIGHT ────────────────────────────────────────────────────────────── */
-  --background: #FFFFFF;
+  /* The page recedes and the panels lift. This is the one structural difference
+     between the two themes, and getting it wrong is what made the first light build
+     read as flat: dark builds structure by making panels LIGHTER than the ground, so
+     a naive flip left a white page holding white cards behind 12% borders, and there
+     was nothing to hold the layout together. Off-white page, pure white panels, and
+     the border stops being the only thing doing the work.
+
+     The page tone is a far lighter cousin of the brand cream (#F5F0E8), warm enough
+     to belong to Luxvance and light enough not to read as beige. */
+  --background: #F6F4EF;
   --foreground: #1A1A1A;
 
-  --card: rgba(201, 168, 76, 0.035);   /* a breath of cream; the hairline does the work */
+  --card: #FFFFFF;
   --card-foreground: #1A1A1A;
 
   --popover: #FFFFFF;
@@ -52,8 +61,10 @@
   --destructive: #DC2626;
   --destructive-foreground: #FFFFFF;
 
-  --border: rgba(26, 26, 26, 0.12);
-  --input: rgba(26, 26, 26, 0.04);
+  /* An edge you can actually see. Inputs, buttons and tabs on a white panel had a 12%
+     border (1.27:1) and read as floating text with no affordance at all. */
+  --border: rgba(26, 26, 26, 0.18);
+  --input: rgba(26, 26, 26, 0.03);
   --ring: #C9A84C;
 
   /* Brand accents, by role */
@@ -78,7 +89,9 @@
   --cyan: #0E7490;
 
   /* Chrome */
-  --hairline: rgba(26, 26, 26, 0.14);  /* panels have to read as panels on white */
+  /* The panel divider stays quieter than --border, because a panel now also separates
+     from the page by its own colour rather than leaning entirely on its outline. */
+  --hairline: rgba(26, 26, 26, 0.13);
   --scrollbar: rgba(26, 26, 26, 0.16);
   --scrollbar-hover: rgba(26, 26, 26, 0.28);
   /* The modal scrim. 60% black is right over near-black and turns a white page into mud,
@@ -89,7 +102,7 @@
   --glow-gold: rgba(201, 168, 76, 0);
   --glow-signal: rgba(15, 138, 79, 0);
   --glow-gold-soft: rgba(201, 168, 76, 0);
-  --ambient-gold: rgba(201, 168, 76, 0.05);
+  --ambient-gold: rgba(201, 168, 76, 0.07);
   --ambient-green: rgba(15, 138, 79, 0.04);
   --ambient-blue: rgba(120, 140, 200, 0.03);
 
