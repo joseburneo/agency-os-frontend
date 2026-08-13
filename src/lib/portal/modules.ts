@@ -26,6 +26,7 @@ const RETIRED: ModuleKey[] = ["cadence", "whatsapp", "content", "linkedin-ads", 
 export const ALL_MODULES: ModuleKey[] = [
   "dashboard",
   "crm",
+  "prospecting",
   "target-lists",
   "email",
   "linkedin",
@@ -68,7 +69,7 @@ export function isModuleEnabled(slug: string, key: ModuleKey): boolean {
 // the pipeline it fills (CRM). No Library/Journey, WhatsApp or Content in a demo.
 // Cadence stays out too: demo workspaces have no locked sequence yet, and an
 // empty "not configured" page would break the demo's feel.
-export const DEMO_MODULES: ModuleKey[] = ["dashboard", "target-lists", "email", "linkedin", "crm"];
+export const DEMO_MODULES: ModuleKey[] = ["dashboard", "prospecting", "target-lists", "email", "linkedin", "crm"];
 
 // A MAGNET is a three-page piece of sales material: the page that explains what
 // we found about their business, their fifty leads with the outreach written,
@@ -77,7 +78,12 @@ export const DEMO_MODULES: ModuleKey[] = ["dashboard", "target-lists", "email", 
 // started building"). Everything else in the app has nothing in it for a
 // prospect, and a sidebar of empty modules reads as an unfinished product
 // rather than a generous gift.
-export const MAGNET_MODULES: ModuleKey[] = ["dashboard", "target-lists", "library"];
+// Prospecting is the one module a magnet gets that is not a finished gift but a
+// working tool: the prospect describes their own market and sees real rows come
+// back. The wall is at the buy, not at the search — the backend refuses to
+// export for kind='magnet' — so the demo can feel the product at exactly the
+// moment it is most persuasive and still cannot walk off with a list.
+export const MAGNET_MODULES: ModuleKey[] = ["dashboard", "prospecting", "target-lists", "library"];
 
 // Per-magnet extras: a magnet that has advanced past "gift" into a live deal can
 // earn additional modules (e.g. the proposal delivered as a Client Success
