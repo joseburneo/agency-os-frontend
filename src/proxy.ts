@@ -106,6 +106,10 @@ export const config = {
   matcher: [
     // set-password is excluded for the same reason as gate: it is where someone
     // WITHOUT a session lands to get one. Its own token is the authorisation.
-    "/((?!api|_next/static|_next/image|gate|set-password|favicon.ico|icon.png|apple-icon.png|manifest.webmanifest).*)",
+    // /brand holds company logomarks drawn inside every workspace (the CRM thread
+    // avatars). They live outside /w/<slug>, so without this they would be judged
+    // agency-scope and a client's browser would get the gate instead of the image,
+    // silently degrading their own logo to a favicon. A public logo leaks nothing.
+    "/((?!api|_next/static|_next/image|gate|set-password|brand/|favicon.ico|icon.png|apple-icon.png|manifest.webmanifest).*)",
   ],
 };
