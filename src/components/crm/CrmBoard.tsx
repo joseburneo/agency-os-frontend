@@ -125,6 +125,8 @@ type Detail = Card & {
   call_notes_at: string | null;
   dossier_facts: Record<string, unknown>;
   dossier_status: string;
+  // The copilot conversation, restored with the card (engaged_prospects.copilot_chat).
+  copilot_chat?: { role: "you" | "copilot"; content: string; mode?: string; options?: string[]; hasDraft?: boolean }[];
   research: {
     website: string;
     google_company: string;
@@ -911,6 +913,11 @@ type CoLog = {
 // "knows this prospect · the thread · the Build" stops being a promise and becomes a receipt:
 // a workspace with no Intelligence Library shows a grey Brain chip instead of quietly
 // answering as if it had one.
+// The settled turn, from the stream's `done` event. Authoritative over the deltas: they are
+// for feel, this is what the turn actually was.
+type CoDone = {
+  mode?: CoMode; reply?: string; draft?: string; options?: string[]; context?: CoContext;
+};
 type CoContext = {
   brain?: boolean;
   brain_sections?: number;
@@ -934,6 +941,14 @@ function useComposer(d: Detail, onSent: () => void) {
   const [coBusy, setCoBusy] = useState(false);
   const [coLog, setCoLog] = useState<CoLog[]>([]);
   const [coCtx, setCoCtx] = useState<CoContext | null>(null);
+  // The copilot turn currently being written. Rendered as a live bubble under the log and
+  // folded into it when the turn settles, so the panel writes in front of you instead of
+  // showing "thinking…" for the length of a flagship call.
+  const [coStream, setCoStream] = useState("");
+  // Whether the last save actually landed. False means migration 015 has not been applied
+  // yet: the chat still works, it just does not survive a close, and the panel says so
+  // rather than letting a lost conversation look like a bug.
+  const [coSaved, setCoSaved] = useState(true);
   const [threadKey, setThreadKey] = useState(0);   // bump to force the thread to reload after a send
   // Sender selector: which mailbox this reply leaves from. Options come from the
   // backend (alive accounts in the client's workspace + the Gmail resurrection path).
@@ -984,6 +999,30 @@ function useComposer(d: Detail, onSent: () => void) {
   // the composer reads as the system being pushy. The draft is one click away,
   // through the copilot — the single AI surface on the card since 2026-08-13.
 
+  // Restore the copilot conversation saved on the prospect row. Through a ref so the effect
+  // depends on the id alone: `d` is refetched after every send, and depending on it would
+  // wipe the turns of the session in progress each time the card reloaded.
+  const savedChat = useRef(d.copilot_chat);
+  savedChat.current = d.copilot_chat;
+  useEffect(() => {
+    setCoLog(Array.isArray(savedChat.current) ? (savedChat.current as CoLog[]) : []);
+    setCoCtx(null); setCoStream(""); setCoSaved(true);
+  }, [id]);
+
+  // Persist the whole visible conversation, turn by turn. Fire and forget: a failed save
+  // must never block the chat, it only flips the badge that says it is not being kept.
+  const persistChat = (log: CoLog[]) => {
+    fetch(`${API}/api/crm/prospect/${id}/copilot/chat`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ log }),
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => setCoSaved(!!j?.saved))
+      .catch(() => setCoSaved(false));
+  };
+
+  const clearChat = () => { setCoLog([]); setCoStream(""); persistChat([]); };
+
   const send = () => {
     setSending(true);
     fetch(`${API}/api/crm/prospect/${id}/send`, {
@@ -1013,51 +1052,89 @@ function useComposer(d: Detail, onSent: () => void) {
 
   // The ONE generation call on the card. The old `Draft with AI` button hit a second
   // endpoint on a weaker model, so the same words produced two different qualities and
-  // you could not tell which you had pressed. Everything routes here now.
-  const askCopilot = (override?: string) => {
+  // you could not tell which you had pressed. Everything routes here now, over SSE, so
+  // the answer appears as it is written rather than after the whole reasoning call.
+  const askCopilot = async (override?: string) => {
     const instruction = (override ?? co).trim();
-    if (!instruction) return;
-    const wantsDraft = /\b(draft|write|rewrite|shorten|reply|redacta|escribe)\b/i.test(instruction);
-    setCoBusy(true); if (wantsDraft) { setDrafting(true); setSent(null); }
-    setCoLog((l) => [...l, { role: "you", content: instruction }]); setCo("");
-    fetch(`${API}/api/crm/prospect/${id}/copilot`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        message: instruction, draft: drafts[chan], target: chan,
-        history: coLog.map((x) => ({ role: x.role === "you" ? "user" : "assistant", content: x.content })),
-      }),
-    })
-      .then(async (r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return await r.json();
-      })
-      // "Updated the draft." was printed even on a 500, whose JSON has no .reply —
-      // the copilot claimed success while nothing had changed.
-      .then((j) => {
-        const mode: CoMode = j.mode || (j.draft ? "draft" : "answer");
-        // Only a real draft turn touches the composer. In question/options mode the
-        // backend echoes the current draft back, and writing it would clobber whatever
-        // was being typed while the copilot was thinking.
-        const landed = mode === "draft" && j.draft && j.draft.trim() && j.draft !== drafts[chan];
-        if (landed) setDraft(chan, j.draft);
-        if (j.context) setCoCtx(j.context as CoContext);
-        const said = j.reply || (landed ? "Updated the draft." : "No answer came back. Try again.");
-        setCoLog((l) => [...l, {
-          role: "copilot", content: said, mode,
-          options: Array.isArray(j.options) ? j.options : [],
-          hasDraft: !!landed,
-        }]);
-      })
-      .catch((e) => setCoLog((l) => [...l, {
+    if (!instruction || coBusy) return;
+
+    const before = drafts[chan];          // to restore if the turn ends up not being a draft
+    const history = coLog.map((x) => ({ role: x.role === "you" ? "user" : "assistant", content: x.content }));
+    const mine: CoLog = { role: "you", content: instruction };
+    setCoBusy(true); setCoStream(""); setCo("");
+    setCoLog((l) => [...l, mine]);
+
+    let say = "", streamedDraft = "", touchedComposer = false;
+    let settled: CoDone | null = null;
+
+    const finish = (turn: CoLog) => {
+      setCoLog((l) => { const next = [...l, turn]; persistChat(next); return next; });
+      setCoStream(""); setCoBusy(false); setDrafting(false);
+    };
+
+    try {
+      const res = await fetch(`${API}/api/crm/prospect/${id}/copilot/stream`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: instruction, draft: before, target: chan, history }),
+      });
+      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        // SSE frames are separated by a blank line; the tail may be a partial frame.
+        const frames = buf.split("\n\n");
+        buf = frames.pop() ?? "";
+        for (const frame of frames) {
+          const line = frame.split("\n").find((l) => l.startsWith("data: "));
+          if (!line) continue;
+          let ev: Record<string, unknown>;
+          try { ev = JSON.parse(line.slice(6)); } catch { continue; }
+          if (ev.type === "context") setCoCtx(ev.context as CoContext);
+          else if (ev.type === "say") { say += ev.delta as string; setCoStream(say); }
+          else if (ev.type === "draft") {
+            // The message writes itself into the composer as it comes.
+            if (!touchedComposer) { touchedComposer = true; setDrafting(true); setSent(null); }
+            streamedDraft += ev.delta as string;
+            setDraft(chan, streamedDraft);
+          } else if (ev.type === "done") settled = ev as unknown as CoDone;
+          else if (ev.type === "error") throw new Error(String(ev.message || "copilot error"));
+        }
+      }
+    } catch (e) {
+      if (touchedComposer) setDraft(chan, before);   // never leave half a message behind
+      finish({
         role: "copilot", mode: "answer",
         content: `Copilot failed (${e instanceof Error ? e.message : "unknown"}). Your draft is untouched.`,
-      }]))
-      .finally(() => { setCoBusy(false); setDrafting(false); });
+      });
+      return;
+    }
+
+    // `done` is authoritative. The deltas are for feel; this is what the turn actually was,
+    // which matters when a stream is cut short or the model reconsiders mid-answer.
+    const mode: CoMode = settled?.mode || (streamedDraft ? "draft" : "answer");
+    const finalDraft = (settled?.draft || streamedDraft || "").trim();
+    const landed = mode === "draft" && !!finalDraft && finalDraft !== before;
+    if (landed) setDraft(chan, finalDraft);
+    else if (touchedComposer) setDraft(chan, before);
+    if (settled?.context) setCoCtx(settled.context);
+
+    const said = (settled?.reply || say).trim();
+    finish({
+      role: "copilot", mode,
+      content: said || (landed ? "Updated the draft." : "No answer came back. Try again."),
+      options: Array.isArray(settled?.options) ? settled.options : [],
+      hasDraft: landed,
+    });
   };
 
   const canSendEmail = chan === "email" && (sendOpts.length > 0 || d.can_send_email);
   const gmailLive = d.live_channel === "gmail";
-  return { d, chan, setChan, text, setDraft, send, logTouch, refresh: onSent, askCopilot, drafting, sending, sent, setSent, co, setCo, coBusy, coLog, coCtx, canSendEmail, gmailLive, threadKey, sendOpts, fromKey, setFromKey, selectedOpt, threadAcct, routeTo, routeCc, setRouteCc, ccAdd, setCcAdd, clientCc, sigInfo };
+  return { d, chan, setChan, text, setDraft, send, logTouch, refresh: onSent, askCopilot, drafting, sending, sent, setSent, co, setCo, coBusy, coLog, coCtx, coStream, coSaved, clearChat, canSendEmail, gmailLive, threadKey, sendOpts, fromKey, setFromKey, selectedOpt, threadAcct, routeTo, routeCc, setRouteCc, ccAdd, setCcAdd, clientCc, sigInfo };
 }
 type ComposerCtl = ReturnType<typeof useComposer>;
 
@@ -1134,16 +1211,16 @@ function ContextChips({ ctx, d }: { ctx: CoContext | null; d: Detail }) {
 }
 
 function Copilot({ c }: { c: ComposerCtl }) {
-  const { d, co, setCo, askCopilot, coBusy, coLog, coCtx, chan, text, send, sending, canSendEmail } = c;
+  const { d, co, setCo, askCopilot, coBusy, coLog, coCtx, coStream, coSaved, clearChat, chan, text, send, sending, canSendEmail } = c;
   const logRef = useRef<HTMLDivElement>(null);
   const [showIntel, setShowIntel] = useState(false);
-  useEffect(() => { logRef.current?.scrollTo({ top: logRef.current.scrollHeight }); }, [coLog, coBusy]);
+  useEffect(() => { logRef.current?.scrollTo({ top: logRef.current.scrollHeight }); }, [coLog, coBusy, coStream]);
 
   const opening = actNow(d);
   const last = coLog[coLog.length - 1];
   // Chips come from the last copilot turn when it offered any (a question's likely answers,
   // or the moves it proposed); otherwise from what the prospect did.
-  const chips = last?.role === "copilot" && last.options?.length ? last.options : (coLog.length === 0 ? copilotChips(d, chan) : []);
+  const chips = coBusy ? [] : (last?.role === "copilot" && last.options?.length ? last.options : (coLog.length === 0 ? copilotChips(d, chan) : []));
   const draftReady = !!text.trim();
 
   return (
@@ -1152,8 +1229,22 @@ function Copilot({ c }: { c: ComposerCtl }) {
         <Bot className="w-4 h-4 text-[#FFD60A]" />
         <span className="text-[11px] uppercase tracking-wider text-[#FFD60A] font-semibold">Copilot</span>
         <span className="text-[10px] text-muted-foreground">it drafts, it asks, it never sends by itself</span>
+        {coLog.length > 0 && (
+          <button onClick={clearChat} disabled={coBusy} title="Start the conversation over"
+            className="ml-auto text-[10px] rounded-full border border-border px-2 py-0.5 text-muted-foreground hover:text-[#FFD60A] hover:border-[#FFD60A]/40 disabled:opacity-40 transition-colors">
+            New chat
+          </button>
+        )}
       </div>
       <ContextChips ctx={coCtx} d={d} />
+      {/* The chat is kept on the prospect, so it is here again tomorrow. When the column is
+          missing (migration 015 not applied) the save fails and this says so, rather than
+          letting a conversation vanish and look like a bug. */}
+      {!coSaved && (
+        <div className="text-[10px] text-[#FFD60A]/80 leading-snug">
+          This chat is not being saved. Run migration 015 (`copilot_chat`) and it will persist with the prospect.
+        </div>
+      )}
 
       <div ref={logRef} className="space-y-2.5 max-h-[26rem] overflow-y-auto text-[12.5px] leading-relaxed pr-1">
         {/* Opening turn — the intent read the card already computed and cached, rendered as
@@ -1176,7 +1267,22 @@ function Copilot({ c }: { c: ComposerCtl }) {
             <div className={`whitespace-pre-wrap ${l.role === "you" ? "text-muted-foreground" : "text-foreground"}`}>{l.content}</div>
           </div>
         ))}
-        {coBusy && <div className="flex items-center gap-1.5 text-[#FFD60A] text-xs"><Loader2 className="w-3.5 h-3.5 animate-spin" /> thinking…</div>}
+
+        {/* The turn being written. It becomes a normal log entry the moment it settles. */}
+        {coBusy && (
+          <div>
+            <span className="font-semibold text-[#FFD60A]">Copilot</span>
+            {coStream ? (
+              <div className="whitespace-pre-wrap text-foreground">
+                {coStream}<span className="inline-block w-1.5 h-3.5 -mb-0.5 ml-0.5 bg-[#FFD60A] animate-pulse" />
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 text-[#FFD60A] text-xs">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" /> reading the deal…
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {chips.length > 0 && (

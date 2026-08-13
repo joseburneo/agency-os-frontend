@@ -48,11 +48,18 @@ async function forward(
   request: NextRequest,
   parts: string[],
   method: "GET" | "POST",
-): Promise<NextResponse> {
+): Promise<Response> {
   const scope = await resolveScope();
   if (!scope) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
+
+  // The copilot answers as Server-Sent Events. Buffering it here (the `await res.text()`
+  // below) would hold every token until the model finished and hand the browser one lump,
+  // which is exactly the dead-screen wait the stream exists to remove. It also needs a
+  // longer leash than a normal call: AbortSignal.timeout kills the whole operation, body
+  // included, so a 60s cap would cut a long draft off mid-sentence.
+  const streaming = parts[parts.length - 1] === "stream";
 
   const url = new URL(`${BACKEND}/api/crm/${parts.join("/")}`);
   request.nextUrl.searchParams.forEach((v, k) => url.searchParams.set(k, v));
@@ -74,8 +81,22 @@ async function forward(
       headers,
       body: method === "POST" ? await request.text() : undefined,
       // Render cold starts and the copilot's flagship call are the slow paths.
-      signal: AbortSignal.timeout(60000),
+      signal: AbortSignal.timeout(streaming ? 300000 : 60000),
     });
+
+    if (streaming && res.body) {
+      return new Response(res.body, {
+        status: res.status,
+        headers: {
+          "Content-Type": res.headers.get("content-type") || "text/event-stream",
+          "Cache-Control": "no-cache, no-transform",
+          // Without this the platform edge can hold the chunks and hand them over at the
+          // end, which looks exactly like no streaming at all.
+          "X-Accel-Buffering": "no",
+        },
+      });
+    }
+
     const text = await res.text();
     return new NextResponse(text, {
       status: res.status,
