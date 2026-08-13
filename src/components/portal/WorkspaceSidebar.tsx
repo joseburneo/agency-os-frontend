@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import {
   LayoutDashboard, Target, Mail, Brain, ChevronsUpDown, ArrowLeft, Check,
   Settings, LogOut, PanelLeftClose, PanelLeftOpen, ShieldBan, Route, Menu, X,
-  Flame, FileText,
+  Flame, FileText, Radar,
 } from "lucide-react";
 import { cn, Linkedin } from "./ui";
 import { CompanyMark } from "./CompanyMark";
@@ -73,6 +73,9 @@ function buildNav(w: Workspace | null, enabled: Set<string>, slug: string, lists
     {
       group: "Targeted lists",
       items: [
+        // Find Prospects sits ABOVE the finished lists on purpose: it is where a
+        // list comes from, so the menu reads in the order the work happens.
+        { key: "prospecting", label: "Find Prospects", icon: Radar },
         { key: "target-lists", label: "Targeted Cold Leads", icon: Target, badge: w && w.coldLeads > 0 ? w.coldLeads.toLocaleString() : undefined },
         ...listItems,
       ],

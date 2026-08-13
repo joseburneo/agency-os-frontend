@@ -6,6 +6,7 @@
 
 export type ModuleKey =
   | "dashboard"
+  | "prospecting"
   | "target-lists"
   | "email"
   | "linkedin"
