@@ -25,7 +25,7 @@ export const viewport: Viewport = {
   // staying black behind a white one. The boot script rewrites this tag when the choice
   // is an explicit light/dark rather than "system".
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#FFFFFF" },
+    { media: "(prefers-color-scheme: light)", color: "#F6F4EF" },
     { media: "(prefers-color-scheme: dark)", color: "#0A0D14" },
   ],
   width: "device-width",

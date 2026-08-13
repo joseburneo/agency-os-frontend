@@ -41,7 +41,7 @@ function paint(pref: ThemePref) {
   // behind a white page, which reads as a rendering bug on a phone.
   document
     .querySelector('meta[name="theme-color"]')
-    ?.setAttribute("content", dark ? "#0A0D14" : "#FFFFFF");
+    ?.setAttribute("content", dark ? "#0A0D14" : "#F6F4EF");
 }
 
 /** Read the stored preference, apply it, and keep following the OS while on "system". */
