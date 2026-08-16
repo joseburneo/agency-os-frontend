@@ -17,5 +17,8 @@ export default async function LibraryPage({ params }: { params: Promise<{ slug: 
     loadWorkspace(slug), loadIntelligence(slug), loadBrainOps(slug),
   ]);
   const wsName = live?.name ?? getWorkspace(slug)?.name ?? slug;
-  return <IntelligenceView slug={slug} wsName={wsName} sections={sections} ops={ops} editable={mode !== "demo"} />;
+  // The domain feeds "Write it from their website": the client's own site is
+  // the one place their real register is already written down.
+  return <IntelligenceView slug={slug} wsName={wsName} domain={live?.domain ?? ""}
+                          sections={sections} ops={ops} editable={mode !== "demo"} />;
 }

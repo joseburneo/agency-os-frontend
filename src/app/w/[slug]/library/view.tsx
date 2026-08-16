@@ -15,13 +15,10 @@ import {
   Target,
   Package,
   Sparkles,
-  Layers,
   Users,
   ShieldQuestion,
   Quote,
   Link as LinkIcon,
-  Phone,
-  Search,
   BookMarked,
   Pencil,
   Trash2,
@@ -30,54 +27,88 @@ import {
   X,
   Loader2,
   Check,
+  AlertTriangle,
+  Globe,
 } from "lucide-react";
 import type { IntelligenceSection, IntelligenceKind } from "@/lib/portal/types";
 import type { BrainOps } from "@/lib/portal/data";
 import { ModuleHeader, Panel, Pill, SectionLabel, StatTile, cn } from "@/components/portal/ui";
 
-// Group order + labels + icons — the reading order the agents (and the client)
-// see: identity first, then who they sell to, then the evidence and raw notes.
-// "playbook" leads: it's the rules of engagement every agent obeys above all,
-// so it gets a distinctive gold treatment below.
-const GROUPS: {
+// THE structure of a Brain. Mirrors client_brain.BRAIN_GROUPS in the backend,
+// which is the authority and serves it at /api/intelligence/taxonomy.
+//
+// Consolidated 2026-08-16 from fourteen flat areas to nine in four blocks.
+// Before, the same kinds were listed in three places in three different orders:
+// the agents' reading order, this list, and the editor's picker. The order the
+// client saw was not the order the agents read. Now there is ONE list and the
+// editor derives from it, so a section cannot exist in one and not the other.
+//
+// The blocks carry the hierarchy the flat list could not: what GOVERNS every
+// agent (the rules, the voice) is not a peer of a testimonial, and rendering
+// them at the same weight is what made this page read as fourteen equal boxes.
+type Section = {
   kind: IntelligenceKind;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
-}[] = [
-  { kind: "playbook", label: "Rules of engagement", icon: BookMarked },
-  { kind: "overview", label: "Overview", icon: Building2 },
-  { kind: "founder", label: "Founder", icon: User },
-  { kind: "voice", label: "Voice & tone", icon: MessageSquareQuote },
-  { kind: "icp", label: "Ideal customer", icon: Target },
-  { kind: "offer", label: "What they sell", icon: Package },
-  { kind: "differentiator", label: "Why they win", icon: Sparkles },
-  { kind: "segment", label: "Segments", icon: Layers },
-  { kind: "persona", label: "Personas", icon: Users },
-  { kind: "objection", label: "Objections", icon: ShieldQuestion },
-  { kind: "proof", label: "Proof & recommendations", icon: Quote },
-  { kind: "asset", label: "Assets & links", icon: LinkIcon },
-  { kind: "call_note", label: "Call notes", icon: Phone },
-  { kind: "research", label: "Research", icon: Search },
+  hint: string;
+  essential?: boolean;   // without it the agents write in a house default
+};
+
+const BLOCKS: { id: string; label: string; blurb: string; sections: Section[] }[] = [
+  {
+    id: "act",
+    label: "How to act",
+    blurb: "Read first, and obeyed above everything else on this page.",
+    sections: [
+      { kind: "playbook", label: "Rules of engagement", icon: BookMarked, essential: true,
+        hint: "What an agent must always or never do. One rule per section." },
+      { kind: "voice", label: "Voice & tone", icon: MessageSquareQuote, essential: true,
+        hint: "How you write. Sentence length, formality, the words you use and avoid." },
+    ],
+  },
+  {
+    id: "who",
+    label: "Who you are",
+    blurb: "The company, and the person the emails come from.",
+    sections: [
+      { kind: "overview", label: "Overview", icon: Building2, essential: true,
+        hint: "What the company is, in plain words." },
+      { kind: "founder", label: "Founder & sender", icon: User,
+        hint: "Who signs the emails, and their role." },
+    ],
+  },
+  {
+    id: "sell",
+    label: "Who you sell to, and what",
+    blurb: "The buyer, the offer, and the reason they choose you.",
+    sections: [
+      { kind: "icp", label: "Ideal customer", icon: Target, essential: true,
+        hint: "Who to target: size, sector, geography, the trigger to reach out." },
+      { kind: "persona", label: "Buyer persona", icon: Users,
+        hint: "The human who replies. What they care about, in their own words." },
+      { kind: "offer", label: "What you sell", icon: Package, essential: true,
+        hint: "The offer, concretely. Never a price in writing." },
+      { kind: "differentiator", label: "Why you win", icon: Sparkles,
+        hint: "The edge a competitor cannot copy." },
+    ],
+  },
+  {
+    id: "proof",
+    label: "The proof",
+    blurb: "What convinces a sceptic, and what answers a no.",
+    sections: [
+      { kind: "objection", label: "Objections", icon: ShieldQuestion,
+        hint: "The objection, and the honest answer to it." },
+      { kind: "proof", label: "Proof, links & assets", icon: Quote,
+        hint: "Real numbers, real quotes, the links you send. Never invented." },
+    ],
+  },
 ];
 
-// The kind picker in the editor — canonical order for choosing where a new
-// piece of knowledge belongs.
-const KIND_OPTIONS: { value: IntelligenceKind; label: string }[] = [
-  { value: "playbook", label: "Rules of engagement" },
-  { value: "overview", label: "Overview" },
-  { value: "founder", label: "Founder" },
-  { value: "voice", label: "Voice & tone" },
-  { value: "icp", label: "Ideal customer" },
-  { value: "offer", label: "What they sell" },
-  { value: "differentiator", label: "Why they win" },
-  { value: "proof", label: "Proof & recommendations" },
-  { value: "segment", label: "Segments" },
-  { value: "persona", label: "Personas" },
-  { value: "objection", label: "Objections" },
-  { value: "asset", label: "Assets & links" },
-  { value: "call_note", label: "Call notes" },
-  { value: "research", label: "Research" },
-];
+const ALL_SECTIONS: Section[] = BLOCKS.flatMap((b) => b.sections);
+// The editor derives from the same list, so the picker can never offer a
+// section the page does not render, or miss one it does.
+const KIND_OPTIONS = ALL_SECTIONS.map((s) => ({ value: s.kind, label: s.label }));
 
 function fmtDate(iso: string): string {
   if (!iso) return "—";
@@ -127,12 +158,14 @@ const inputCls =
 export function IntelligenceView({
   slug,
   wsName,
+  domain,
   sections,
   ops,
   editable,
 }: {
   slug: string;
   wsName: string;
+  domain?: string;
   sections: IntelligenceSection[];
   ops: BrainOps;
   editable: boolean;
@@ -158,15 +191,41 @@ export function IntelligenceView({
   const [optErr, setOptErr] = useState<string | null>(null);
   const [suggestion, setSuggestion] = useState<{ title: string; body: string } | null>(null);
 
+  // "Write it from their website". Opens the normal editor prefilled with a
+  // DRAFT: a voice section saved without a human reading it would silently
+  // shape every email afterwards, so the model never writes straight to the DB.
+  const [voiceBusy, setVoiceBusy] = useState(false);
+  const [voiceErr, setVoiceErr] = useState<string | null>(null);
+  async function voiceFromWeb() {
+    setVoiceBusy(true); setVoiceErr(null);
+    try {
+      const r = await fetch("/api/intelligence/voice-from-web", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug, domain, company: wsName }),
+      });
+      const d = await r.json();
+      if (!d?.ok) throw new Error(d?.error || "could not read that website");
+      setEditMode(true);
+      openEditor({ id: null, kind: "voice", title: d.title, body: d.body });
+    } catch (e) {
+      setVoiceErr(e instanceof Error ? e.message : "could not read that website");
+    } finally { setVoiceBusy(false); }
+  }
+
   // Every knowledge area renders, filled or not (Octave-style): an empty area
   // shown as an invitation gets filled; an empty area hidden stays empty forever.
-  const groups = GROUPS.map((g) => ({
+  const groups = ALL_SECTIONS.map((g) => ({
     ...g,
     items: sections
       .filter((s) => s.kind === g.kind)
       .sort((a, b) => a.sort - b.sort),
   }));
+  const byKind = Object.fromEntries(groups.map((g) => [g.kind, g]));
   const filledCount = groups.filter((g) => g.items.length > 0).length;
+  // The gap that actually costs quality: an essential area with nothing in it
+  // means the agents fall back to a house default and nobody can tell from the
+  // output. Named here so it is impossible to miss.
+  const missingEssential = groups.filter((g) => g.essential && g.items.length === 0);
 
   // Most recent updatedAt across all sections — the freshness of the brain.
   const lastUpdated = sections.reduce<string>((acc, s) => {
@@ -532,33 +591,68 @@ export function IntelligenceView({
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <StatTile label="Sections" value={String(sections.length)} sub="knowledge entries" />
-        <StatTile label="Areas covered" value={`${filledCount}/${GROUPS.length}`} sub="knowledge areas filled" />
+        <StatTile label="Areas covered" value={`${filledCount}/${ALL_SECTIONS.length}`} sub="knowledge areas filled"
+          tone={missingEssential.length ? "warn" : "good"} />
         <StatTile label="Last updated" value={fmtDate(lastUpdated)} sub="most recent section" tone="good" />
       </div>
 
-      {/* Area map — one chip per knowledge area, dimmed when empty. Jump nav +
-          completeness meter in one: the gaps are visible at a glance. */}
-      <div className="flex flex-wrap gap-1.5">
-        {groups.map((g) => {
-          const GIcon = g.icon;
-          const has = g.items.length > 0;
-          return (
-            <a
-              key={g.kind}
-              href={`#brain-${g.kind}`}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors",
-                has
-                  ? "border-gold/25 bg-gold/5 text-foreground hover:border-gold/50"
-                  : "border-border/60 text-subtle hover:text-muted-foreground"
-              )}
+      {/* What is missing, named. An essential area left empty does not break
+          anything visibly — the agents just fall back to a house default and the
+          copy quietly stops sounding like this client. That silence is the
+          failure mode this banner exists to remove. */}
+      {missingEssential.length > 0 && (
+        <Panel className="p-4 border-gold/40 bg-gold/[0.04] flex flex-wrap items-center gap-x-3 gap-y-2">
+          <AlertTriangle className="w-4 h-4 text-gold-ink shrink-0" />
+          <p className="text-[13px] text-foreground flex-1 min-w-[16rem]">
+            The agents are writing without{" "}
+            <span className="font-semibold">{missingEssential.map((g) => g.label.toLowerCase()).join(", ")}</span>.
+            They fall back to a generic default, and nothing in the output says so.
+          </p>
+          {editable && (
+            <button
+              type="button"
+              onClick={() => { setEditMode(true); openEditor({ id: null, kind: missingEssential[0].kind, title: "", body: "" }); }}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-gold px-3 py-1.5 text-[12px] font-medium text-ink-inverse transition-opacity hover:opacity-90"
             >
-              <GIcon className={cn("w-3 h-3", has ? "text-gold-ink" : "")} />
-              {g.label}
-              <span className="tabular-nums opacity-70">{g.items.length}</span>
-            </a>
-          );
-        })}
+              <Plus className="w-3.5 h-3.5" />
+              Fill {missingEssential[0].label.toLowerCase()}
+            </button>
+          )}
+        </Panel>
+      )}
+
+      {/* Jump nav, grouped the way the page is. Dimmed = empty. */}
+      <div className="flex flex-col gap-2">
+        {BLOCKS.map((b) => (
+          <div key={b.id} className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[10px] uppercase tracking-[0.18em] text-subtle w-full sm:w-auto sm:min-w-[11rem]">
+              {b.label}
+            </span>
+            {b.sections.map((sec) => {
+              const g = byKind[sec.kind];
+              const GIcon = sec.icon;
+              const has = (g?.items.length ?? 0) > 0;
+              return (
+                <a
+                  key={sec.kind}
+                  href={`#brain-${sec.kind}`}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors",
+                    has
+                      ? "border-gold/25 bg-gold/5 text-foreground hover:border-gold/50"
+                      : sec.essential
+                        ? "border-gold/40 text-gold-ink hover:bg-gold/10"
+                        : "border-border/60 text-subtle hover:text-muted-foreground"
+                  )}
+                >
+                  <GIcon className={cn("w-3 h-3", has ? "text-gold-ink" : "")} />
+                  {sec.label}
+                  <span className="tabular-nums">{g?.items.length ?? 0}</span>
+                </a>
+              );
+            })}
+          </div>
+        ))}
       </div>
 
       {/* Add section — the composer for brand-new knowledge. */}
@@ -595,7 +689,21 @@ export function IntelligenceView({
           </p>
         </Panel>
       ) : (
-        groups.map((g) => {
+        BLOCKS.map((block) => (
+          <section key={block.id} className="flex flex-col gap-3">
+            <div className={cn(
+              "flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-xl px-4 py-3",
+              // The governing block is not a peer of the others and should not
+              // look like one: these two sections outrank every card below.
+              block.id === "act"
+                ? "border border-gold/30 bg-gold/[0.05]"
+                : "border-l-2 border-border pl-4"
+            )}>
+              <h2 className={cn("text-sm font-semibold",
+                block.id === "act" ? "text-gold-ink" : "text-foreground")}>{block.label}</h2>
+              <p className="text-[12px] text-muted-foreground">{block.blurb}</p>
+            </div>
+            {block.sections.map((sec) => byKind[sec.kind]).filter(Boolean).map((g) => {
           const Icon = g.icon;
           const isPlaybook = g.kind === "playbook";
           // An empty area is a visible invitation, not a hidden hole.
@@ -608,8 +716,21 @@ export function IntelligenceView({
                 </div>
                 <div className="rounded-xl border border-dashed border-border/70 px-4 py-3 flex items-center gap-3">
                   <p className="text-[12.5px] italic text-subtle flex-1">
+                    {g.kind === "voice" && voiceErr ? voiceErr : null}
                     Nothing here yet — the agent works without it until someone adds what it should know.
                   </p>
+                  {/* Voice is the section that most changes the copy and the one
+                      most often missing, and their own website is where their
+                      real register already lives. */}
+                  {editable && g.kind === "voice" && domain && (
+                    <button
+                      type="button" onClick={voiceFromWeb} disabled={voiceBusy}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-gold px-3 py-1.5 text-[11px] font-medium text-ink-inverse disabled:opacity-50 transition-opacity shrink-0"
+                    >
+                      <Globe className={cn("w-3.5 h-3.5", voiceBusy && "animate-spin")} />
+                      {voiceBusy ? `Reading ${domain}` : "Write it from their website"}
+                    </button>
+                  )}
                   {editable && (
                     <button
                       type="button"
@@ -765,7 +886,9 @@ export function IntelligenceView({
               </div>
             </div>
           );
-        })
+            })}
+          </section>
+        ))
       )}
     </div>
   );
