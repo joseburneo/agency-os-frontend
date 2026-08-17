@@ -4,7 +4,7 @@ import { Fragment, createContext, useCallback, useContext, useEffect, useMemo, u
 import {
   X, Link2, MessageCircle, Phone, ExternalLink, Copy, Check,
   Search, RefreshCw, CalendarClock, Sparkles, Send, PenLine, Loader2,
-  Flame, LayoutGrid, List, Bot, ChevronRight, Zap, Mail, Magnet,
+  Flame, LayoutGrid, List, Bot, ChevronRight, Zap, Mail, Magnet, Globe,
   PhoneCall, PhoneOff, Mic, MicOff, Smartphone, AlertTriangle,
 } from "lucide-react";
 import DOMPurify from "dompurify";
@@ -1915,30 +1915,11 @@ function ContactActions({ d, onChanged }: { d: Detail; onChanged: () => void }) 
       .finally(() => setFinding(false));
   };
 
+  // No LinkedIn button here anymore — the profile is a branded handle row up in
+  // the Contact block, and "open profile" is how you connect. This component is
+  // now just the phone: reach out if we have a number, enrich the gap if we don't.
   return (
     <div className="space-y-2">
-      {/* LinkedIn — one compact connect action, no heavy card around it. */}
-      {d.linkedin_url ? (
-        <div className="flex items-center gap-1.5">
-          <a href={d.linkedin_url} target="_blank" rel="noreferrer"
-            className="flex-1 inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-[12.5px] text-foreground hover:text-cyan hover:border-cyan/40 transition-colors">
-            <Link2 className="w-3.5 h-3.5 text-cyan shrink-0" /> Connect on LinkedIn
-            <ExternalLink className="w-3 h-3 ml-auto shrink-0 opacity-60" />
-          </a>
-          <CopyBtn value={d.linkedin_url} />
-        </div>
-      ) : (
-        <a href={linkedinSearchUrl(d.name, d.company)} target="_blank" rel="noreferrer"
-          className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-[12.5px] text-muted-foreground hover:text-cyan hover:border-cyan/40 transition-colors">
-          <Search className="w-3.5 h-3.5 shrink-0" /> Find on LinkedIn
-          <ExternalLink className="w-3 h-3 ml-auto shrink-0 opacity-60" />
-        </a>
-      )}
-
-      {/* Phone. The number itself is shown in the Contact block right above, so
-          here we only carry the ACTIONS — reach out if we have it, enrich if we
-          don't. Enrichment is a paid Clay lookup; the manual entry is the quiet,
-          free alternative underneath. */}
       {editing ? phoneEditor : d.phone ? (
         <div className="flex items-center gap-1.5">
           <a href={d.wa_link || `https://wa.me/${d.phone.replace(/[^\d]/g, "")}`} target="_blank" rel="noreferrer"
@@ -2226,33 +2207,60 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
           else on the card: the right person, the right company, and the three
           handles you copy into a call, a CRM or a search. Reaching them lives
           further down; this is for reading and copying. */}
+      {/* CONTACT — one identity block. Who they are, every handle we hold on them
+          (each carrying its own brand mark, so the record reads as connected rather
+          than as a list of blue links), and the actions to reach them. LinkedIn is
+          here ONCE, as a real link; the phone lives here too. Reading someone and
+          reaching them are no longer two separate rails. */}
       <div>
         <div className="text-[10px] uppercase tracking-[0.16em] text-subtle font-semibold mb-2">Contact</div>
-        <div className="rounded-lg border border-border bg-card px-3 py-2.5 space-y-1.5">
-          <div className="text-[13.5px] font-semibold text-foreground leading-tight">{d.name || "—"}</div>
-          <div className="text-[12px] text-muted-foreground leading-snug">
-            {[d.job_title, d.company].filter(Boolean).join(" · ") || "—"}
-            {d.country ? <span className="text-subtle"> · {d.country}</span> : null}
+        <div className="rounded-lg border border-border bg-card overflow-hidden">
+          {/* identity */}
+          <div className="px-3 py-2.5">
+            <div className="text-[13.5px] font-semibold text-foreground leading-tight">{d.name || "—"}</div>
+            <div className="text-[12px] text-muted-foreground leading-snug mt-0.5 truncate">
+              {[d.job_title, d.company].filter(Boolean).join(" · ") || "—"}
+              {d.country ? <span className="text-subtle"> · {d.country}</span> : null}
+            </div>
           </div>
-          <div className="pt-1 space-y-1">
+
+          {/* handles — each a branded, copyable row. The brand mark does the visual
+              work the colour used to do badly (blue-300 washed out on white). */}
+          <div className="border-t border-border/70 px-3 py-2 space-y-1.5">
             {d.email && (
-              <div className="flex items-center gap-1 text-[12px]">
-                <span className="truncate text-foreground/90" title={d.email}>{d.email}</span>
-                <span className="ml-auto shrink-0"><CopyBtn value={d.email} /></span>
-              </div>
-            )}
-            {d.phone && (
-              <div className="flex items-center gap-1 text-[12px]">
-                <span className="truncate text-foreground/90 tabular-nums">{d.phone}</span>
-                <span className="ml-auto shrink-0"><CopyBtn value={d.phone} /></span>
+              <div className="group flex items-center gap-2 text-[12.5px]">
+                <Mail className="w-4 h-4 text-muted-foreground shrink-0" />
+                <span className="flex-1 min-w-0 truncate text-foreground" title={d.email}>{d.email}</span>
+                <CopyBtn value={d.email} />
               </div>
             )}
             {d.linkedin_url && (
-              <div className="flex items-center gap-1 text-[12px]">
+              <div className="group flex items-center gap-2 text-[12.5px]">
+                <Favicon domain="linkedin.com" label="LinkedIn" size={16} />
                 <a href={d.linkedin_url} target="_blank" rel="noreferrer"
-                  className="truncate text-blue-300 hover:text-blue-200">LinkedIn profile</a>
-                <ExternalLink className="w-3 h-3 text-blue-300/70 shrink-0" />
-                <span className="ml-auto shrink-0"><CopyBtn value={d.linkedin_url} /></span>
+                  className="flex-1 min-w-0 inline-flex items-center gap-1 text-foreground hover:text-[#0A66C2] transition-colors">
+                  <span className="truncate">LinkedIn profile</span>
+                  <ExternalLink className="w-3 h-3 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </a>
+                <CopyBtn value={d.linkedin_url} />
+              </div>
+            )}
+            {siteUrl && (
+              <div className="group flex items-center gap-2 text-[12.5px]">
+                <Favicon domain={domainOf(d.email)} label={d.company} size={16} />
+                <a href={siteUrl} target="_blank" rel="noreferrer"
+                  className="flex-1 min-w-0 inline-flex items-center gap-1 text-foreground hover:text-gold-ink transition-colors">
+                  <span className="truncate">{siteUrl.replace(/^https?:\/\//, "")}</span>
+                  <ExternalLink className="w-3 h-3 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </a>
+                <CopyBtn value={siteUrl} />
+              </div>
+            )}
+            {d.phone && (
+              <div className="group flex items-center gap-2 text-[12.5px]">
+                <Phone className="w-4 h-4 text-muted-foreground shrink-0" />
+                <span className="flex-1 min-w-0 truncate text-foreground tabular-nums">{d.phone}</span>
+                <CopyBtn value={d.phone} />
               </div>
             )}
             {/* Colleagues seen writing on this thread (Tanya answering for Jaya):
@@ -2261,31 +2269,31 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
               <div className="pt-1.5 mt-1 border-t border-border/60">
                 <div className="text-[9.5px] uppercase tracking-[0.14em] text-subtle mb-1">Also on this thread</div>
                 {(d.contacts ?? []).map((ct) => (
-                  <div key={ct.email} className="flex items-center gap-1 text-[12px]">
-                    <span className="truncate text-foreground/90" title={ct.email}>{ct.email}</span>
-                    <span className="ml-auto shrink-0"><CopyBtn value={ct.email} /></span>
+                  <div key={ct.email} className="flex items-center gap-2 text-[12px]">
+                    <span className="w-4 shrink-0" />
+                    <span className="flex-1 min-w-0 truncate text-foreground/90" title={ct.email}>{ct.email}</span>
+                    <CopyBtn value={ct.email} />
                   </div>
                 ))}
               </div>
             )}
-            {siteUrl && (
-              <div className="flex items-center gap-1 text-[12px]">
-                <a href={siteUrl} target="_blank" rel="noreferrer"
-                  className="truncate text-blue-300 hover:text-blue-200">{siteUrl.replace(/^https?:\/\//, "")}</a>
-                <ExternalLink className="w-3 h-3 text-blue-300/70 shrink-0" />
-                <span className="ml-auto shrink-0"><CopyBtn value={siteUrl} /></span>
+          </div>
+
+          {/* reach — the outbound actions, plus a coverage strip: at a glance, which
+              channels we already hold on them and which is the gap to enrich. */}
+          <div className="border-t border-border/70 bg-secondary/30 px-3 py-2.5 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="text-[9.5px] uppercase tracking-[0.16em] text-subtle font-semibold">Reach them</div>
+              <div className="flex items-center gap-1.5" title="Channels we hold on this contact">
+                <Favicon domain="linkedin.com" size={12} className={d.linkedin_url ? "" : "opacity-25 grayscale"} />
+                <Mail className={`w-3 h-3 ${d.email ? "text-signal-ink" : "text-subtle opacity-40"}`} />
+                <Globe className={`w-3 h-3 ${siteUrl ? "text-signal-ink" : "text-subtle opacity-40"}`} />
+                <Phone className={`w-3 h-3 ${d.phone ? "text-signal-ink" : "text-subtle opacity-40"}`} />
               </div>
-            )}
+            </div>
+            <ContactActions d={d} onChanged={() => reload(true)} />
           </div>
         </div>
-      </div>
-
-      {/* REACH THEM — right under the contact details it belongs to, so the way you
-          read someone (name, email, LinkedIn, phone) and the way you reach them
-          (connect, WhatsApp, call, enrich the number) are one block, not two. */}
-      <div>
-        <div className="text-[10px] uppercase tracking-[0.16em] text-subtle font-semibold mb-2">Reach them</div>
-        <ContactActions d={d} onChanged={() => reload(true)} />
       </div>
 
       <div>
