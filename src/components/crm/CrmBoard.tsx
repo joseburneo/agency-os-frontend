@@ -1980,7 +1980,13 @@ function ContactActions({ d, onChanged }: { d: Detail; onChanged: () => void }) 
       }
       if (j.found) { onChanged(); }                     // number arrived → the button is gone
       else if (j.queued) { setFindNote("Still searching Clay — reopen the card in a minute."); }
-      else { setTriedClay(true); setFindNote(j.note || "No mobile found via Clay."); }
+      else {
+        setTriedClay(true);
+        setFindNote(j.note || "No mobile found via Clay.");
+        // Even with no phone, Clay may have found + saved a LinkedIn — reload so it
+        // shows in the contact block and the "Add LinkedIn" row disappears.
+        if (j.linkedin_added) onChanged();
+      }
     } catch {
       // A network/transport failure is not a completed lookup, so leave the button
       // live — nothing was charged and a retry is fair.
