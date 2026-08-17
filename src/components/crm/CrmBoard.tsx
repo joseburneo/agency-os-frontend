@@ -1840,6 +1840,11 @@ function BuildCard({ d, onChanged, autoOptimize = false }: { d: Detail; onChange
 function ContactActions({ d, onChanged }: { d: Detail; onChanged: () => void }) {
   const [finding, setFinding] = useState(false);
   const [findNote, setFindNote] = useState<string | null>(null);
+  // Once Clay has run and come back empty for this contact, don't offer another
+  // PAID lookup in the same session — a second click would spend a second credit
+  // on a search we just learned has no answer. (An existing number never reaches
+  // Clay at all: the button is hidden below, and the server short-circuits too.)
+  const [triedClay, setTriedClay] = useState(false);
   // Extraction is a guess: a signature can hand us our own number or a switchboard,
   // and a wrong number is worse than none. So the number is always editable.
   const [editing, setEditing] = useState(false);
@@ -1896,11 +1901,17 @@ function ContactActions({ d, onChanged }: { d: Detail; onChanged: () => void }) 
   // The email-thread scan runs automatically server-side when the record opens, so
   // there is no "find in thread" button. The only button is Clay (paid, optional).
   const shopClay = () => {
+    if (finding || triedClay || d.phone) return; // never fire a second paid lookup
     setFinding(true); setFindNote(null);
     fetch(`${API}/api/crm/prospect/${d.id}/find-phone?source=clay`, { method: "POST" })
       .then((r) => r.json())
-      .then((j) => { if (j.found) onChanged(); else setFindNote(j.note || "Clay lookup not available yet."); })
-      .catch(() => setFindNote("Clay lookup failed."))
+      .then((j) => {
+        if (j.found) { onChanged(); }              // number arrived → the button is gone
+        else { setTriedClay(true); setFindNote(j.note || "No mobile found via Clay."); }
+      })
+      // A network/transport failure is not a completed lookup, so leave the button
+      // live — nothing was charged and a retry is fair.
+      .catch(() => setFindNote("Clay lookup failed — try again."))
       .finally(() => setFinding(false));
   };
 
@@ -1945,12 +1956,19 @@ function ContactActions({ d, onChanged }: { d: Detail; onChanged: () => void }) 
         </div>
       ) : (
         <div className="space-y-1">
-          <button onClick={shopClay} disabled={finding}
-            className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-[12.5px] font-medium text-foreground hover:border-gold/40 disabled:opacity-40 transition-colors">
-            {finding
-              ? <><Loader2 className="w-4 h-4 animate-spin" /> Enriching the number…</>
-              : <><Favicon domain="clay.com" label="Clay" size={15} /> Enrich via Clay <span className="text-[10px] text-subtle font-normal">· phone</span></>}
-          </button>
+          {triedClay ? (
+            <div className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-secondary/40 px-3 py-2 text-[12px] text-muted-foreground">
+              <Favicon domain="clay.com" label="Clay" size={14} /> Searched Clay — no mobile found
+            </div>
+          ) : (
+            <button onClick={shopClay} disabled={finding}
+              title="Runs a paid Clay mobile lookup. Skipped when a number is already on file, and only once per contact."
+              className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-[12.5px] font-medium text-foreground hover:border-gold/40 disabled:opacity-40 transition-colors">
+              {finding
+                ? <><Loader2 className="w-4 h-4 animate-spin" /> Enriching the number…</>
+                : <><Favicon domain="clay.com" label="Clay" size={15} /> Enrich via Clay <span className="text-[10px] text-subtle font-normal">· phone</span></>}
+            </button>
+          )}
           <button onClick={() => { setDraftPhone(""); setEditing(true); }}
             className="w-full text-center text-[11px] text-subtle hover:text-muted-foreground transition-colors py-0.5">
             or add a number manually
