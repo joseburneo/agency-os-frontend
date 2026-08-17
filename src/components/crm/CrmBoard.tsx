@@ -4,7 +4,7 @@ import { Fragment, createContext, useCallback, useContext, useEffect, useMemo, u
 import {
   X, Link2, MessageCircle, Phone, ExternalLink, Copy, Check,
   Search, RefreshCw, CalendarClock, Sparkles, Send, PenLine, Loader2,
-  Flame, LayoutGrid, List, Bot, ChevronRight, Zap, Mail, Magnet, Globe,
+  Flame, LayoutGrid, List, Bot, ChevronRight, Zap, Mail, Magnet, Globe, Plus,
   PhoneCall, PhoneOff, Mic, MicOff, Smartphone, AlertTriangle,
 } from "lucide-react";
 import DOMPurify from "dompurify";
@@ -1837,6 +1837,67 @@ function BuildCard({ d, onChanged, autoOptimize = false }: { d: Detail; onChange
 }
 
 // ── channel contacts (LinkedIn + Phone) ──────────────────────────────
+// Add a LinkedIn URL to a contact that has none. LinkedIn is the primary key for
+// the cheap Clay phone providers (LeadMagic/Springbolt/Lyne/Prospeo all require it),
+// so a replied lead with no profile on file can't be enriched cheaply until one is
+// added. Mirrors the manual-phone editor: a quiet "Add LinkedIn profile" row that
+// opens an inline input and saves to engaged_prospects.linkedin_url.
+function AddLinkedin({ d, onChanged }: { d: Detail; onChanged: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const save = () => {
+    const v = val.trim();
+    if (!v) { setEditing(false); return; }
+    setSaving(true); setErr(null);
+    fetch(`${API}/api/crm/prospect/${d.id}/linkedin`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ linkedin_url: v }),
+    })
+      .then(async (r) => {
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) { setErr(j.detail || "Could not save the URL."); return; }
+        setEditing(false); onChanged();
+      })
+      .catch(() => setErr("Could not save the URL."))
+      .finally(() => setSaving(false));
+  };
+
+  if (!editing) {
+    return (
+      <button onClick={() => { setVal(""); setEditing(true); }}
+        className="group flex items-center gap-2 text-[12.5px] w-full text-muted-foreground hover:text-cyan transition-colors">
+        <Favicon domain="linkedin.com" label="LinkedIn" size={16} className="opacity-40 group-hover:opacity-100 transition-opacity" />
+        <span className="flex-1 text-left">Add LinkedIn profile</span>
+        <Plus className="w-3.5 h-3.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+      </button>
+    );
+  }
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-1.5">
+        <Favicon domain="linkedin.com" label="LinkedIn" size={16} />
+        <input value={val} onChange={(e) => setVal(e.target.value)} autoFocus
+          placeholder="linkedin.com/in/…"
+          onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") setEditing(false); }}
+          className="flex-1 min-w-0 bg-background border border-border rounded-lg px-2.5 py-1.5 text-[12.5px] text-foreground focus:outline-none focus:ring-1 focus:ring-gold/50" />
+        <button onClick={save} disabled={saving}
+          className="rounded-lg bg-gold px-2.5 py-1.5 text-ink-inverse hover:bg-gold-hi disabled:opacity-40 transition-colors">
+          {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+        </button>
+        <button onClick={() => { setEditing(false); setErr(null); }}
+          className="rounded-lg border border-border px-2 py-1.5 text-muted-foreground hover:text-foreground transition-colors">
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+      {err && <div className="text-[11px] text-danger-soft">{err}</div>}
+      <div className="text-[10px] text-subtle">Unlocks the cheaper phone providers for this contact.</div>
+    </div>
+  );
+}
+
 function ContactActions({ d, onChanged }: { d: Detail; onChanged: () => void }) {
   const [finding, setFinding] = useState(false);
   const [findNote, setFindNote] = useState<string | null>(null);
@@ -1845,6 +1906,9 @@ function ContactActions({ d, onChanged }: { d: Detail; onChanged: () => void }) 
   // on a search we just learned has no answer. (An existing number never reaches
   // Clay at all: the button is hidden below, and the server short-circuits too.)
   const [triedClay, setTriedClay] = useState(false);
+  // A LinkedIn URL just added (or a number that appeared) changes what Clay can do,
+  // so re-open the paid lookup after it settled into "searched, nothing found".
+  useEffect(() => { setTriedClay(false); }, [d.linkedin_url, d.phone]);
   // Extraction is a guess: a signature can hand us our own number or a switchboard,
   // and a wrong number is worse than none. So the number is always editable.
   const [editing, setEditing] = useState(false);
@@ -2256,6 +2320,7 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
                 <CopyBtn value={d.linkedin_url} />
               </div>
             )}
+            {!d.linkedin_url && <AddLinkedin d={d} onChanged={() => reload(true)} />}
             {siteUrl && (
               <div className="group flex items-center gap-2 text-[12.5px]">
                 <Favicon domain={domainOf(d.email)} label={d.company} size={16} />
