@@ -4,7 +4,7 @@ import { Fragment, createContext, useCallback, useContext, useEffect, useMemo, u
 import {
   X, Link2, MessageCircle, Phone, ExternalLink, Copy, Check,
   Search, RefreshCw, CalendarClock, Sparkles, Send, PenLine, Loader2,
-  Flame, LayoutGrid, List, Bot, ChevronRight, Zap, Mail, Magnet, Globe, Plus,
+  Flame, LayoutGrid, List, Bot, ChevronRight, Zap, Mail, Magnet, Globe, Plus, MapPin, Building2,
   PhoneCall, PhoneOff, Mic, MicOff, Smartphone, AlertTriangle,
 } from "lucide-react";
 import DOMPurify from "dompurify";
@@ -399,6 +399,70 @@ function convoSource(c: Convo): Src {
 function linkedinSearchUrl(name: string, company: string): string {
   const q = [name, company].filter(Boolean).join(" ");
   return `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(q)}`;
+}
+
+// ── location: prospect country + company HQ, with a flag ──────────────
+// Both derive from data already on engaged_prospects — the prospect country from
+// its `country`, the company HQ from the ccTLD of its `domain` — so nothing here
+// reads a second table or a second source.
+function flagEmoji(code: string): string {
+  const cc = (code || "").trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(cc)) return "";
+  return String.fromCodePoint(...[...cc].map((c) => 127397 + c.charCodeAt(0)));
+}
+// Country NAME -> ISO alpha-2 (the markets we actually sell into, plus majors).
+const COUNTRY_CODE: Record<string, string> = {
+  "united arab emirates": "AE", uae: "AE", "u.a.e.": "AE", "saudi arabia": "SA", ksa: "SA",
+  qatar: "QA", kuwait: "KW", bahrain: "BH", oman: "OM", jordan: "JO", lebanon: "LB",
+  egypt: "EG", israel: "IL", turkey: "TR", morocco: "MA", tunisia: "TN",
+  netherlands: "NL", ireland: "IE", "united kingdom": "GB", uk: "GB", "great britain": "GB",
+  germany: "DE", france: "FR", spain: "ES", portugal: "PT", italy: "IT", belgium: "BE",
+  switzerland: "CH", austria: "AT", sweden: "SE", norway: "NO", denmark: "DK", finland: "FI",
+  poland: "PL", greece: "GR", romania: "RO", "czech republic": "CZ", czechia: "CZ",
+  "united states": "US", "united states of america": "US", usa: "US", "u.s.a.": "US", america: "US",
+  canada: "CA", mexico: "MX", brazil: "BR", ecuador: "EC", argentina: "AR", colombia: "CO", chile: "CL",
+  india: "IN", pakistan: "PK", bangladesh: "BD", "sri lanka": "LK", philippines: "PH",
+  indonesia: "ID", malaysia: "MY", singapore: "SG", "hong kong": "HK", china: "CN",
+  japan: "JP", "south korea": "KR", vietnam: "VN", thailand: "TH", australia: "AU", "new zealand": "NZ",
+  "south africa": "ZA", nigeria: "NG", kenya: "KE", ghana: "GH", "sierra leone": "SL",
+};
+// ccTLD -> [ISO code, display name] for company HQ. Generic TLDs (com/io/…) are absent on purpose.
+const TLD_COUNTRY: Record<string, [string, string]> = {
+  ae: ["AE", "United Arab Emirates"], sa: ["SA", "Saudi Arabia"], qa: ["QA", "Qatar"],
+  kw: ["KW", "Kuwait"], bh: ["BH", "Bahrain"], om: ["OM", "Oman"], eg: ["EG", "Egypt"],
+  jo: ["JO", "Jordan"], lb: ["LB", "Lebanon"], nl: ["NL", "Netherlands"], ie: ["IE", "Ireland"],
+  uk: ["GB", "United Kingdom"], de: ["DE", "Germany"], fr: ["FR", "France"], es: ["ES", "Spain"],
+  pt: ["PT", "Portugal"], it: ["IT", "Italy"], be: ["BE", "Belgium"], ch: ["CH", "Switzerland"],
+  at: ["AT", "Austria"], se: ["SE", "Sweden"], no: ["NO", "Norway"], dk: ["DK", "Denmark"],
+  fi: ["FI", "Finland"], pl: ["PL", "Poland"], ca: ["CA", "Canada"], mx: ["MX", "Mexico"],
+  br: ["BR", "Brazil"], ec: ["EC", "Ecuador"], in: ["IN", "India"], pk: ["PK", "Pakistan"],
+  ph: ["PH", "Philippines"], my: ["MY", "Malaysia"], sg: ["SG", "Singapore"], hk: ["HK", "Hong Kong"],
+  cn: ["CN", "China"], jp: ["JP", "Japan"], au: ["AU", "Australia"], nz: ["NZ", "New Zealand"],
+  za: ["ZA", "South Africa"], ng: ["NG", "Nigeria"], ke: ["KE", "Kenya"],
+};
+function parseCountry(raw?: string): { code: string; name: string } | null {
+  if (!raw) return null;
+  // "City, Region, Country" -> take the last segment, which is the country.
+  const name = raw.split(",").map((s) => s.trim()).filter(Boolean).pop() || raw.trim();
+  if (!name) return null;
+  return { code: COUNTRY_CODE[name.toLowerCase()] || "", name };
+}
+function companyCountryFromDomain(domain?: string): { code: string; name: string } | null {
+  if (!domain) return null;
+  const host = domain.toLowerCase().replace(/^https?:\/\//, "").split("/")[0];
+  const tld = host.split(".").pop() || "";
+  const hit = TLD_COUNTRY[tld];
+  return hit ? { code: hit[0], name: hit[1] } : null;
+}
+function LocationLine({ icon: Icon, place, title }: { icon: React.ComponentType<{ className?: string }>; place: { code: string; name: string }; title: string }) {
+  const flag = flagEmoji(place.code);
+  return (
+    <div className="flex items-center gap-1.5 text-[12px]" title={title}>
+      <Icon className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+      {flag && <span className="text-[13px] leading-none">{flag}</span>}
+      <span className="text-foreground truncate">{place.name}</span>
+    </div>
+  );
 }
 
 // ── tiny shared components ───────────────────────────────────────────
@@ -2301,8 +2365,18 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
             <div className="text-[13.5px] font-semibold text-foreground leading-tight">{d.name || "—"}</div>
             <div className="text-[12px] text-muted-foreground leading-snug mt-0.5 truncate">
               {[d.job_title, d.company].filter(Boolean).join(" · ") || "—"}
-              {d.country ? <span className="text-subtle"> · {d.country}</span> : null}
             </div>
+            {(() => {
+              const pc = parseCountry(d.country);
+              const cc = companyCountryFromDomain(siteUrl);
+              if (!pc && !cc) return null;
+              return (
+                <div className="mt-2 flex flex-col gap-1">
+                  {pc && <LocationLine icon={MapPin} place={pc} title="Prospect location" />}
+                  {cc && <LocationLine icon={Building2} place={cc} title="Company HQ" />}
+                </div>
+              );
+            })()}
           </div>
 
           {/* handles — each a branded, copyable row. The brand mark does the visual
