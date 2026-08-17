@@ -4,7 +4,7 @@ import { Fragment, createContext, useCallback, useContext, useEffect, useMemo, u
 import {
   X, Link2, MessageCircle, Phone, ExternalLink, Copy, Check,
   Search, RefreshCw, CalendarClock, Sparkles, Send, PenLine, Loader2,
-  Flame, LayoutGrid, List, Bot, ChevronRight, Zap, Mail, Magnet, Globe, Plus, MapPin, Building2,
+  Flame, LayoutGrid, List, Bot, ChevronRight, Zap, Mail, Magnet, Globe, Plus, MapPin, Building2, Briefcase,
   PhoneCall, PhoneOff, Mic, MicOff, Smartphone, AlertTriangle,
 } from "lucide-react";
 import DOMPurify from "dompurify";
@@ -35,6 +35,9 @@ type Card = {
   company: string;
   job_title: string;
   country: string;
+  industry?: string;
+  company_country?: string;
+  domain?: string;
   category: string;
   status: string;
   status_label: string;
@@ -2092,7 +2095,7 @@ function ContactActions({ d, onChanged }: { d: Detail; onChanged: () => void }) 
               className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-[12.5px] font-medium text-foreground hover:border-gold/40 disabled:opacity-40 transition-colors">
               {finding
                 ? <><Loader2 className="w-4 h-4 animate-spin" /> Enriching the number…</>
-                : <><Favicon domain="clay.com" label="Clay" size={15} /> Enrich via Clay <span className="text-[10px] text-subtle font-normal">· phone</span></>}
+                : <><Favicon domain="clay.com" label="Clay" size={15} /> Enrich with Clay <span className="text-[10px] text-subtle font-normal">· phone + LinkedIn</span></>}
             </button>
           )}
           <button onClick={() => { setDraftPhone(""); setEditing(true); }}
@@ -2368,12 +2371,20 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
             </div>
             {(() => {
               const pc = parseCountry(d.country);
-              const cc = companyCountryFromDomain(siteUrl);
-              if (!pc && !cc) return null;
+              // Company HQ: prefer the stored value (from graduation/enrichment), else the ccTLD guess.
+              const cc = d.company_country ? parseCountry(d.company_country) : companyCountryFromDomain(d.domain || siteUrl);
+              const ind = (d.industry || "").trim();
+              if (!pc && !cc && !ind) return null;
               return (
                 <div className="mt-2 flex flex-col gap-1">
                   {pc && <LocationLine icon={MapPin} place={pc} title="Prospect location" />}
                   {cc && <LocationLine icon={Building2} place={cc} title="Company HQ" />}
+                  {ind && (
+                    <div className="flex items-center gap-1.5 text-[12px]" title="Industry">
+                      <Briefcase className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                      <span className="text-foreground truncate">{ind}</span>
+                    </div>
+                  )}
                 </div>
               );
             })()}
