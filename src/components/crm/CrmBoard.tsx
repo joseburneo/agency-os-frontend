@@ -1900,19 +1900,30 @@ function ContactActions({ d, onChanged }: { d: Detail; onChanged: () => void }) 
 
   // The email-thread scan runs automatically server-side when the record opens, so
   // there is no "find in thread" button. The only button is Clay (paid, optional).
-  const shopClay = () => {
+  const shopClay = async () => {
     if (finding || triedClay || d.phone) return; // never fire a second paid lookup
-    setFinding(true); setFindNote(null);
-    fetch(`${API}/api/crm/prospect/${d.id}/find-phone?source=clay`, { method: "POST" })
-      .then((r) => r.json())
-      .then((j) => {
-        if (j.found) { onChanged(); }              // number arrived → the button is gone
-        else { setTriedClay(true); setFindNote(j.note || "No mobile found via Clay."); }
-      })
+    setFinding(true); setFindNote("Searching Clay…");
+    try {
+      // Start the cheapest-first waterfall, then poll the same route with the run_id
+      // until the number lands (or every provider misses). It runs async because
+      // chaining up to six providers can take ~30-60s.
+      let j = await fetch(`${API}/api/crm/prospect/${d.id}/find-phone?source=clay`, { method: "POST" }).then((r) => r.json());
+      let runId: string = j.run_id || "";
+      for (let i = 0; i < 24 && j.queued && runId; i++) {
+        await new Promise((res) => setTimeout(res, 5000));
+        j = await fetch(`${API}/api/crm/prospect/${d.id}/find-phone?source=clay&run_id=${encodeURIComponent(runId)}`, { method: "POST" }).then((r) => r.json());
+        runId = j.run_id || runId;
+      }
+      if (j.found) { onChanged(); }                     // number arrived → the button is gone
+      else if (j.queued) { setFindNote("Still searching Clay — reopen the card in a minute."); }
+      else { setTriedClay(true); setFindNote(j.note || "No mobile found via Clay."); }
+    } catch {
       // A network/transport failure is not a completed lookup, so leave the button
       // live — nothing was charged and a retry is fair.
-      .catch(() => setFindNote("Clay lookup failed — try again."))
-      .finally(() => setFinding(false));
+      setFindNote("Clay lookup failed — try again.");
+    } finally {
+      setFinding(false);
+    }
   };
 
   // No LinkedIn button here anymore — the profile is a branded handle row up in
