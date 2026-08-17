@@ -1905,69 +1905,59 @@ function ContactActions({ d, onChanged }: { d: Detail; onChanged: () => void }) 
   };
 
   return (
-    <div className="space-y-3">
-      {/* LinkedIn */}
-      <div className="bg-card border border-border rounded-xl p-3">
-        <div className="flex items-center gap-2 text-sm font-medium text-foreground mb-2">
-          <Link2 className="w-4 h-4 text-cyan" /> LinkedIn
-        </div>
-        {d.linkedin_url ? (
-          <div className="flex items-center gap-2">
-            <a href={d.linkedin_url} target="_blank" rel="noreferrer"
-              className="flex-1 inline-flex items-center gap-2 rounded-lg bg-background border border-border px-3 py-2 text-sm text-foreground hover:text-gold-ink truncate">
-              Open profile & connect <ExternalLink className="w-3.5 h-3.5 shrink-0" />
-            </a>
-            <CopyBtn value={d.linkedin_url} />
-          </div>
-        ) : (
-          <a href={linkedinSearchUrl(d.name, d.company)} target="_blank" rel="noreferrer"
-            className="inline-flex items-center gap-2 rounded-lg border border-cyan/40 bg-cyan/10 px-3 py-2 text-sm text-cyan hover:bg-cyan/15 transition-colors">
-            <Search className="w-3.5 h-3.5" /> Search on LinkedIn to connect <ExternalLink className="w-3.5 h-3.5" />
+    <div className="space-y-2">
+      {/* LinkedIn — one compact connect action, no heavy card around it. */}
+      {d.linkedin_url ? (
+        <div className="flex items-center gap-1.5">
+          <a href={d.linkedin_url} target="_blank" rel="noreferrer"
+            className="flex-1 inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-[12.5px] text-foreground hover:text-cyan hover:border-cyan/40 transition-colors">
+            <Link2 className="w-3.5 h-3.5 text-cyan shrink-0" /> Connect on LinkedIn
+            <ExternalLink className="w-3 h-3 ml-auto shrink-0 opacity-60" />
           </a>
-        )}
-      </div>
-
-      {/* Phone / WhatsApp / Call */}
-      <div className="bg-card border border-border rounded-xl p-3">
-        <div className="flex items-center gap-2 text-sm font-medium text-foreground mb-2">
-          <Phone className="w-4 h-4 text-warn" /> Phone · WhatsApp · Call
+          <CopyBtn value={d.linkedin_url} />
         </div>
-        {editing ? phoneEditor : d.phone ? (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 bg-background border border-border rounded-lg px-3 py-2">
-              <span className="flex-1 text-sm text-foreground tabular-nums">{d.phone}</span>
-              <button onClick={() => { setDraftPhone(d.phone); setEditing(true); }} title="Edit or remove this number"
-                className="text-muted-foreground hover:text-gold-ink transition-colors">
-                <PenLine className="w-3.5 h-3.5" />
-              </button>
-              <CopyBtn value={d.phone} label="Copy to call" />
-            </div>
-            <div className="flex items-center gap-2">
-              <a href={d.wa_link || `https://wa.me/${d.phone.replace(/[^\d]/g, "")}`} target="_blank" rel="noreferrer"
-                className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg border border-signal/40 bg-signal/10 px-3 py-2 text-sm text-signal-ink hover:bg-signal/15 transition-colors">
-                <MessageCircle className="w-4 h-4" /> WhatsApp
-              </a>
-              <a href={`tel:${d.phone}`}
-                className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-foreground hover:bg-secondary transition-colors">
-                <Phone className="w-4 h-4" /> Call
-              </a>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <div className="text-xs text-muted-foreground">No number in the email thread. Type it yourself, or shop for it with Clay (paid).</div>
-            <button onClick={() => { setDraftPhone(""); setEditing(true); }}
-              className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-foreground hover:bg-secondary transition-colors">
-              <PenLine className="w-4 h-4" /> Add a number
-            </button>
-            <button onClick={shopClay} disabled={finding}
-              className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-warn hover:bg-warn/15 disabled:opacity-40 transition-colors">
-              {finding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />} Shop via Clay
-            </button>
-            {findNote && <div className="text-xs text-muted-foreground">{findNote}</div>}
-          </div>
-        )}
-      </div>
+      ) : (
+        <a href={linkedinSearchUrl(d.name, d.company)} target="_blank" rel="noreferrer"
+          className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-[12.5px] text-muted-foreground hover:text-cyan hover:border-cyan/40 transition-colors">
+          <Search className="w-3.5 h-3.5 shrink-0" /> Find on LinkedIn
+          <ExternalLink className="w-3 h-3 ml-auto shrink-0 opacity-60" />
+        </a>
+      )}
+
+      {/* Phone. The number itself is shown in the Contact block right above, so
+          here we only carry the ACTIONS — reach out if we have it, enrich if we
+          don't. Enrichment is a paid Clay lookup; the manual entry is the quiet,
+          free alternative underneath. */}
+      {editing ? phoneEditor : d.phone ? (
+        <div className="flex items-center gap-1.5">
+          <a href={d.wa_link || `https://wa.me/${d.phone.replace(/[^\d]/g, "")}`} target="_blank" rel="noreferrer"
+            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-signal/40 bg-signal/10 px-3 py-2 text-[12.5px] text-signal-ink hover:bg-signal/15 transition-colors">
+            <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
+          </a>
+          <a href={`tel:${d.phone}`}
+            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-[12.5px] text-foreground hover:bg-secondary transition-colors">
+            <Phone className="w-3.5 h-3.5" /> Call
+          </a>
+          <button onClick={() => { setDraftPhone(d.phone); setEditing(true); }} title="Edit or remove this number"
+            className="rounded-lg border border-border p-2 text-muted-foreground hover:text-gold-ink transition-colors">
+            <PenLine className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-1">
+          <button onClick={shopClay} disabled={finding}
+            className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-[12.5px] font-medium text-foreground hover:border-gold/40 disabled:opacity-40 transition-colors">
+            {finding
+              ? <><Loader2 className="w-4 h-4 animate-spin" /> Enriching the number…</>
+              : <><Favicon domain="clay.com" label="Clay" size={15} /> Enrich via Clay <span className="text-[10px] text-subtle font-normal">· phone</span></>}
+          </button>
+          <button onClick={() => { setDraftPhone(""); setEditing(true); }}
+            className="w-full text-center text-[11px] text-subtle hover:text-muted-foreground transition-colors py-0.5">
+            or add a number manually
+          </button>
+          {findNote && <div className="text-[11px] text-muted-foreground">{findNote}</div>}
+        </div>
+      )}
     </div>
   );
 }
@@ -2272,6 +2262,14 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
         </div>
       </div>
 
+      {/* REACH THEM — right under the contact details it belongs to, so the way you
+          read someone (name, email, LinkedIn, phone) and the way you reach them
+          (connect, WhatsApp, call, enrich the number) are one block, not two. */}
+      <div>
+        <div className="text-[10px] uppercase tracking-[0.16em] text-subtle font-semibold mb-2">Reach them</div>
+        <ContactActions d={d} onChanged={() => reload(true)} />
+      </div>
+
       <div>
         <div className="text-[10px] uppercase tracking-[0.16em] text-subtle font-semibold mb-2">Deal</div>
         <dl className="space-y-2 text-[12.5px]">
@@ -2430,12 +2428,6 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
           </button>
           <span className="text-[10px] text-subtle">auto-saves when you click away</span>
         </div>
-      </div>
-
-      {/* REACH THEM — always visible so Jose can call / WhatsApp / LinkedIn / email right now */}
-      <div>
-        <div className="text-[10px] uppercase tracking-[0.16em] text-subtle font-semibold mb-2">Reach them</div>
-        <ContactActions d={d} onChanged={() => reload(true)} />
       </div>
 
       {/* QUICK ACTIONS */}
