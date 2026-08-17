@@ -2,7 +2,7 @@ import { cache } from "react";
 import { db } from "./server";
 import type {
   Workspace, WorkspaceData, TargetList, Lead, OutreachChannel, Kpi, JourneyItem,
-  CrmCard, CrmStage, ReplyCategory, BlocklistEntry, BlocklistReason, BlocklistSource,
+  CrmCard, CrmSummary, CrmTopLead, CrmStage, ReplyCategory, BlocklistEntry, BlocklistReason, BlocklistSource,
   IntelligenceSection, IntelligenceKind, RoadmapItem, EmailCampaign,
 } from "./types";
 
@@ -272,18 +272,30 @@ function toChannel(v: unknown): OutreachChannel | null {
 
 export async function loadCrm(
   slug: string
-): Promise<{ cards: CrmCard[]; warm: number; meetings: number }> {
-  const empty = { cards: [] as CrmCard[], warm: 0, meetings: 0 };
+): Promise<{ cards: CrmCard[]; warm: number; meetings: number; summary: CrmSummary }> {
+  const emptySummary: CrmSummary = {
+    total: 0, wantsMeeting: 0, hotNow: 0, waitingUs: 0, waitingThem: 0,
+    meetings: 0, withBuild: 0, top: [],
+  };
+  const empty = { cards: [] as CrmCard[], warm: 0, meetings: 0, summary: emptySummary };
   if (!slug) return empty; // never ask the API for "every workspace"
   try {
+    // Same-origin browser calls go through /api/crm (the proxy adds the key), but
+    // this runs server-side, so it must authenticate itself: without X-CRM-Key the
+    // Render API returns "bad or missing X-CRM-Key" and the whole dashboard reads
+    // zero even when the workspace is full of live conversations. X-CRM-Scope pins
+    // the read to this one workspace, exactly as the proxy does for a client session.
+    const key = process.env.CRM_API_KEY;
+    const headers: Record<string, string> = { "X-CRM-Scope": slug };
+    if (key) headers["X-CRM-Key"] = key;
     // Bounded: a Render mid-deploy answers nothing for minutes, and an unbounded
     // fetch here once stalled the Vercel build's prerender of "/" past its 60s
     // budget. Better an empty CRM slice than a failed build or a hung page.
     const [pRes, sRes] = await Promise.all([
       fetch(`${CRM_API}/api/crm/prospects?workspace=${encodeURIComponent(slug)}`,
-        { next: { revalidate: 60 }, signal: AbortSignal.timeout(15000) }),
+        { headers, next: { revalidate: 60 }, signal: AbortSignal.timeout(15000) }),
       fetch(`${CRM_API}/api/crm/summary?workspace=${encodeURIComponent(slug)}`,
-        { next: { revalidate: 60 }, signal: AbortSignal.timeout(15000) }),
+        { headers, next: { revalidate: 60 }, signal: AbortSignal.timeout(15000) }),
     ]);
     const pJson = pRes.ok ? await pRes.json() : null;
     const sJson = sRes.ok ? await sRes.json() : null;
@@ -319,9 +331,31 @@ export async function loadCrm(
       };
     });
 
-    const warm = Number(sJson?.counts?.total ?? cards.length);
-    const meetings = Number(sJson?.counts?.meetings ?? 0);
-    return { cards, warm, meetings };
+    const c = sJson?.counts ?? {};
+    const warm = Number(c.total ?? cards.length);
+    const meetings = Number(c.meetings ?? 0);
+    const top: CrmTopLead[] = (Array.isArray(sJson?.top) ? sJson.top : []).map(
+      (t: Record<string, unknown>) => ({
+        id: String(t.id ?? ""),
+        name: String(t.name ?? ""),
+        company: String(t.company ?? ""),
+        heat: Number(t.heat ?? 0),
+        reason: String(t.heat_reason ?? ""),
+        wantsMeeting: Boolean(t.wants_meeting),
+        lastReplyAt: String(t.last_reply_at ?? ""),
+      })
+    );
+    const summary: CrmSummary = {
+      total: Number(c.total ?? cards.length),
+      wantsMeeting: Number(c.wants_meeting ?? 0),
+      hotNow: Number(c.hot_now ?? 0),
+      waitingUs: Number(c.waiting_us ?? 0),
+      waitingThem: Number(c.waiting_them ?? 0),
+      meetings,
+      withBuild: Number(c.with_build ?? 0),
+      top,
+    };
+    return { cards, warm, meetings, summary };
   } catch {
     return empty;
   }
@@ -554,6 +588,7 @@ export async function loadPortal(
     phoneTouches: [],
     content: [],
     crm: crm.cards,
+    crmSummary: crm.summary,
     library: [],
     journey: JOURNEY_SEED[slug] ?? [],
   };

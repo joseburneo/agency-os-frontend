@@ -272,6 +272,31 @@ export interface ActivityItem {
   when: string;
 }
 
+// The warm side of the dashboard, straight from the CRM summary endpoint. These
+// are the numbers that make a live workspace feel alive — how many people are
+// mid-conversation, how many asked to talk, how many are hot right now — plus
+// the handful of hottest names to surface as the dashboard's centerpiece.
+export interface CrmTopLead {
+  id: string;
+  name: string;
+  company: string;
+  heat: number;      // 0-100
+  reason: string;    // why this lead is hot ("wants to meet, positive reply")
+  wantsMeeting: boolean;
+  lastReplyAt: string; // ISO, "" when unknown
+}
+
+export interface CrmSummary {
+  total: number;        // conversations in play
+  wantsMeeting: number; // asked to talk / open to a call
+  hotNow: number;       // high-heat right now
+  waitingUs: number;    // ball in our court — they replied, we owe an answer
+  waitingThem: number;
+  meetings: number;
+  withBuild: number;
+  top: CrmTopLead[];
+}
+
 export interface WorkspaceData {
   kpis: Kpi[];
   activity: ActivityItem[];
@@ -282,6 +307,7 @@ export interface WorkspaceData {
   phoneTouches: PhoneTouch[];
   content: ContentPost[];
   crm: CrmCard[];
+  crmSummary?: CrmSummary; // warm headline numbers; absent on the mock path
   library: LibraryItem[];
   journey: JourneyItem[];
 }
