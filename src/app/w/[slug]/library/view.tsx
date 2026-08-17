@@ -6,7 +6,6 @@ import {
   Brain,
   CalendarClock,
   FileSignature,
-  Languages,
   ShieldAlert,
   Library,
   Building2,
@@ -913,8 +912,6 @@ const OPS_FIELDS: {
     hint: "This client's own calendar. Drafts offer this link — never another client's." },
   { key: "signature_html", label: "Warm-reply signature", icon: FileSignature, multiline: true, isHtml: true,
     hint: "Attached when replying to a prospect who answered. Cold emails stay plain text. Shown below exactly as it will render." },
-  { key: "brain_language", label: "Language & tone", icon: Languages,
-    hint: "How the agent writes for this client, e.g. \"British English, punchy\"." },
   { key: "brain_rules", label: "Hard rules", icon: ShieldAlert, multiline: true,
     hint: "Absolute guardrails the agent obeys above everything, e.g. \"never quote prices in writing\"." },
 ];
