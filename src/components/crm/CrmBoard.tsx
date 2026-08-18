@@ -790,7 +790,14 @@ type Convo = {
   replied: boolean; active: boolean; count: number; reply_count: number;
   sent_count: number; first_at: string | null; last_at: string | null;
   last_reply_at: string | null; subject: string; messages: ThreadMsg[];
+  chat_id?: string;
 };
+
+// LinkedIn and WhatsApp are one thread per person, not one per mailbox, so their block
+// has no subject and no burner to label. It gets the person's name and the channel.
+function isChannelConvo(c: Convo): boolean {
+  return c.kind === "linkedin" || c.kind === "whatsapp";
+}
 
 // A single campaign thread: a labeled, collapsible block. The burner + a REPLIED/no-reply
 // badge sit in the header so Jose knows at a glance which mailbox ran it and whether the
@@ -800,6 +807,7 @@ function ConvoBlock({ c, themName, themCompany, themDomain, defaultOpen }: {
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const src = SRC[convoSource(c)];
+  const chan = isChannelConvo(c);
   // Our half of the thread is the workspace's company, never the person who typed it.
   const us = wsBrand(useContext(WorkspaceCtx));
   const routeShow = c.messages.map((m, i) => i === 0 || routeKey(m) !== routeKey(c.messages[i - 1]));
@@ -813,11 +821,13 @@ function ConvoBlock({ c, themName, themCompany, themDomain, defaultOpen }: {
         <Favicon domain={src.logo} label={src.name} size={18} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
-            <span className="text-[12px] font-semibold text-foreground truncate">{cleanSubject(c.subject) || "(no subject)"}</span>
+            <span className="text-[12px] font-semibold text-foreground truncate">
+              {chan ? (themName || src.name) : (cleanSubject(c.subject) || "(no subject)")}
+            </span>
             {c.active && <span className="shrink-0 text-[8.5px] uppercase tracking-[0.1em] px-1 py-px rounded bg-gold/15 text-gold-ink">active</span>}
           </div>
           <div className="text-[10.5px] text-muted-foreground truncate">
-            <span style={{ color: src.bar }}>{src.name}</span> · {c.eaccount}
+            <span style={{ color: src.bar }}>{src.name}</span>{chan ? "" : ` · ${c.eaccount}`}
           </div>
         </div>
         {c.replied
@@ -1158,9 +1168,14 @@ function useComposer(d: Detail, onSent: () => void) {
     fetch(`${API}/api/crm/prospect/${id}/send`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        text, channel: "email", eaccount: selectedOpt?.eaccount, via: selectedOpt?.via,
-        // Routing chips travel with the send; absent = the thread's own default.
-        ...(routeTo ? { to: routeTo, cc: routeCc ?? [] } : {}),
+        text, channel: chan,
+        // Mailbox selection and reply-all routing are email concepts. A LinkedIn or
+        // WhatsApp send has one thread and one recipient, so sending them a mailbox
+        // would be noise the backend has to ignore.
+        ...(chan === "email"
+          ? { eaccount: selectedOpt?.eaccount, via: selectedOpt?.via,
+              ...(routeTo ? { to: routeTo, cc: routeCc ?? [] } : {}) }
+          : {}),
       }),
     })
       .then(async (r) => {
@@ -1263,8 +1278,14 @@ function useComposer(d: Detail, onSent: () => void) {
   };
 
   const canSendEmail = chan === "email" && (sendOpts.length > 0 || d.can_send_email);
+  // LinkedIn and WhatsApp now leave through Unipile instead of being copied by hand.
+  // The check here is only "do we hold an address for them"; whether the session is
+  // alive, whether they are a first-degree connection, whether a chat exists — all of
+  // that is the backend's to answer, and it answers with a 409 that says which.
+  const canSendChannel = (chan === "whatsapp" && !!d.phone)
+    || (chan === "linkedin" && !!d.linkedin_url);
   const gmailLive = d.live_channel === "gmail";
-  return { d, chan, setChan, text, setDraft, send, logTouch, refresh: onSent, askCopilot, drafting, sending, sent, setSent, co, setCo, coBusy, coLog, coCtx, coStream, coSaved, clearChat, canSendEmail, gmailLive, threadKey, sendOpts, fromKey, setFromKey, selectedOpt, threadAcct, routeTo, routeCc, setRouteCc, ccAdd, setCcAdd, clientCc, sigInfo };
+  return { d, chan, setChan, text, setDraft, send, logTouch, refresh: onSent, askCopilot, drafting, sending, sent, setSent, co, setCo, coBusy, coLog, coCtx, coStream, coSaved, clearChat, canSendEmail, canSendChannel, gmailLive, threadKey, sendOpts, fromKey, setFromKey, selectedOpt, threadAcct, routeTo, routeCc, setRouteCc, ccAdd, setCcAdd, clientCc, sigInfo };
 }
 type ComposerCtl = ReturnType<typeof useComposer>;
 
@@ -1577,7 +1598,7 @@ function CallPanel({ d, onTouched }: { d: Detail; onTouched: () => void }) {
 }
 
 function Composer({ c }: { c: ComposerCtl }) {
-  const { d, chan, setChan, text, setDraft, send, logTouch, drafting, sending, sent, setSent, canSendEmail, gmailLive, sendOpts, fromKey, setFromKey, selectedOpt, threadAcct, routeTo, routeCc, setRouteCc, ccAdd, setCcAdd, clientCc } = c;
+  const { d, chan, setChan, text, setDraft, send, logTouch, drafting, sending, sent, setSent, canSendEmail, canSendChannel, gmailLive, sendOpts, fromKey, setFromKey, selectedOpt, threadAcct, routeTo, routeCc, setRouteCc, ccAdd, setCcAdd, clientCc } = c;
   // Compact by default so an empty composer never steals the conversation's space; it opens
   // on click or as soon as there's a draft (incl. one the copilot / Draft-with-AI wrote).
   const [open, setOpen] = useState(false);
@@ -1607,6 +1628,7 @@ function Composer({ c }: { c: ComposerCtl }) {
           {chan === "email"
             ? (canSendEmail ? "Sends on-thread via Instantly" : gmailLive ? "Reply from Gmail" : "No thread — copy & send")
             : chan === "call" ? "Dials from here, logged automatically"
+            : canSendChannel ? `Sends from your connected ${CHANNEL_META[chan].label}`
             : "Copy & send by hand"}
         </span>
       </div>
@@ -1732,6 +1754,22 @@ function Composer({ c }: { c: ComposerCtl }) {
               {sending ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending…</>
                 : <><Send className="w-4 h-4" /> {selectedOpt?.via === "gmail" ? `Send from ${selectedOpt.eaccount}` : "Send via Instantly"}</>}
             </button>
+          ) : canSendChannel && text.trim() ? (
+            <>
+              <button onClick={send} disabled={sending || !text.trim()}
+                className="neon-btn inline-flex items-center gap-2 rounded-lg bg-gold px-4 py-2 text-sm font-semibold text-ink-inverse hover:bg-gold-hi disabled:opacity-40 transition-colors">
+                {sending ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending…</>
+                  : <><Send className="w-4 h-4" /> Send on {CHANNEL_META[chan].label}</>}
+              </button>
+              {/* Still available on purpose: if the session is down or they are not a
+                  connection yet, sending by hand has to stay one click away. */}
+              <a href={chan === "whatsapp" && d.phone ? (d.wa_link || `https://wa.me/${d.phone.replace(/[^\d]/g, "")}`) : (d.linkedin_url || linkedinSearchUrl(d.name, d.company))}
+                target="_blank" rel="noreferrer"
+                onClick={() => { navigator.clipboard.writeText(text); logTouch(chan); }}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs text-muted-foreground hover:border-gold/40 transition-colors">
+                <Copy className="w-3.5 h-3.5" /> or copy &amp; open
+              </a>
+            </>
           ) : chan !== "email" && chan !== "call" && text.trim() ? (
             <a href={chan === "whatsapp" && d.phone ? (d.wa_link || `https://wa.me/${d.phone.replace(/[^\d]/g, "")}`) : (d.linkedin_url || linkedinSearchUrl(d.name, d.company))}
               target="_blank" rel="noreferrer"
