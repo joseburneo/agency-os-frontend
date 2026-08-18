@@ -68,11 +68,9 @@ function workspaceFromRow(row: Record<string, unknown>, coldLeads: number): Work
 // into the CRM. Conflating the two put 1,606 prospect-owned rows (59% of the
 // table) into "our leads"; magnets now read from magnets + magnet_leads instead.
 //
-// Every magnet read below falls back to the old tables when the new ones are
-// empty for that workspace. The fallback is what makes the migration deployable
-// in any order: a magnet page can never render an empty list because a deploy
-// landed before the data move. Delete the fallbacks once target_list_leads holds
-// no source='magnet' rows.
+// The migration fallbacks that let these read the old tables mid-move were removed
+// on 2026-08-18, once target_list_leads held no source='magnet' rows at all. A
+// magnet resolves through its own tables or not at all.
 
 type MagnetRow = { id: string; content: Record<string, unknown> | null };
 
@@ -96,13 +94,12 @@ async function leadCountFor(wsRow: Record<string, unknown>): Promise<number> {
   const wsId = String(wsRow.id);
   if (wsRow.kind === "magnet") {
     const magnet = await loadMagnetFor(wsId);
-    if (magnet) {
-      const { count } = await sb
-        .from("magnet_leads")
-        .select("id", { count: "exact", head: true })
-        .eq("magnet_id", magnet.id);
-      if ((count ?? 0) > 0) return count ?? 0;
-    }
+    if (!magnet) return 0;
+    const { count } = await sb
+      .from("magnet_leads")
+      .select("id", { count: "exact", head: true })
+      .eq("magnet_id", magnet.id);
+    return count ?? 0;
   }
   const { count } = await sb
     .from("target_list_leads")
@@ -225,15 +222,14 @@ export const loadTargetLists = cache(async function loadTargetLists(
   const wsId = wsRow.id as string;
 
   // A magnet's leads belong to the prospect, not to us, and live in magnet_leads.
-  // Falls through to the legacy path when the move has not reached this magnet yet.
+  // This returns whatever the magnet has, including nothing: target_list_leads is
+  // ours now, so falling through to it would show a prospect our client campaigns.
   if (wsRow.kind === "magnet") {
     const magnet = await loadMagnetFor(wsId);
-    if (magnet) {
-      const { lists, leads } = await loadMagnetLists(magnet.id, withBodies);
-      if (leads.length > 0) {
-        return { ws: workspaceFromRow(wsRow, leads.length), lists, leads };
-      }
-    }
+    const { lists, leads } = magnet
+      ? await loadMagnetLists(magnet.id, withBodies)
+      : { lists: [] as TargetList[], leads: [] as Lead[] };
+    return { ws: workspaceFromRow(wsRow, leads.length), lists, leads };
   }
 
   const { data: listRows } = await sb
@@ -374,12 +370,9 @@ export const loadListsMeta = cache(async function loadListsMeta(
   // A magnet's tabs come from its own leads, where the list level is denormalized.
   if (wsRow.kind === "magnet") {
     const magnet = await loadMagnetFor(String(wsRow.id));
-    if (magnet) {
-      const { lists } = await loadMagnetLists(magnet.id, false);
-      if (lists.length > 0) {
-        return lists.map((l) => ({ key: listKey(l.name), name: l.name, count: l.count }));
-      }
-    }
+    if (!magnet) return [];
+    const { lists } = await loadMagnetLists(magnet.id, false);
+    return lists.map((l) => ({ key: listKey(l.name), name: l.name, count: l.count }));
   }
   const { data: rows } = await sb
     .from("target_lists")
@@ -768,19 +761,15 @@ export const loadWorkspaceKind = cache(async function loadWorkspaceKind(slug: st
 export const loadMagnetBrief = cache(async function loadMagnetBrief(slug: string) {
   const sb = db();
   if (!sb) return null;
-  const { data } = await sb.from("workspaces").select("id,kind,brief_json,name,owner_name,domain")
+  const { data } = await sb.from("workspaces").select("id,kind,name,owner_name,domain")
     .eq("slug", slug).maybeSingle();
-  if (!data) return null;
+  if (!data || data.kind !== "magnet") return null;
 
-  // The research now lives on the magnet itself (magnets.content). brief_json is the
-  // pre-refactor home and stays readable so a magnet built before the move — or one
-  // whose row has not been created yet — still renders its page.
-  const magnet = data.kind === "magnet" ? await loadMagnetFor(String(data.id)) : null;
-  const content = magnet?.content;
-  const brief = (content && Object.keys(content).length > 0)
-    ? content
-    : (data.brief_json as Record<string, unknown> | null);
-  if (!brief) return null;
+  // The research lives on the magnet itself. It used to be workspaces.brief_json,
+  // which was retired on 2026-08-18 — one copy, in magnets.content.
+  const magnet = await loadMagnetFor(String(data.id));
+  const brief = magnet?.content;
+  if (!brief || Object.keys(brief).length === 0) return null;
 
   // A magnet built as a plan (no list yet) hides the "Your list" section rather
   // than linking to an empty Target Lists page.
