@@ -62,6 +62,141 @@ function workspaceFromRow(row: Record<string, unknown>, coldLeads: number): Work
   };
 }
 
+// ── Magnets: a separate domain from our campaign leads ───────────────────────
+// A magnet is the prospect's OWN gift — their ~50 leads, built for them, owned by
+// them. Our real campaign leads live in target_list_leads and are what graduates
+// into the CRM. Conflating the two put 1,606 prospect-owned rows (59% of the
+// table) into "our leads"; magnets now read from magnets + magnet_leads instead.
+//
+// Every magnet read below falls back to the old tables when the new ones are
+// empty for that workspace. The fallback is what makes the migration deployable
+// in any order: a magnet page can never render an empty list because a deploy
+// landed before the data move. Delete the fallbacks once target_list_leads holds
+// no source='magnet' rows.
+
+type MagnetRow = { id: string; content: Record<string, unknown> | null };
+
+// workspace id -> its magnet row. One magnet per magnet workspace (unique index).
+const loadMagnetFor = cache(async function loadMagnetFor(wsId: string): Promise<MagnetRow | null> {
+  const sb = db();
+  if (!sb) return null;
+  const { data } = await sb
+    .from("magnets")
+    .select("id,content")
+    .eq("workspace_id", wsId)
+    .maybeSingle();
+  return data ? { id: String(data.id), content: (data.content ?? null) as Record<string, unknown> | null } : null;
+});
+
+// The lead count behind a workspace badge. A magnet counts its own leads; a client
+// counts the campaign leads. Falls back for a magnet whose rows have not moved yet.
+async function leadCountFor(wsRow: Record<string, unknown>): Promise<number> {
+  const sb = db();
+  if (!sb) return 0;
+  const wsId = String(wsRow.id);
+  if (wsRow.kind === "magnet") {
+    const magnet = await loadMagnetFor(wsId);
+    if (magnet) {
+      const { count } = await sb
+        .from("magnet_leads")
+        .select("id", { count: "exact", head: true })
+        .eq("magnet_id", magnet.id);
+      if ((count ?? 0) > 0) return count ?? 0;
+    }
+  }
+  const { count } = await sb
+    .from("target_list_leads")
+    .select("id", { count: "exact", head: true })
+    .eq("workspace_id", wsId);
+  return count ?? 0;
+}
+
+// The columns the magnet workspace renders. No addresses: a magnet ships LinkedIn
+// and the written outreach, and the emails are bought after the 15-minute call.
+const MAGNET_COLS =
+  "id,full_name,role,company,sector,domain,country,linkedin_url,linkedin_company," +
+  "why_now,has_draft,list_name,list_note,list_sort,list_channels";
+const MAGNET_BODY_COLS = "email_subject,email_copy,linkedin_copy";
+
+// A magnet's lists and leads, in the shape the Target Lists view already renders.
+// The list level is denormalized onto each lead (list_name / list_note / list_sort),
+// so the tabs are rebuilt here rather than joined: a magnet is written once and read
+// many times, and 5 of the 39 magnets are genuinely multi-list — ku217's five
+// hand-designed tabs, land-of-the-braves' two pillars — which a flat list would lose.
+async function loadMagnetLists(
+  magnetId: string,
+  withBodies: boolean
+): Promise<{ lists: TargetList[]; leads: Lead[] }> {
+  const sb = db();
+  if (!sb) return { lists: [], leads: [] };
+  const cols = withBodies ? `${MAGNET_COLS},${MAGNET_BODY_COLS}` : MAGNET_COLS;
+
+  const PAGE = 1000;
+  const rows: Record<string, unknown>[] = [];
+  for (let from = 0; from < 50000; from += PAGE) {
+    const { data } = await sb
+      .from("magnet_leads")
+      .select(cols)
+      .eq("magnet_id", magnetId)
+      .order("list_sort", { ascending: true })
+      .order("created_at", { ascending: true })
+      .range(from, from + PAGE - 1);
+    const page = (data ?? []) as unknown as Record<string, unknown>[];
+    rows.push(...page);
+    if (page.length < PAGE) break;
+  }
+
+  // Tab id from the sort index, which the build assigns per list and never reuses.
+  // It has to be stable across renders: the view filters leads by lead.listId.
+  const listId = (r: Record<string, unknown>) => `m${Number(r.list_sort ?? 0)}`;
+
+  const leads: Lead[] = rows.map((r) => {
+    const subject = String(r.email_subject ?? "");
+    const body = String(r.email_copy ?? "");
+    return {
+      id: String(r.id),
+      listId: listId(r),
+      name: String(r.full_name ?? ""),
+      role: String(r.role ?? ""),
+      company: String(r.company ?? ""),
+      sector: String(r.sector ?? ""),
+      domain: String(r.domain ?? ""),
+      // A magnet has no addresses on file, so there is nothing to show or mask and
+      // nothing to send: the prospect opens their own mail client from the preview.
+      emailDisplay: "",
+      linkedin: Boolean(r.linkedin_url),
+      linkedinUrl: (r.linkedin_url as string | null) || undefined,
+      linkedinCompany: (r.linkedin_company as string | null) || undefined,
+      hasEmail: false,
+      hasDraft: Boolean(r.has_draft ?? body),
+      emailSubject: subject || undefined,
+      emailBody: body || undefined,
+      canSend: false,
+      whyNow: (r.why_now as string | null) || undefined,
+      linkedinNote: (r.linkedin_copy as string | null) || undefined,
+      country: (r.country as string | null) || undefined,
+    };
+  });
+
+  const seen = new Map<string, TargetList>();
+  for (const r of rows) {
+    const id = listId(r);
+    if (seen.has(id)) {
+      seen.get(id)!.count += 1;
+      continue;
+    }
+    seen.set(id, {
+      id,
+      name: String(r.list_name ?? "Your targeted leads"),
+      note: String(r.list_note ?? ""),
+      count: 1,
+      channels: toChannels(r.list_channels),
+    });
+  }
+  const lists = [...seen.values()].sort((a, b) => Number(a.id.slice(1)) - Number(b.id.slice(1)));
+  return { lists, leads };
+}
+
 // Columns every caller needs. The rendered email/LinkedIn bodies are deliberately
 // NOT here: they are ~1.7MB of the ~2MB this used to transfer, and only the Target
 // Lists table (which previews and sends them) ever reads them. Callers that just
@@ -88,6 +223,18 @@ export const loadTargetLists = cache(async function loadTargetLists(
   const { data: wsRow } = await sb.from("workspaces").select("*").eq("slug", slug).maybeSingle();
   if (!wsRow) return null;
   const wsId = wsRow.id as string;
+
+  // A magnet's leads belong to the prospect, not to us, and live in magnet_leads.
+  // Falls through to the legacy path when the move has not reached this magnet yet.
+  if (wsRow.kind === "magnet") {
+    const magnet = await loadMagnetFor(wsId);
+    if (magnet) {
+      const { lists, leads } = await loadMagnetLists(magnet.id, withBodies);
+      if (leads.length > 0) {
+        return { ws: workspaceFromRow(wsRow, leads.length), lists, leads };
+      }
+    }
+  }
 
   const { data: listRows } = await sb
     .from("target_lists")
@@ -201,12 +348,9 @@ export const loadWorkspace = cache(async function loadWorkspace(
   const { data: wsRow } = await sb.from("workspaces").select("*").eq("slug", slug).maybeSingle();
   if (!wsRow) return null;
 
-  const { count } = await sb
-    .from("target_list_leads")
-    .select("id", { count: "exact", head: true })
-    .eq("workspace_id", wsRow.id as string);
+  const count = await leadCountFor(wsRow as Record<string, unknown>);
 
-  return workspaceFromRow(wsRow as Record<string, unknown>, count ?? 0);
+  return workspaceFromRow(wsRow as Record<string, unknown>, count);
 });
 
 // Stable, readable deep-link key for a list, derived from its name. Used by the
@@ -225,8 +369,18 @@ export const loadListsMeta = cache(async function loadListsMeta(
 ): Promise<{ key: string; name: string; count: number }[]> {
   const sb = db();
   if (!sb) return [];
-  const { data: wsRow } = await sb.from("workspaces").select("id").eq("slug", slug).maybeSingle();
+  const { data: wsRow } = await sb.from("workspaces").select("id,kind").eq("slug", slug).maybeSingle();
   if (!wsRow) return [];
+  // A magnet's tabs come from its own leads, where the list level is denormalized.
+  if (wsRow.kind === "magnet") {
+    const magnet = await loadMagnetFor(String(wsRow.id));
+    if (magnet) {
+      const { lists } = await loadMagnetLists(magnet.id, false);
+      if (lists.length > 0) {
+        return lists.map((l) => ({ key: listKey(l.name), name: l.name, count: l.count }));
+      }
+    }
+  }
   const { data: rows } = await sb
     .from("target_lists")
     .select("name, lead_count")
@@ -614,21 +768,29 @@ export const loadWorkspaceKind = cache(async function loadWorkspaceKind(slug: st
 export const loadMagnetBrief = cache(async function loadMagnetBrief(slug: string) {
   const sb = db();
   if (!sb) return null;
-  const { data } = await sb.from("workspaces").select("id,brief_json,name,owner_name,domain")
+  const { data } = await sb.from("workspaces").select("id,kind,brief_json,name,owner_name,domain")
     .eq("slug", slug).maybeSingle();
-  if (!data?.brief_json) return null;
+  if (!data) return null;
+
+  // The research now lives on the magnet itself (magnets.content). brief_json is the
+  // pre-refactor home and stays readable so a magnet built before the move — or one
+  // whose row has not been created yet — still renders its page.
+  const magnet = data.kind === "magnet" ? await loadMagnetFor(String(data.id)) : null;
+  const content = magnet?.content;
+  const brief = (content && Object.keys(content).length > 0)
+    ? content
+    : (data.brief_json as Record<string, unknown> | null);
+  if (!brief) return null;
+
   // A magnet built as a plan (no list yet) hides the "Your list" section rather
   // than linking to an empty Target Lists page.
-  const { count } = await sb
-    .from("target_list_leads")
-    .select("id", { count: "exact", head: true })
-    .eq("workspace_id", data.id as string);
+  const leadCount = await leadCountFor(data as Record<string, unknown>);
   return {
-    brief: data.brief_json as Record<string, unknown>,
+    brief,
     name: String(data.name ?? ""),
     owner: String(data.owner_name ?? ""),
     domain: (data.domain as string | null) || undefined,
-    leadCount: count ?? 0,
+    leadCount,
   };
 });
 
@@ -649,15 +811,14 @@ export async function loadWorkspaces(): Promise<Workspace[] | null> {
   // was slow or mid-deploy, failing the whole Vercel build on "/".
   return Promise.all(
     rows.map(async (row) => {
-      const [{ count }, crm] = await Promise.all([
-        sb
-          .from("target_list_leads")
-          .select("id", { count: "exact", head: true })
-          .eq("workspace_id", row.id as string),
+      const [count, crm] = await Promise.all([
+        // Magnet workspaces count their own magnet_leads, client workspaces our
+        // campaign leads — the two are different tables and different owners.
+        leadCountFor(row as Record<string, unknown>),
         // Warm/meetings from the same CRM source (wired for Luxvance today).
         loadCrm(String(row.slug)),
       ]);
-      const w = workspaceFromRow(row as Record<string, unknown>, count ?? 0);
+      const w = workspaceFromRow(row as Record<string, unknown>, count);
       w.warmLeads = crm.warm;
       w.meetings = crm.meetings;
       return w;
