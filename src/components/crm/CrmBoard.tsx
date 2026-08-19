@@ -1,6 +1,8 @@
 "use client";
 
 import { Fragment, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+// lucide-react in this project ships no brand glyphs, so the LinkedIn mark is ours.
+import { Linkedin } from "@/components/portal/ui";
 import {
   X, Link2, MessageCircle, Phone, ExternalLink, Copy, Check,
   Search, RefreshCw, CalendarClock, Sparkles, Send, PenLine, Loader2,
@@ -550,8 +552,14 @@ function Briefing({ onOpen, workspace }: { onOpen: (id: number) => void; workspa
   return (
     <div className="bg-gradient-to-br from-card to-card/40 border border-gold/20 rounded-2xl px-5 py-4 mb-4">
       <button onClick={toggle} className="w-full flex items-center gap-2 text-xs font-semibold uppercase tracking-wider">
-        <Sparkles className="w-4 h-4 text-gold-ink" />
-        <span className="neon-hl">// WHERE_YOU_STAND</span>
+        {/* The model wrote this paragraph, so it signs it. A sparkle says
+            "generated"; a name says which one, which is the difference between
+            decoration and provenance. CRM_BRIEFING_MODEL is an OpenAI model, so
+            the badge says GPT and not something friendlier but untrue. */}
+        <span className="shrink-0 rounded-md border border-gold/40 bg-gold/10 px-1.5 py-0.5 text-[10px] font-bold text-gold-ink leading-none">
+          GPT
+        </span>
+        <span className="neon-hl">WHERE YOU STAND</span>
         {!open && s && <span className="normal-case tracking-normal text-muted-foreground font-normal truncate ml-1">— {s.counts.waiting_us} your turn · {s.counts.hot_now} hot · {s.counts.wants_meeting} want to meet</span>}
         <ChevronRight className={`w-4 h-4 text-muted-foreground ml-auto transition-transform ${open ? "rotate-90" : ""}`} />
       </button>
@@ -3502,7 +3510,7 @@ function BoardCard({ r, onOpen }: { r: Card; onOpen: (id: number) => void }) {
         <TileAction href={`mailto:${r.email}`} active={!!r.email} title="Email" color="#EA4335"><Mail className="w-3.5 h-3.5" /></TileAction>
         <TileAction href={r.phone ? `tel:${r.phone.replace(/[^\d+]/g, "")}` : undefined} active={!!r.phone} title="Call" color="#e6e6e6"><Phone className="w-3.5 h-3.5" /></TileAction>
         <TileAction href={waHref} active={!!r.phone} title="WhatsApp" color="#25D366"><MessageCircle className="w-3.5 h-3.5" /></TileAction>
-        <TileAction href={r.linkedin_url || liHref} active={!!r.has_linkedin} title="LinkedIn profile" color="#0A66C2"><Link2 className="w-3.5 h-3.5" /></TileAction>
+        <TileAction href={r.linkedin_url || liHref} active={!!r.has_linkedin} title="LinkedIn profile" color="#0A66C2"><Linkedin width={14} height={14} /></TileAction>
         <TileAction href={previewUrl(r.build_url)} active={!!r.build_url} title={r.build_delivered ? "Build delivered — open" : "Build ready — open"} color={r.build_delivered ? "#26D07C" : "#FFD60A"}><Magnet className="w-3.5 h-3.5" /></TileAction>
         {r.build_delivered && <span className="text-[9px] text-signal-ink ml-0.5" title="Build delivered to prospect">sent</span>}
       </div>
@@ -3551,7 +3559,7 @@ function TodoRow({ r, onOpen, onChanged }: { r: Card; onOpen: (id: number) => vo
         <TileAction href={`mailto:${r.email}`} active={!!r.email} title="Email" color="#EA4335"><Mail className="w-3.5 h-3.5" /></TileAction>
         <TileAction href={r.phone ? `tel:${r.phone.replace(/[^\d+]/g, "")}` : undefined} active={!!r.phone} title="Call" color="#e6e6e6"><Phone className="w-3.5 h-3.5" /></TileAction>
         <TileAction href={waHref} active={!!r.phone} title="WhatsApp" color="#25D366"><MessageCircle className="w-3.5 h-3.5" /></TileAction>
-        <TileAction href={r.linkedin_url || (r.name ? linkedinSearchUrl(r.name, r.company) : undefined)} active={!!r.has_linkedin} title="LinkedIn" color="#0A66C2"><Link2 className="w-3.5 h-3.5" /></TileAction>
+        <TileAction href={r.linkedin_url || (r.name ? linkedinSearchUrl(r.name, r.company) : undefined)} active={!!r.has_linkedin} title="LinkedIn" color="#0A66C2"><Linkedin width={14} height={14} /></TileAction>
         <TileAction href={previewUrl(r.build_url)} active={!!r.build_url} title="Build" color={r.build_delivered ? "#26D07C" : "#FFD60A"}><Magnet className="w-3.5 h-3.5" /></TileAction>
       </div>
       <button onClick={done} disabled={busy} title="Mark this step done — logs the touch and passes the ball to them"
@@ -3651,7 +3659,7 @@ type FilterKey =
   | "build_sent" | "build_ready" | "no_build"
   | "has_phone" | "has_linkedin";
 
-const FILTERS: { key: FilterKey; label: string; group: string; test: (c: Card) => boolean }[] = [
+const FILTERS: { key: FilterKey; label: string; group: string; brand?: string; test: (c: Card) => boolean }[] = [
   { key: "us",       label: "⚡ Your turn",      group: "Status", test: (c) => c.waiting_on === "us" },
   { key: "them",     label: "Waiting on them",   group: "Status", test: (c) => c.waiting_on === "them" },
   { key: "nudge",    label: "⏰ Nudge due",       group: "Status", test: (c) => c.waiting_on === "them" && !!c.next_touch_at && new Date(c.next_touch_at).getTime() <= Date.now() },
@@ -3662,8 +3670,11 @@ const FILTERS: { key: FilterKey; label: string; group: string; test: (c: Card) =
   // The goldmine state: the asset exists, the prospect has never seen it. 44 cards on day one.
   { key: "build_ready", label: "💤 Build never sent",  group: "Build", test: (c) => c.has_build && !c.build_delivered },
   { key: "no_build",    label: "No Build",             group: "Build", test: (c) => !c.has_build },
-  { key: "has_phone",    label: "☎ Phone / WhatsApp", group: "Reach", test: (c) => c.has_phone },
-  { key: "has_linkedin", label: "🔗 LinkedIn",        group: "Reach", test: (c) => c.has_linkedin },
+  // The brand marks, not a telephone receiver and a paperclip. These filters are
+  // about reaching someone ON WhatsApp and ON LinkedIn, and the logo says that
+  // faster than any glyph.
+  { key: "has_phone",    label: "WhatsApp", group: "Reach", brand: "whatsapp.com", test: (c) => c.has_phone },
+  { key: "has_linkedin", label: "LinkedIn", group: "Reach", brand: "linkedin.com", test: (c) => c.has_linkedin },
 ];
 const FILTER_BY_KEY = Object.fromEntries(FILTERS.map((f) => [f.key, f.test])) as Record<FilterKey, (c: Card) => boolean>;
 function passesAll(c: Card, active: Set<FilterKey>): boolean {
@@ -3839,33 +3850,11 @@ export function CrmBoard({ workspace, basePath = "/crm", live = true, canBuild =
     <WorkspaceCtx.Provider value={workspace}>
     <div className="w-full">
       <div className="crm-ambient" aria-hidden />
-      {/* one compact command bar: identity · search · view · sort · refresh */}
-      <div className="flex items-center gap-2 mb-4 flex-wrap">
-        <h1 className="text-xl font-bold neon tracking-tight mr-1 shrink-0">// {(workspace ?? "luxvance").toUpperCase().replace(/-/g, "_")}_LIVE_DEALS</h1>
-        <div className="relative flex-1 min-w-[180px] max-w-md">
-          <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, company, email…"
-            className="w-full bg-card border border-border rounded-lg pl-9 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-gold/50" />
-        </div>
-        <div className="flex items-center bg-card border border-border rounded-lg p-0.5 shrink-0">
-          <button onClick={() => setView("board")}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${view === "board" ? "bg-gold/12 text-gold-ink" : "text-muted-foreground"}`}>
-            <LayoutGrid className="w-4 h-4" /> Board
-          </button>
-          <button onClick={() => setView("queue")}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${view === "queue" ? "bg-gold/12 text-gold-ink" : "text-muted-foreground"}`}>
-            <List className="w-4 h-4" /> Queue
-          </button>
-          <button onClick={() => setView("todos")}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${view === "todos" ? "bg-gold/12 text-gold-ink" : "text-muted-foreground"}`}>
-            <Check className="w-4 h-4" /> To-dos
-          </button>
-        </div>
-        <button onClick={load} title="Refresh" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground px-2 py-1.5 shrink-0">
-          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-        </button>
-      </div>
-
+      {/* What you should do next is the first thing on the page. The old command
+          bar sat above it with the workspace name, the search and the view
+          switcher, so the top of the screen was chrome and the answer was below
+          the fold of attention. Those controls belong with the cards they act on,
+          and they moved to the filter row. */}
       <Briefing onOpen={openRecord} workspace={workspace} />
 
       {/* the tiles ARE the filters: click to narrow the pipeline, click again to clear */}
@@ -3893,7 +3882,10 @@ export function CrmBoard({ workspace, basePath = "/crm", live = true, canBuild =
           const on = filters.has(f.key);
           return (
             <button key={f.key} onClick={() => toggleFilter(f.key)} title={f.group}
-              className={`text-[11px] rounded-full border px-2.5 py-1 transition-colors ${on ? "bg-gold/15 border-gold/50 text-gold-ink font-medium" : "border-border text-muted-foreground hover:text-foreground hover:border-gold/30"}`}>
+              className={`inline-flex items-center gap-1.5 text-[11px] rounded-full border px-2.5 py-1 transition-colors ${on ? "bg-gold/15 border-gold/50 text-gold-ink font-medium" : "border-border text-muted-foreground hover:text-foreground hover:border-gold/30"}`}>
+              {f.brand && (
+                <img src={`https://www.google.com/s2/favicons?domain=${f.brand}&sz=32`} alt="" width={12} height={12} className="rounded-[2px]" />
+              )}
               {f.label}
             </button>
           );
@@ -3904,6 +3896,48 @@ export function CrmBoard({ workspace, basePath = "/crm", live = true, canBuild =
             Clear all ({filters.size}) <X className="w-3 h-3" />
           </button>
         )}
+
+        {/* Search, view and refresh live here now, beside the filters they work
+            with. The X appears once there is something to clear: a search box you
+            can only empty by selecting the text and deleting it is a small daily
+            tax. */}
+        <div className="ml-auto flex items-center gap-2 shrink-0">
+          <div className="relative w-[220px]">
+            <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search name, company, email…"
+              className="w-full bg-card border border-border rounded-full pl-8 pr-8 py-1.5 text-[12px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-gold/50"
+            />
+            {q && (
+              <button
+                onClick={() => setQ("")}
+                aria-label="Clear search"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+          <div className="flex items-center bg-card border border-border rounded-full p-0.5">
+            {([["board", LayoutGrid, "Board"], ["queue", List, "Queue"], ["todos", Check, "To-dos"]] as const).map(
+              ([key, Icon, label]) => (
+                <button
+                  key={key}
+                  onClick={() => setView(key)}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-medium transition-colors ${view === key ? "bg-gold/12 text-gold-ink" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  <Icon className="w-3.5 h-3.5" /> {label}
+                </button>
+              )
+            )}
+          </div>
+          <button onClick={load} title="Refresh" aria-label="Refresh"
+            className="text-muted-foreground hover:text-foreground p-1.5">
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+          </button>
+        </div>
       </div>
 
       {loading ? (

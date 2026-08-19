@@ -36,7 +36,6 @@ export function Linkedin({ width = 24, height = 24, ...props }: React.SVGProps<S
 export function SectionLabel({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
     <div className={cn("text-[11px] uppercase tracking-[0.2em] text-muted-foreground", className)}>
-      <span className="opacity-40">// </span>
       {children}
     </div>
   );
