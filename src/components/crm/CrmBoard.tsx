@@ -827,6 +827,29 @@ const FILTER_BRAND: Record<string, { name: string; logo?: string }> = {
 // One honest line about why LinkedIn will or will not send. "Not connected" is not an
 // error, it is a different next action — invite, then write — and saying so beats a
 // disabled button with no explanation.
+
+// LinkedIn connection state, always on screen rather than hidden behind picking a
+// channel to write in. It is a fact about the CONTACT, not about the composer: whether
+// you can write to this person at all is something you want to know while reading their
+// card, before deciding what to do — and 28 of 115 prospects turn out to be connections
+// already, reach that stays invisible if you have to go looking for it.
+function LinkedInStatus({ d }: { d: Detail }) {
+  const st = d.linkedin?.state ?? "unknown";
+  const look = {
+    connected:     { text: "Connected · you can message", cls: "text-signal-ink", dot: "bg-signal" },
+    invited:       { text: d.linkedin?.invited_at ? `Invited ${fmtDate(d.linkedin.invited_at)} · waiting` : "Invitation pending", cls: "text-gold-ink", dot: "bg-gold" },
+    not_connected: { text: "Not connected · invite first", cls: "text-muted-foreground", dot: "bg-muted-foreground/50" },
+    unknown:       { text: "No LinkedIn profile on file", cls: "text-subtle", dot: "bg-subtle/50" },
+  }[st];
+  return (
+    <div className="flex items-center gap-1.5 text-[11px]">
+      <Favicon domain="linkedin.com" size={12} className={st === "unknown" ? "opacity-30 grayscale" : ""} />
+      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${look.dot}`} />
+      <span className={look.cls}>{look.text}</span>
+    </div>
+  );
+}
+
 function linkedinHint(d: Detail): string {
   const st = d.linkedin?.state ?? "unknown";
   if (st === "connected") return "You are connected — sends from your LinkedIn";
@@ -2586,6 +2609,7 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
                 <Phone className={`w-3 h-3 ${d.phone ? "text-signal-ink" : "text-subtle opacity-40"}`} />
               </div>
             </div>
+            <LinkedInStatus d={d} />
             <ContactActions d={d} onChanged={() => reload(true)} />
           </div>
         </div>
