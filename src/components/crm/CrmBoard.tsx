@@ -39,6 +39,7 @@ type Card = {
   country: string;
   industry?: string;
   company_country?: string;
+  avatar_url?: string;
   domain?: string;
   category: string;
   status: string;
@@ -292,6 +293,36 @@ const CHANNEL_META: Record<string, { label: string; cls: string }> = {
   whatsapp: { label: "WhatsApp", cls: "text-signal-ink" },
   call: { label: "Call", cls: "text-warn" },
 };
+
+
+// THE FACE, in three steps down.
+//
+// Every card opened with a grey monogram — AF, MB — repeating two letters of the name
+// printed next to it. LinkedIn hands us a photo on every profile we resolve, so we had
+// it and were throwing it away.
+//
+// Photo, then the company logo, then the monogram. The middle step matters more than it
+// looks: most prospects have no photo on file, and a company mark still makes a card
+// recognisable at a glance in a way two grey letters never do. licdn URLs expire, so a
+// broken photo falls through to the next step rather than showing a gap.
+function ProspectAvatar({ name, photo, domain, cls }: {
+  name: string; photo?: string; domain?: string; cls: string;
+}) {
+  const [broken, setBroken] = useState(false);
+  useEffect(() => { setBroken(false); }, [photo]);
+  if (photo && !broken) {
+    return <img src={photo} alt={name} onError={() => setBroken(true)}
+      className="w-10 h-10 rounded-lg object-cover shrink-0 border border-border" />;
+  }
+  if (domain) {
+    return (
+      <span className="w-10 h-10 rounded-lg shrink-0 grid place-items-center bg-secondary border border-border overflow-hidden">
+        <Favicon domain={domain} label={name} size={24} />
+      </span>
+    );
+  }
+  return <div className={`w-10 h-10 rounded-lg grid place-items-center text-sm font-bold shrink-0 ${cls}`}>{initials(name || "?")}</div>;
+}
 
 function initials(name: string): string {
   const p = (name || "?").trim().split(/\s+/);
@@ -2519,10 +2550,6 @@ function ContactActions({ d, onChanged, compact }: { d: Detail; onChanged: () =>
       {editing ? phoneEditor : d.phone ? (
         compact ? (
           <div className="flex flex-col gap-1.5">
-            <button onClick={() => { setDraftPhone(d.phone); setEditing(true); }}
-              className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-gold-ink transition-colors">
-              <PenLine className="w-3 h-3" /> Edit number
-            </button>
             {/* Clay's waterfall returns a LinkedIn profile as well as a mobile, and it
                 saves the profile even when no number comes back. So the button belongs
                 here too: a contact with a phone but a dead or missing LinkedIn has a gap
@@ -2539,6 +2566,14 @@ function ContactActions({ d, onChanged, compact }: { d: Detail; onChanged: () =>
             )}
             {needsLinkedin && triedClay && (
               <span className="text-[11px] text-subtle">Searched Clay — no profile found</span>
+            )}
+            {/* Nothing missing: say so, quietly. A record with every field filled looks
+                identical to one nobody has checked, and the difference is exactly what
+                you want to know before working a card. */}
+            {!needsLinkedin && (
+              <span className="inline-flex items-center gap-1.5 text-[10.5px] text-subtle">
+                <Favicon domain="clay.com" label="Clay" size={11} /> Enriched · nothing missing
+              </span>
             )}
             {findNote && <span className="text-[11px] text-muted-foreground">{findNote}</span>}
           </div>
@@ -3379,9 +3414,8 @@ function Record({ id, initial, queue, onNavigate, onClose, onChanged }: { id: nu
         {/* header */}
         <div className="shrink-0 border-b border-border px-5 py-3.5 flex items-start justify-between gap-4">
           <div className="flex items-start gap-3 min-w-0">
-            <div className={`w-10 h-10 rounded-lg grid place-items-center text-sm font-bold shrink-0 ${avatarCls}`}>
-              {initials(head?.name || "?")}
-            </div>
+            <ProspectAvatar name={head?.name || "?"} photo={d?.avatar_url}
+              domain={d?.domain || domainOf(head?.email || "")} cls={avatarCls} />
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-lg font-semibold text-foreground truncate">{head?.name || "…"}</h2>
