@@ -22,6 +22,7 @@ type NavItem = {
   badge?: string;
   href?: string; // explicit href (e.g. a list deep-link with ?list=); default is /w/{slug}/{key}
   indent?: boolean; // a sub-item under its parent (the individual lists)
+  tone?: "hot" | "cold"; // tints the icon; everything else stays monochrome
 };
 type NavGroup = { group: string; items: NavItem[] };
 
@@ -98,8 +99,14 @@ function buildNav(w: Workspace | null, enabled: Set<string>, slug: string, lists
       // reply, which is why they are siblings and not separate products.
       group: "CRM",
       items: [
-        { key: "crm", label: "Hot Pipeline", icon: Flame, badge: w && w.warmLeads > 0 ? String(w.warmLeads) : undefined },
-        { key: "cold", label: "Cold Pipeline", icon: Snowflake },
+        // The icons carry the temperature. Yellow is the brand's own heat, and
+        // cyan is the coldest tone already in the token set — Signal Green would
+        // have been the obvious second pick and it is spoken for: green means
+        // live and positive everywhere else in this product, so a green
+        // snowflake would fight a meaning we rely on.
+        { key: "crm", label: "Hot Pipeline", icon: Flame, tone: "hot",
+          badge: w && w.warmLeads > 0 ? String(w.warmLeads) : undefined },
+        { key: "cold", label: "Cold Pipeline", icon: Snowflake, tone: "cold" },
       ],
     },
     {
@@ -291,9 +298,15 @@ export function WorkspaceSidebar({ slug, ws, workspaces, lists = [], demo = fals
       {nav.map((grp, gi) => (
         <div key={gi} className="flex flex-col gap-0.5">
           {!isCollapsed && grp.group && (
-            <div className="px-2 pb-1 text-[10px] uppercase tracking-[0.18em] text-subtle">{grp.group}</div>
+            // Signal Green, not yellow. Yellow already means "you are here" in
+            // this rail (the active item's fill and ink), so a yellow heading
+            // would put two different meanings on one colour and every section
+            // would read as selected. Green is unused here, which gives the
+            // sidebar a clean second channel: green names the structure, yellow
+            // marks your position in it.
+            <div className="px-2 pb-1 text-[10px] uppercase tracking-[0.18em] text-signal-ink font-semibold">{grp.group}</div>
           )}
-          {grp.items.map(({ key, label, icon: Icon, badge, href: explicitHref, indent }) => {
+          {grp.items.map(({ key, label, icon: Icon, badge, href: explicitHref, indent, tone }) => {
             // Collapsed rail shows icons only; the list sub-items fold into their parent.
             if (isCollapsed && indent) return null;
             const href = explicitHref ?? `/w/${slug}/${key}`;
@@ -329,7 +342,16 @@ export function WorkspaceSidebar({ slug, ws, workspaces, lists = [], demo = fals
                 {indent ? (
                   <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", active ? "bg-gold" : "bg-muted-foreground/40")} />
                 ) : (
-                  <Icon className="w-[17px] h-[17px] shrink-0" />
+                  <Icon
+                    className={cn(
+                      "w-[17px] h-[17px] shrink-0",
+                      // Only the two pipelines are tinted. If every icon carried a
+                      // colour the tint would stop meaning anything, and the eye
+                      // would have nothing to land on.
+                      tone === "hot" && "text-[var(--gold)]",
+                      tone === "cold" && "text-cyan"
+                    )}
+                  />
                 )}
                 {!isCollapsed && <span className="flex-1 truncate">{label}</span>}
                 {!isCollapsed && badge && (
