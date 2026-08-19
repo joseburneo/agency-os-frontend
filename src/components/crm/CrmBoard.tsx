@@ -120,6 +120,10 @@ type Detail = Card & {
   build_open_count: number;      // the prospect's opens
   build_any_open_count?: number; // every visit including our own previews
   live_channel: string;
+  // Where they stand on LinkedIn, cached server-side (migration 032). "connected" is the
+  // only state LinkedIn lets you message in, so it is the only one that offers a Send.
+  linkedin?: { state: "connected" | "invited" | "not_connected" | "unknown";
+               can_message: boolean; invited_at?: string | null; handle?: string | null };
   can_send_email: boolean;
   intent_label: string;
   intent_summary: string;
@@ -820,6 +824,20 @@ const FILTER_BRAND: Record<string, { name: string; logo?: string }> = {
   whatsapp: { name: "WhatsApp", logo: "whatsapp.com" },
 };
 
+// One honest line about why LinkedIn will or will not send. "Not connected" is not an
+// error, it is a different next action — invite, then write — and saying so beats a
+// disabled button with no explanation.
+function linkedinHint(d: Detail): string {
+  const st = d.linkedin?.state ?? "unknown";
+  if (st === "connected") return "You are connected — sends from your LinkedIn";
+  if (st === "invited") {
+    const since = d.linkedin?.invited_at ? ` since ${fmtDate(d.linkedin.invited_at)}` : "";
+    return `Invitation pending${since} — you can write once they accept`;
+  }
+  if (st === "not_connected") return "Not connected yet — send an invitation first";
+  return "No LinkedIn profile on file";
+}
+
 function convoChannel(c: Convo): "email" | "linkedin" | "whatsapp" {
   if (c.kind === "linkedin") return "linkedin";
   if (c.kind === "whatsapp") return "whatsapp";
@@ -1341,8 +1359,11 @@ function useComposer(d: Detail, onSent: () => void) {
   // The check here is only "do we hold an address for them"; whether the session is
   // alive, whether they are a first-degree connection, whether a chat exists — all of
   // that is the backend's to answer, and it answers with a 409 that says which.
+  // LinkedIn only lets you write to a first-degree connection, so having their profile
+  // URL was never the right test — Matthew Weeks had been a connection since 2024 with no
+  // URL on file, and plenty have a URL without being connected. The server says which.
   const canSendChannel = (chan === "whatsapp" && !!d.phone)
-    || (chan === "linkedin" && !!d.linkedin_url);
+    || (chan === "linkedin" && !!d.linkedin?.can_message);
   const gmailLive = d.live_channel === "gmail";
   return { d, chan, setChan, text, setDraft, send, logTouch, refresh: onSent, askCopilot, drafting, sending, sent, setSent, co, setCo, coBusy, coLog, coCtx, coStream, coSaved, clearChat, canSendEmail, canSendChannel, gmailLive, threadKey, sendOpts, fromKey, setFromKey, selectedOpt, threadAcct, routeTo, routeCc, setRouteCc, ccAdd, setCcAdd, clientCc, sigInfo };
 }
@@ -1687,6 +1708,7 @@ function Composer({ c }: { c: ComposerCtl }) {
           {chan === "email"
             ? (canSendEmail ? "Sends on-thread via Instantly" : gmailLive ? "Reply from Gmail" : "No thread — copy & send")
             : chan === "call" ? "Dials from here, logged automatically"
+            : chan === "linkedin" ? linkedinHint(d)
             : canSendChannel ? `Sends from your connected ${CHANNEL_META[chan].label}`
             : "Copy & send by hand"}
         </span>
