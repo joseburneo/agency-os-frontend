@@ -803,6 +803,13 @@ function isChannelConvo(c: Convo): boolean {
 // is NOT tied to the composer's channel: reading the email while answering on WhatsApp
 // is the normal case, not an edge one, so picking a channel to write in must never
 // hide the conversation you are writing about.
+const FILTER_BRAND: Record<string, { name: string; logo?: string }> = {
+  all: { name: "All" },
+  email: { name: "Email", logo: "gmail.com" },
+  linkedin: { name: "LinkedIn", logo: "linkedin.com" },
+  whatsapp: { name: "WhatsApp", logo: "whatsapp.com" },
+};
+
 function convoChannel(c: Convo): "email" | "linkedin" | "whatsapp" {
   if (c.kind === "linkedin") return "linkedin";
   if (c.kind === "whatsapp") return "whatsapp";
@@ -1000,14 +1007,17 @@ function Conversation({ id, themName, themCompany = "", themDomain = "", fallbac
         <div className="flex items-center gap-1.5 flex-wrap">
           {(["all", ...channels] as const).map((k) => {
             const on = chanFilter === k;
-            const src = k === "all" ? null : SRC[k as Src];
+            // FILTER_BRAND, not SRC: a filter groups by PIPE, and "email" covers both
+            // Gmail and Instantly, so it has no entry in SRC (which keys on the exact
+            // sender). Reading SRC["email"] returned undefined and crashed the card.
+            const b = FILTER_BRAND[k];
             return (
               <button key={k} type="button" onClick={() => setChanFilter(k)}
                 className={`inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[11px] transition-colors ${
                   on ? "border-gold/40 bg-gold/10 text-gold-ink" : "border-border text-muted-foreground hover:border-gold/30"}`}>
-                {src && <Favicon domain={src.logo} label={src.name} size={12} />}
-                {k === "all" ? "All" : SRC[k as Src].name}
-                <span className="tabular-nums text-subtle">{k === "all" ? convos.length : perChannel[k]}</span>
+                {b.logo && <Favicon domain={b.logo} label={b.name} size={12} />}
+                {b.name}
+                <span className="tabular-nums text-subtle">{k === "all" ? convos.length : (perChannel[k] ?? 0)}</span>
               </button>
             );
           })}
