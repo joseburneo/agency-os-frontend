@@ -409,7 +409,7 @@ export function WorkspaceSidebar({ slug, ws, workspaces, lists = [], demo = fals
         aria-modal="true"
         aria-label="Workspace menu"
         className={cn(
-          "lg:hidden fixed inset-y-0 left-0 z-50 w-[280px] max-w-[85vw] flex flex-col gap-4 overflow-y-auto overscroll-contain border-r border-border bg-background p-4 transition-transform duration-200",
+          "rail lg:hidden fixed inset-y-0 left-0 z-50 w-[280px] max-w-[85vw] flex flex-col gap-4 overflow-y-auto overscroll-contain border-r border-border p-4 transition-transform duration-200",
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
@@ -443,8 +443,8 @@ export function WorkspaceSidebar({ slug, ws, workspaces, lists = [], demo = fals
       {/* ---- Desktop rail (lg and up): the original sticky collapsible aside ---- */}
       <aside
         className={cn(
-          "shrink-0 self-start sticky top-0 hidden lg:flex flex-col gap-4 transition-[width] duration-200",
-          collapsed ? "w-16" : "w-[236px]"
+          "rail rounded-2xl p-3 shrink-0 self-start sticky top-4 hidden lg:flex flex-col gap-4 transition-[width] duration-200",
+          collapsed ? "w-[72px]" : "w-[248px]"
         )}
       >
         {/* Top row: back to agency (expanded) + collapse toggle */}

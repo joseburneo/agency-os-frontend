@@ -29,7 +29,7 @@
 
      The page tone is a far lighter cousin of the brand cream (#F5F0E8), warm enough
      to belong to Luxvance and light enough not to read as beige. */
-  --background: #F6F4EF;
+  --background: #EFEBE2;   /* warmer and deeper: a white page next to a navy rail reads as unfinished */
   --foreground: #1A1A1A;
 
   --card: #FFFFFF;
@@ -80,6 +80,19 @@
      dark type whichever way the page is painted. */
   --ink-inverse: #0A0E1A;
 
+  /* THE RAIL. Jose, 2026-08-19: light mode should not be a white page, and the
+     site's navy should appear in it. The sidebar is the right place for it: it is
+     chrome, not content, so it can carry the brand at full strength without
+     fighting the document it frames. Navy in both themes, so the app reads as one
+     product whichever mode you are in. */
+  --rail: #0A0E1A;
+  --rail-raised: #10162A;
+  --rail-foreground: #F5F5F0;
+  --rail-muted: rgba(245, 245, 240, 0.62);
+  --rail-subtle: rgba(245, 245, 240, 0.42);
+  --rail-border: rgba(255, 255, 255, 0.08);
+  --rail-hover: rgba(255, 255, 255, 0.06);
+
   /* Status */
   --danger: #DC2626;
   --danger-soft: #B91C1C;
@@ -107,24 +120,24 @@
   --ambient-blue: rgba(120, 140, 200, 0.03);
 
   /* Typography */
-  /* Faithful to luxvance.com: Inter reads, Inter Tight leads, JetBrains Mono
-     labels. The app used to set EVERYTHING in mono, which is a labelling face:
-     it gave the product its terminal character and made every paragraph, brief
-     and email preview harder to read than it needed to be. */
-  --font-lv-sans: var(--font-lv-inter), "Inter", system-ui, -apple-system, sans-serif;
-  --font-lv-display: var(--font-lv-inter-tight), var(--font-lv-inter), "Inter", sans-serif;
-  --font-lv-code: var(--font-lv-mono), ui-monospace, "SF Mono", Menlo, monospace;
-  /* Old name, kept so nothing that still points at it silently loses its face. */
-  --font-lv-serif: var(--font-lv-code);
+  /* The exact stack luxvance.com applies to display, body and mono alike. No web
+     font is loaded: ui-monospace resolves to the real SF Mono on Apple, which is
+     the terminal look the brand is built on. The app used to load JetBrains Mono
+     instead, and a different monospace is not the same monospace. */
+  --font-lv-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Monaco, "Cascadia Code", "Roboto Mono", monospace;
+  --font-lv-sans: var(--font-lv-mono);
+  --font-lv-display: var(--font-lv-mono);
+  --font-lv-code: var(--font-lv-mono);
+  --font-lv-serif: var(--font-lv-mono);
 }
 
 .dark {
   /* ── DARK (the original terminal palette, unchanged) ──────────────────── */
-  --background: #0A0D14;
-  --foreground: #EDEFF2;
+  --background: #0A0E1A;   /* the site's bg, exactly */
+  --foreground: #F5F5F0;   /* the site's text, exactly */
 
-  --card: rgba(255, 214, 10, 0.02);
-  --card-foreground: #EDEFF2;
+  --card: #141B2E;         /* the site's bgCard */
+  --card-foreground: #F5F5F0;
 
   --popover: #0A0D11;
   --popover-foreground: #EDEFF2;
@@ -219,6 +232,13 @@
   --color-warn: var(--warn);
   --color-cyan: var(--cyan);
 
+  --color-rail: var(--rail);
+  --color-rail-raised: var(--rail-raised);
+  --color-rail-foreground: var(--rail-foreground);
+  --color-rail-muted: var(--rail-muted);
+  --color-rail-subtle: var(--rail-subtle);
+  --color-rail-border: var(--rail-border);
+  --color-rail-hover: var(--rail-hover);
   --font-sans: var(--font-lv-sans);
   --font-display: var(--font-lv-display);
   --font-mono: var(--font-lv-code);
@@ -244,10 +264,11 @@ body {
    heading look loose and a small one look cramped. */
 h1, h2, h3, h4 {
   font-family: var(--font-display);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
 }
-h1 { letter-spacing: -0.035em; }
-h2 { letter-spacing: -0.03em; }
+/* Mono is already even-width; the tight tracking that flatters Inter Tight only
+   makes a monospace heading collide with itself. */
+h1, h2 { letter-spacing: -0.01em; }
 
 /* The terminal voice, kept exactly where it belongs. Every eyebrow in this app is
    an .uppercase label ("// WHERE_YOU_STAND", "TARGETED LISTS", "COLD") and every
@@ -257,6 +278,37 @@ h2 { letter-spacing: -0.03em; }
 .tabular-nums,
 code, kbd, pre, samp {
   font-family: var(--font-mono);
+}
+
+/* THE RAIL. The sidebar carries the site's navy in BOTH themes, so light mode is
+   a warm page framed in brand rather than a white screen.
+
+   It re-points the semantic tokens INSIDE itself instead of restyling its
+   children. Every utility in this project emits var(--…) rather than a baked
+   value (see the note on @theme inline above), so redefining --foreground here
+   re-colours all 31 token usages in the sidebar at once. Restyling them one by
+   one would have meant finding the thirty-second next time someone adds a row. */
+.rail {
+  background: var(--rail);
+  color: var(--rail-foreground);
+  --foreground: var(--rail-foreground);
+  --muted-foreground: var(--rail-muted);
+  --subtle: var(--rail-subtle);
+  --border: var(--rail-border);
+  --hairline: var(--rail-border);
+  --card: var(--rail-raised);
+  --popover: var(--rail-raised);
+  --secondary: var(--rail-hover);
+  --input: rgba(255, 255, 255, 0.04);
+  /* Gold and green have to hold on navy in light mode too, so the rail takes the
+     dark theme's brighter pair rather than the print gold that was tuned for
+     white and disappears here. */
+  --gold: #FFD60A;
+  --gold-ink: #FFD60A;
+  --signal: #26D07C;
+  --signal-ink: #26D07C;
+  --accent: rgba(255, 214, 10, 0.14);
+  --accent-foreground: #FFD60A;
 }
 
 /* Terminal panels: one neutral hairline, flat. No glass, no heavy shadow. */
