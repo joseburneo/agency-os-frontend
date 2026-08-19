@@ -3822,19 +3822,25 @@ function catRank(cat: string): number {
 // available client-side, not a literal "we sent a LinkedIn DM" flag.
 type FilterKey =
   | "us" | "them" | "nudge" | "hot" | "wants" | "meetings"
+  | "has_build"
+  // Retired keys, kept so a filter set saved before 2026-08-19 cannot crash on an
+  // unknown one. They simply match nothing.
   | "build_sent" | "build_ready" | "no_build"
   | "has_phone" | "has_linkedin";
 
-const FILTERS: { key: FilterKey; label: string; group: string; brand?: string; test: (c: Card) => boolean }[] = [
+const FILTERS: { key: FilterKey; label: string; group: string; brand?: string;
+                 icon?: React.ComponentType<{ className?: string }>; test: (c: Card) => boolean }[] = [
   { key: "us",       label: "⚡ Your turn",      group: "Status", test: (c) => c.waiting_on === "us" },
   { key: "them",     label: "Waiting on them",   group: "Status", test: (c) => c.waiting_on === "them" },
   { key: "nudge",    label: "⏰ Nudge due",       group: "Status", test: (c) => c.waiting_on === "them" && !!c.next_touch_at && new Date(c.next_touch_at).getTime() <= Date.now() },
   { key: "hot",      label: "🔥 Hot",            group: "Status", test: (c) => c.heat >= 70 },
   { key: "wants",    label: "📅 Wants meeting",   group: "Status", test: (c) => c.wants_meeting },
   { key: "meetings", label: "✅ Booked",          group: "Status", test: (c) => c.status === "meeting_booked" },
-  // The three Build filters are gone (Jose, 2026-08-19): nobody narrowed the
-  // board by them. Their keys stay in FilterKey so a saved filter set from before
-  // today does not crash on an unknown key; it simply matches nothing.
+  // One binary chip, like WhatsApp and LinkedIn: does this prospect have a magnet
+  // at all. The three-way version (sent / never sent / none) went out yesterday
+  // because nobody used it — asking "which ones have one" is the useful question,
+  // and the card's own Built/Sent/Opened mark answers the rest without a filter.
+  { key: "has_build", label: "Lead Magnet", group: "Asset", icon: Magnet, test: (c) => c.has_build },
   // The brand marks, not a telephone receiver and a paperclip. These filters are
   // about reaching someone ON WhatsApp and ON LinkedIn, and the logo says that
   // faster than any glyph.
@@ -4073,6 +4079,7 @@ export function CrmBoard({ workspace, basePath = "/crm", live = true, canBuild =
               {f.brand && (
                 <img src={`https://www.google.com/s2/favicons?domain=${f.brand}&sz=32`} alt="" width={12} height={12} className="rounded-[2px]" />
               )}
+              {f.icon && <f.icon className="w-3 h-3" />}
               {f.label}
             </button>
           );
