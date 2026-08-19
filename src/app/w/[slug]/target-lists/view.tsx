@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Target, Download, Search, ExternalLink, Eye, X, Send, Copy, Check, Phone, MessageCircle, Star, Lock, PenLine, Loader2 } from "lucide-react";
+import { Target, Download, Search, ExternalLink, Eye, X, Send, Copy, Check, Phone, MessageCircle, Star, Lock, PenLine, Loader2, UserPlus } from "lucide-react";
 import type { Workspace, WorkspaceData, Lead } from "@/lib/portal/types";
 import { ModuleHeader, Panel, Pill, CompanyMark, ChannelDots, cn } from "@/components/portal/ui";
 
@@ -191,6 +191,59 @@ function WriteOutreach({ listId, pending }: { listId: string; pending: number })
         {state === "running" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PenLine className="h-3.5 w-3.5" />}
         {state === "running" ? `Writing ${msg}` : `Write the outreach · ${pending}`}
       </button>
+    </div>
+  );
+}
+
+
+/** "Work this lead" — promote a cold list row into the CRM and open its card.
+ *
+ *  A target_list_lead is a row in a list; an engaged_prospect is somebody being
+ *  worked. The card, the copilot, the four channels and the research panel all
+ *  hang off the second one, so opening a cold lead as a card means promoting it.
+ *  The backend (POST /api/crm/lead/{id}/work) is idempotent, so clicking twice
+ *  lands on the same prospect rather than creating a duplicate.
+ *
+ *  No verified email, no button: engaged_prospects.email is NOT NULL UNIQUE and
+ *  the card's whole job is a conversation. Showing a button that can only 409 is
+ *  worse than showing why it is not there.
+ */
+function WorkLeadButton({ leadId, slug, hasEmail }: { leadId: string; slug: string; hasEmail: boolean }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  if (!hasEmail) {
+    return (
+      <span className="text-[11px] text-subtle" title="A verified email is needed before this lead can be opened as a prospect">
+        no email yet
+      </span>
+    );
+  }
+  const go = async () => {
+    setBusy(true); setErr("");
+    try {
+      const r = await fetch(`/api/crm/lead/${encodeURIComponent(leadId)}/work`, { method: "POST" });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) { setErr(j?.detail || j?.error || "Could not open this lead"); return; }
+      router.push(`/w/${slug}/crm?lead=${j.prospect_id}`);
+    } catch {
+      setErr("Network error");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="inline-flex flex-col items-end gap-0.5">
+      <button
+        type="button" onClick={go} disabled={busy}
+        title="Opens this lead as a full prospect card: copilot, channels, notes and research"
+        className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1.5 text-[12px] font-medium text-foreground hover:border-gold/40 disabled:opacity-40 transition-colors"
+      >
+        {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserPlus className="w-3.5 h-3.5" />}
+        Work this lead
+      </button>
+      {err && <span className="text-[10px] text-red-400 max-w-[180px] text-right">{err}</span>}
     </div>
   );
 }
@@ -713,6 +766,9 @@ export function TargetListsView({
                       {/* The written email is the product a magnet prospect judges us
                           by, so it gets the accent treatment there, and a label that
                           says what is inside — "Preview" undersold it. */}
+                      {!magnet && (
+                        <WorkLeadButton leadId={l.id} slug={ws.slug} hasEmail={l.hasEmail} />
+                      )}
                       {l.emailBody ? (
                         <button
                           onClick={() => openPreview(l)}
