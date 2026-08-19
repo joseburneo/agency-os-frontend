@@ -108,11 +108,15 @@ async function leadCountFor(wsRow: Record<string, unknown>): Promise<number> {
   return count ?? 0;
 }
 
-// The columns the magnet workspace renders. No addresses: a magnet ships LinkedIn
-// and the written outreach, and the emails are bought after the 15-minute call.
+// The columns the magnet workspace renders. Addresses are back (Jose, 2026-08-19):
+// ten verified ones cost about $0.28, and withholding them protected an asset worth
+// cents while making the whole gift read as a teaser. Only a VERIFIED address is
+// rendered, which is what email_status records: bouncing the prospect's first send
+// would be the worst possible demonstration from a deliverability company.
 const MAGNET_COLS =
   "id,full_name,role,company,sector,domain,country,linkedin_url,linkedin_company," +
-  "why_now,has_draft,list_name,list_note,list_sort,list_channels";
+  "why_now,why_now_url,why_now_date,email,email_status,status," +
+  "has_draft,list_name,list_note,list_sort,list_channels";
 const MAGNET_BODY_COLS = "email_subject,email_copy,linkedin_copy";
 
 // A magnet's lists and leads, in the shape the Target Lists view already renders.
@@ -150,6 +154,7 @@ async function loadMagnetLists(
   const leads: Lead[] = rows.map((r) => {
     const subject = String(r.email_subject ?? "");
     const body = String(r.email_copy ?? "");
+    const verifiedEmail = r.email_status ? String(r.email ?? "") : "";
     return {
       id: String(r.id),
       listId: listId(r),
@@ -158,18 +163,24 @@ async function loadMagnetLists(
       company: String(r.company ?? ""),
       sector: String(r.sector ?? ""),
       domain: String(r.domain ?? ""),
-      // A magnet has no addresses on file, so there is nothing to show or mask and
-      // nothing to send: the prospect opens their own mail client from the preview.
-      emailDisplay: "",
+      // Only a verified address is shown. An unverified one is treated exactly
+      // like no address at all rather than displayed with a caveat: the prospect
+      // will paste whatever is on screen into a real send.
+      emailDisplay: verifiedEmail,
       linkedin: Boolean(r.linkedin_url),
       linkedinUrl: (r.linkedin_url as string | null) || undefined,
       linkedinCompany: (r.linkedin_company as string | null) || undefined,
-      hasEmail: false,
+      hasEmail: Boolean(verifiedEmail),
       hasDraft: Boolean(r.has_draft ?? body),
       emailSubject: subject || undefined,
       emailBody: body || undefined,
-      canSend: false,
+      // With a real address on file the Send button does what it says: it opens
+      // the prospect's own mail client, addressed, with the copy already in it.
+      canSend: Boolean(verifiedEmail && body),
       whyNow: (r.why_now as string | null) || undefined,
+      whyNowUrl: (r.why_now_url as string | null) || undefined,
+      whyNowDate: (r.why_now_date as string | null) || undefined,
+      status: (r.status as string | null) || "new",
       linkedinNote: (r.linkedin_copy as string | null) || undefined,
       country: (r.country as string | null) || undefined,
     };

@@ -61,12 +61,19 @@ function truncate(s: string, n = 120) {
 // A "why now" that carries its source URL, stored as "… · https://…". The claim
 // is only worth as much as the link behind it: a prospect judging our research
 // clicks it, so the source ships as a link rather than as pasted URL text.
-function WhyNowCell({ value }: { value: string }) {
+// The signal, its date and its source. The link is not decoration: a claim the
+// reader can check in one second is the difference between a list and evidence.
+// `url`/`date` come from their own columns now; the " · http..." split stays for
+// the rows built before those columns existed.
+function WhyNowCell({ value, url, date }: { value: string; url?: string; date?: string }) {
   const parts = value.split(" · ");
-  const src = parts.find((p) => p.startsWith("http"));
+  const src = url || parts.find((p) => p.startsWith("http"));
   const text = parts.filter((p) => !p.startsWith("http")).join(" · ");
   return (
     <span className="text-[12px] leading-snug" title={text}>
+      {date && (
+        <span className="mr-1.5 text-[11px] tabular-nums text-muted-foreground">{date}</span>
+      )}
       {truncate(text)}
       {src && (
         <>
@@ -555,7 +562,7 @@ export function TargetListsView({
                   ) : hasWhyNow ? (
                     <td className="px-4 py-3 text-muted-foreground max-w-[320px]">
                       {l.whyNow ? (
-                        <WhyNowCell value={l.whyNow} />
+                        <WhyNowCell value={l.whyNow} url={l.whyNowUrl} date={l.whyNowDate} />
                       ) : (
                         <span>—</span>
                       )}

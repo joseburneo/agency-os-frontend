@@ -15,6 +15,32 @@ import { CompanyMark } from "./CompanyMark";
 type Brief = Record<string, unknown>;
 
 const str = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
+const num = (v: unknown): number | null =>
+  typeof v === "number" && Number.isFinite(v) ? v : null;
+
+// Evidence gathered from the open web at build time. Each entry carries a live
+// source, checked reachable before it was stored. What has a source is printed as
+// a fact WITH its link; what does not is never printed as a fact at all, because
+// the two replies that killed a magnet were both "you got my market wrong".
+type Finding = { claim: string; url: string; date?: string };
+const EVIDENCE_LABELS: Record<string, string> = {
+  markets: "Where you sell",
+  customers: "Who buys from you",
+  offer: "What you sell",
+  competitors: "Who you compete with",
+  outbound: "Your outbound today",
+  recent: "What just happened",
+};
+function findings(brief: Brief): [string, Finding][] {
+  const raw = brief.evidence;
+  if (!raw || typeof raw !== "object") return [];
+  return Object.entries(raw as Record<string, unknown>)
+    .map(([k, v]) => {
+      const o = (v ?? {}) as Record<string, unknown>;
+      return [k, { claim: str(o.claim), url: str(o.url), date: str(o.date) }] as [string, Finding];
+    })
+    .filter(([, f]) => f.claim && f.url);
+}
 const arr = (v: unknown): string[] =>
   Array.isArray(v) ? v.map((x) => (typeof x === "string" ? x.trim() : "")).filter(Boolean) : [];
 
@@ -26,6 +52,22 @@ export function MagnetOverview({
     ? (brief.secondary_audiences as Record<string, unknown>[])
     : [];
   const talking = arr(brief.talking_points);
+  const evidence = findings(brief);
+  const market = (brief.market_map ?? null) as Record<string, unknown> | null;
+  const peopleMatching = market ? num(market.people_matching) : null;
+  // Only the numbers we actually measured. A missing one is left out rather than
+  // shown as zero: "0 companies match your market" is a worse lie than silence.
+  const marketTiles: { value: string; label: string }[] = [];
+  if (market) {
+    const add = (v: unknown, label: string, suffix = "") => {
+      const n = num(v);
+      if (n !== null && n > 0) marketTiles.push({ value: n.toLocaleString() + suffix, label });
+    };
+    add(market.people_matching, "match your profile", "+");
+    add(market.companies_reviewed, "companies reviewed");
+    add(market.with_signal, "with a live signal");
+    add(market.shipped, "in your list");
+  }
   const firstName = owner.split(" ")[0] || "";
   // A magnet can carry a step-by-step plan instead of (or beside) a list brief.
   const steps = Array.isArray(brief.plan_steps)
@@ -108,6 +150,73 @@ export function MagnetOverview({
                 {str(pa.why_fit)}
               </p>
             )}
+          </Panel>
+        </section>
+      )}
+
+      {evidence.length > 0 && (
+        <section>
+          <SectionLabel>What we verified, and where</SectionLabel>
+          <Panel className="mt-2">
+            <ul className="space-y-3">
+              {evidence.map(([key, f]) => (
+                <li key={key} className="text-[13.5px] leading-snug">
+                  <span className="text-[10px] uppercase tracking-[0.14em] text-subtle">
+                    {EVIDENCE_LABELS[key] ?? key}
+                  </span>
+                  <p className="mt-0.5 text-foreground/90">{f.claim}</p>
+                  <a
+                    href={f.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-0.5 inline-flex items-center gap-1 text-[11.5px] text-gold-ink hover:underline"
+                  >
+                    {f.date ? `${f.date} · source` : "source"}
+                    <ExternalLink className="w-2.5 h-2.5" />
+                  </a>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-4 pt-4 border-t border-border text-[12.5px] text-muted-foreground leading-relaxed">
+              Everything above has a live source you can open. Anything we could not
+              verify is written as an assumption, not stated as fact. If we read your
+              market wrong, that is the fastest thing to fix and the first thing we
+              would ask you.
+            </p>
+          </Panel>
+        </section>
+      )}
+
+      {market && (
+        <section>
+          <SectionLabel>Your market, and how we narrowed it</SectionLabel>
+          <Panel className="mt-2">
+            {marketTiles.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {marketTiles.map((t) => (
+                  <StatTile key={t.label} value={t.value} label={t.label} />
+                ))}
+              </div>
+            )}
+            <p className="mt-4 text-[13.5px] leading-relaxed text-muted-foreground">
+              {peopleMatching !== null ? (
+                <>
+                  About <span className="text-foreground font-medium">
+                    {peopleMatching.toLocaleString()}
+                  </span>{" "}
+                  people match the profile above. We reviewed a sample of them, kept
+                  only the companies that fit, then kept only the ones with something
+                  real that happened in the last three months. What is in your list is
+                  what survived all three.
+                </>
+              ) : (
+                <>
+                  We reviewed the market above, kept only the companies that fit, then
+                  kept only the ones with something real that happened in the last
+                  three months. What is in your list is what survived all three.
+                </>
+              )}
+            </p>
           </Panel>
         </section>
       )}
@@ -246,7 +355,7 @@ export function MagnetOverview({
               {str(pa.label) || "Your targeted leads"}
             </div>
             <div className="text-[12.5px] text-muted-foreground mt-0.5">
-              Each one with their LinkedIn profile, and the email and LinkedIn message already written.
+              Each one with a verified address, their LinkedIn profile, the dated reason we picked them, and the email and LinkedIn message already written.
             </div>
           </div>
           <ArrowRight className="w-4 h-4 text-gold-ink ml-auto shrink-0" />
@@ -267,7 +376,7 @@ export function MagnetOverview({
               </div>
               <p className="mt-1 text-[13px] text-muted-foreground leading-relaxed max-w-xl">
                 {str(brief.cta_body) ||
-                  "Fifteen minutes to refine your ideal customer profile and confirm these are the right people. We rebuild it from what you tell us and hand it over with the email addresses, ready to send."}
+                  "These ten are yours, addresses included. Fifteen minutes to confirm we read your market right, and to show you what this looks like at five hundred a month: your team working inside this workspace on their own email and LinkedIn, with direct phone numbers, and new lists and new signals from us every month."}
               </p>
             </div>
             <a

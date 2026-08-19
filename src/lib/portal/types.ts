@@ -90,6 +90,15 @@ export interface Lead {
   // the prepared note, then calls. Withheld from a demo prospect, like the address.
   phone?: string;
   whyNow?: string; // the dated signal that earned the VIP slot
+  // Provenance for whyNow. A magnet lead now ships a NAMED, DATED event with a
+  // live source, and the link is the point: a claim the prospect can check in one
+  // second is what turns a list into evidence of a method rather than an export.
+  whyNowUrl?: string;
+  whyNowDate?: string;
+  // Contact state for the prospect-facing pipeline: new | contacted | replied |
+  // meeting. Every magnet lead starts at "new", which is not a placeholder but
+  // the truth: nothing has been sent to them yet.
+  status?: string;
   linkedinNote?: string; // prepared connection message, copy-to-clipboard
   whatsappNote?: string; // prepared opener, prefilled into the wa.me link
   hrLeadName?: string;
