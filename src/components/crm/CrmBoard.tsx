@@ -552,13 +552,23 @@ function Briefing({ onOpen, workspace }: { onOpen: (id: number) => void; workspa
   return (
     <div className="bg-gradient-to-br from-card to-card/40 border border-gold/20 rounded-2xl px-5 py-4 mb-4">
       <button onClick={toggle} className="w-full flex items-center gap-2 text-xs font-semibold uppercase tracking-wider">
-        {/* The model wrote this paragraph, so it signs it. A sparkle says
-            "generated"; a name says which one, which is the difference between
-            decoration and provenance. CRM_BRIEFING_MODEL is an OpenAI model, so
-            the badge says GPT and not something friendlier but untrue. */}
-        <span className="shrink-0 rounded-md border border-gold/40 bg-gold/10 px-1.5 py-0.5 text-[10px] font-bold text-gold-ink leading-none">
-          GPT
-        </span>
+        {/* The model that wrote this paragraph signs it with its own mark, the
+            same way the reach filters carry WhatsApp's and LinkedIn's.
+            
+            It is OpenAI's because CRM_BRIEFING_MODEL is gpt-5-mini. Jose asked for
+            Claude's mark here and it would be a lie today: the badge points at
+            whatever system to debug when the briefing reads wrong, so it has to
+            match the system that produced it. Point CRM_BRIEFING_MODEL at a Claude
+            model (needs an ANTHROPIC_API_KEY, which the server does not have) and
+            this one line becomes anthropic.com. */}
+        <img
+          src="https://www.google.com/s2/favicons?domain=openai.com&sz=64"
+          alt="Written by OpenAI"
+          title="Written by gpt-5-mini"
+          width={16}
+          height={16}
+          className="shrink-0 rounded-[3px]"
+        />
         <span className="neon-hl">WHERE YOU STAND</span>
         {!open && s && <span className="normal-case tracking-normal text-muted-foreground font-normal truncate ml-1">— {s.counts.waiting_us} your turn · {s.counts.hot_now} hot · {s.counts.wants_meeting} want to meet</span>}
         <ChevronRight className={`w-4 h-4 text-muted-foreground ml-auto transition-transform ${open ? "rotate-90" : ""}`} />
@@ -2319,6 +2329,80 @@ function ChannelStrip({ d, onChannel }: { d: Detail; onChannel: (ch: Chan) => vo
           )}
         </div>
       ))}
+    </div>
+  );
+}
+
+
+// ONE editor for the whole contact.
+//
+// Every field was already editable somewhere: the phone had an inline editor behind a
+// hover pencil, LinkedIn had a different one behind a quiet "Add profile" row, and the
+// name, company, title and email had none at all. Correcting a record meant knowing
+// which of three shapes to look for, and two were invisible until you hovered.
+//
+// One pencil, one form, every field. Clearing a value is deliberate and allowed —
+// a LinkedIn URL that resolves to nothing is worse than none, which is the case that
+// started this.
+function ContactEditor({ d, onDone }: { d: Detail; onDone: () => void }) {
+  const [f, setF] = useState({
+    first_name: d.name?.split(" ")[0] ?? "",
+    last_name: d.name?.split(" ").slice(1).join(" ") ?? "",
+    company_name: d.company ?? "",
+    job_title: d.job_title ?? "",
+    email: d.email ?? "",
+    phone: d.phone ?? "",
+    linkedin_url: d.linkedin_url ?? "",
+  });
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setF((p) => ({ ...p, [k]: e.target.value }));
+
+  const save = () => {
+    setBusy(true); setErr(null);
+    fetch(`${API}/api/crm/prospect/${d.id}/contact`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(f),
+    })
+      .then(async (r) => {
+        if (!r.ok) { const j = await r.json().catch(() => ({})); setErr(j.detail || "Could not save."); return; }
+        onDone();
+      })
+      .catch(() => setErr("Could not save."))
+      .finally(() => setBusy(false));
+  };
+
+  const Field = ({ k, label, ph }: { k: keyof typeof f; label: string; ph?: string }) => (
+    <label className="flex flex-col gap-0.5">
+      <span className="text-[9.5px] uppercase tracking-[0.14em] text-subtle">{label}</span>
+      <input value={f[k]} onChange={set(k)} placeholder={ph}
+        className="bg-background border border-border rounded-md px-2 py-1 text-[12px] text-foreground focus:outline-none focus:ring-1 focus:ring-gold/50" />
+    </label>
+  );
+
+  return (
+    <div className="space-y-2">
+      <div className="grid grid-cols-2 gap-2">
+        <Field k="first_name" label="First name" />
+        <Field k="last_name" label="Last name" />
+      </div>
+      <Field k="company_name" label="Company" />
+      <Field k="job_title" label="Title" />
+      <Field k="email" label="Email" ph="name@company.com" />
+      <Field k="phone" label="Phone" ph="+971 50 000 0000" />
+      <Field k="linkedin_url" label="LinkedIn" ph="linkedin.com/in/name" />
+      <p className="text-[10px] text-subtle">Leave a field empty to clear it.</p>
+      {err && <div className="text-[11px] text-[#F87171]">{err}</div>}
+      <div className="flex items-center gap-1.5">
+        <button onClick={save} disabled={busy}
+          className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-gold px-3 py-1.5 text-[12px] font-semibold text-ink-inverse hover:bg-gold-hi disabled:opacity-40 transition-colors">
+          {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} Save
+        </button>
+        <button onClick={onDone} className="rounded-lg border border-border px-3 py-1.5 text-[12px] text-muted-foreground hover:text-foreground transition-colors">
+          Cancel
+        </button>
+      </div>
     </div>
   );
 }
