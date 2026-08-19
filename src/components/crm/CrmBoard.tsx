@@ -2237,7 +2237,82 @@ function AddLinkedin({ d, onChanged }: { d: Detail; onChanged: () => void }) {
   );
 }
 
-function ContactActions({ d, onChanged }: { d: Detail; onChanged: () => void }) {
+
+// THE CHANNEL STRIP — four rows, one grammar: channel · state · action.
+//
+// Before this, the same question ("how do I reach this person?") was answered three
+// different ways depending on which channel you meant: WhatsApp and Call were buttons in
+// this rail, LinkedIn was a status line, Email was a tab at the top of another column.
+// That is why the Send invitation button was unfindable — there was no single place the
+// eye had learned to check.
+//
+// Every row now says what the channel can do RIGHT NOW and offers the one action that
+// makes sense there, and the action always lands in the same composer.
+function ChannelStrip({ d, onChannel }: { d: Detail; onChannel: (ch: Chan) => void }) {
+  const ws = useContext(WorkspaceCtx);
+  const [q, setQ] = useState<{ remaining: number; cap: number } | null>(null);
+  useEffect(() => {
+    fetch(`${API}/api/crm/linkedin/status${ws ? `?workspace=${encodeURIComponent(ws)}` : ""}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (j?.quota) setQ(j.quota); })
+      .catch(() => {});
+  }, [ws]);
+
+  const li = d.linkedin?.state ?? "unknown";
+  const rows: { ch: Chan; logo?: string; label: string; state: string;
+                tone: "go" | "warn" | "off"; action: string | null; note?: string }[] = [
+    { ch: "email", logo: "gmail.com", label: "Email",
+      state: d.can_send_email ? "on thread" : d.email ? "no live thread" : "no address",
+      tone: d.can_send_email ? "go" : d.email ? "warn" : "off",
+      action: d.email ? "Write" : null },
+    { ch: "linkedin", logo: "linkedin.com", label: "LinkedIn",
+      state: li === "connected" ? "connected"
+           : li === "invited" ? "invitation pending"
+           : li === "not_connected" ? "not connected" : "no profile",
+      tone: li === "connected" ? "go" : li === "unknown" ? "off" : "warn",
+      action: li === "connected" ? "Write" : li === "not_connected" ? "Invite" : null,
+      note: li === "not_connected" && q ? `${q.remaining} of ${q.cap} invitations left · our limit` : undefined },
+    { ch: "whatsapp", logo: "whatsapp.com", label: "WhatsApp",
+      state: d.phone ? "ready" : "no number",
+      tone: d.phone ? "go" : "off",
+      action: d.phone ? "Write" : null },
+    { ch: "call", label: "Call",
+      state: d.phone ? "ready" : "no number",
+      tone: d.phone ? "go" : "off",
+      action: d.phone ? "Call" : null },
+  ];
+  const toneCls = { go: "text-signal-ink", warn: "text-gold-ink", off: "text-subtle" };
+
+  return (
+    <div className="flex flex-col gap-1">
+      {rows.map((r) => (
+        <div key={r.ch} className="flex flex-col">
+          <div className="flex items-center gap-2 py-1">
+            {r.logo
+              ? <Favicon domain={r.logo} size={13} className={r.tone === "off" ? "opacity-30 grayscale" : ""} />
+              : <Phone className={`w-3.5 h-3.5 ${r.tone === "off" ? "text-subtle opacity-40" : "text-signal-ink"}`} />}
+            <span className="text-[12px] text-foreground w-[4.6rem] shrink-0">{r.label}</span>
+            <span className={`text-[11px] flex-1 min-w-0 truncate ${toneCls[r.tone]}`}>{r.state}</span>
+            {r.action && (
+              <button type="button" onClick={() => onChannel(r.ch)}
+                className="shrink-0 rounded-md border border-border px-2 py-0.5 text-[11px] text-muted-foreground hover:border-gold/40 hover:text-gold-ink transition-colors">
+                {r.action}
+              </button>
+            )}
+          </div>
+          {r.note && (
+            <span className="pl-[22px] pb-0.5 text-[10px] text-subtle tabular-nums"
+              title="Our own weekly limit, set at half of LinkedIn's real ceiling. LinkedIn publishes no remaining figure.">
+              {r.note}
+            </span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ContactActions({ d, onChanged, compact }: { d: Detail; onChanged: () => void; compact?: boolean }) {
   const [finding, setFinding] = useState(false);
   const [findNote, setFindNote] = useState<string | null>(null);
   // Once Clay has run and come back empty for this contact, don't offer another
@@ -2340,7 +2415,17 @@ function ContactActions({ d, onChanged }: { d: Detail; onChanged: () => void }) 
   // now just the phone: reach out if we have a number, enrich the gap if we don't.
   return (
     <div className="space-y-2">
+      {/* In compact mode the WhatsApp and Call buttons are gone: the channel strip above
+          owns reaching out now, and two ways to start the same message in the same rail is
+          exactly the confusion the strip was built to end. What stays here is what the
+          strip cannot do — correct a wrong number, or go buy one. */}
       {editing ? phoneEditor : d.phone ? (
+        compact ? (
+          <button onClick={() => { setDraftPhone(d.phone); setEditing(true); }}
+            className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-gold-ink transition-colors">
+            <PenLine className="w-3 h-3" /> Edit number
+          </button>
+        ) : (
         <div className="flex items-center gap-1.5">
           <a href={d.wa_link || `https://wa.me/${d.phone.replace(/[^\d]/g, "")}`} target="_blank" rel="noreferrer"
             className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-signal/40 bg-signal/10 px-3 py-2 text-[12.5px] text-signal-ink hover:bg-signal/15 transition-colors">
@@ -2355,6 +2440,7 @@ function ContactActions({ d, onChanged }: { d: Detail; onChanged: () => void }) 
             <PenLine className="w-3.5 h-3.5" />
           </button>
         </div>
+        )
       ) : (
         <div className="space-y-1">
           {triedClay ? (
@@ -2512,7 +2598,33 @@ function Row({ k, v }: { k: string; v: ReactNode }) {
 // The left rail: who-and-where a closer needs at a glance — deal facts, which channels are
 // reachable, the Build status, and quick actions. Build/contact management tools tuck into a
 // collapsible so the rail stays clean by default.
-function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f?: boolean) => void }) {
+
+// A rail section that folds, and remembers. Identity and the channel strip never fold —
+// those are read on every single card — but Deal, Build and Notes are opened
+// occasionally and cost the same scroll as the things you always need. Per-section, per
+// browser: the rail settles into the shape of how you actually work.
+function FoldSection({ id, title, children, defaultOpen = true }: {
+  id: string; title: ReactNode; children: ReactNode; defaultOpen?: boolean;
+}) {
+  const key = `lv.rail.${id}`;
+  const [open, setOpen] = useState(defaultOpen);
+  useEffect(() => {
+    try { const v = localStorage.getItem(key); if (v !== null) setOpen(v === "1"); } catch {}
+  }, [key]);
+  const toggle = () => setOpen((o) => { try { localStorage.setItem(key, o ? "0" : "1"); } catch {} return !o; });
+  return (
+    <div>
+      <button type="button" onClick={toggle}
+        className="w-full flex items-center gap-1.5 text-left mb-2 group">
+        <span className="text-[9px] text-subtle w-2 shrink-0">{open ? "▾" : "▸"}</span>
+        <span className="text-[10px] uppercase tracking-[0.16em] text-subtle font-semibold group-hover:text-gold-ink transition-colors">{title}</span>
+      </button>
+      {open && children}
+    </div>
+  );
+}
+
+function DealRail({ d, both, reload, onChannel }: { d: Detail; both: () => void; reload: (f?: boolean) => void; onChannel: (ch: Chan) => void }) {
   // Agency only — see CanBuildCtx. A client sees the rest of the rail unchanged.
   const canBuild = useContext(CanBuildCtx);
   const [tools, setTools] = useState(false);
@@ -2730,14 +2842,14 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
                 <Phone className={`w-3 h-3 ${d.phone ? "text-signal-ink" : "text-subtle opacity-40"}`} />
               </div>
             </div>
-            <LinkedInStatus d={d} />
-            <ContactActions d={d} onChanged={() => reload(true)} />
+            <ChannelStrip d={d} onChannel={onChannel} />
+            <ContactActions d={d} onChanged={() => reload(true)} compact />
           </div>
         </div>
       </div>
 
       <div>
-        <div className="text-[10px] uppercase tracking-[0.16em] text-subtle font-semibold mb-2">Deal</div>
+        <FoldSection id="deal" title="Deal">
         <dl className="space-y-2 text-[12.5px]">
           <Row k="Source" v={d.reply_campaign || "Cold outbound"} />
           <Row k="Segment" v={d.category || "—"} />
@@ -2801,6 +2913,7 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
             </div>
           </div>
         )}
+        </FoldSection>
       </div>
 
       {/* BUILD — the lead magnet. Sits high in the card because deciding who gets
@@ -2969,7 +3082,7 @@ function RecordBody({ d, id, themName, reload, both }: { d: Detail; id: number; 
     <div className="flex-1 min-h-0 overflow-y-auto lg:overflow-hidden grid grid-cols-1 lg:grid-cols-[23%_1fr_30%]">
       {/* LEFT rail */}
       <div className="lg:overflow-y-auto p-4 lg:p-5 lg:border-r border-border">
-        <DealRail d={d} both={both} reload={reload} />
+        <DealRail d={d} both={both} reload={reload} onChannel={(ch) => { c.setChan(ch); c.setSent(null); }} />
       </div>
 
       {/* CENTER — ONE continuous scroll: composer → action banner → full thread. Nothing is
