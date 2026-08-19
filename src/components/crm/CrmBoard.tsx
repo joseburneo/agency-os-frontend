@@ -3583,7 +3583,7 @@ function BoardCard({ r, onOpen }: { r: Card; onOpen: (id: number) => void }) {
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(r.id); } }}
       onMouseEnter={() => loadDetail(r.id)}
       onDragStart={(e) => e.dataTransfer.setData("text/plain", String(r.id))}
-      className={`w-full text-left bg-card border border-border rounded-xl p-[18px] hover:border-gold/50 focus:outline-none focus:ring-1 focus:ring-gold/40 cursor-pointer transition-colors ${rotEdge(r)}`}>
+      className={`card-lift w-full text-left bg-card border border-border rounded-xl p-[18px] focus:outline-none focus:ring-1 focus:ring-gold/40 cursor-pointer ${rotEdge(r)}`}>
       {/* logo + COMPANY (primary) · person · title — heat + NEW top-right */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-start gap-2.5 min-w-0">

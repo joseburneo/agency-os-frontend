@@ -84,8 +84,34 @@
      Google Maps pin does; a monochrome logo beside a full-colour one looks like
      one of them failed to load. */
   --li-blue: #0A66C2;
+  /* The card-lift shadow. Print gold on cream: Signal Yellow goes muddy here. */
+  --glow-card: rgba(201, 168, 76, 0.42);
 
-  /* THE RAIL. Jose, 2026-08-19: light mode should not be a white page, and the
+  /* CARD LIFT — the website's team-card hover, on the CRM board.
+   
+   Straight from AgenticBrain.jsx: a gold border at 30%, a 2px rise, and a soft
+   gold shadow thrown downward, all in 220ms. CSS-only on purpose: the board
+   renders 115 cards, and 115 React hover states would be a lot of re-rendering
+   for something the browser does for free.
+   
+   The glow colour is a token because Signal Yellow is a DARK-theme accent: on
+   cream it turns muddy, so light uses the print gold instead. This is the same
+   rule the palette already follows for every other glow in the product. */
+.card-lift {
+  transition: border-color 220ms ease, transform 220ms ease, box-shadow 220ms ease;
+}
+.card-lift:hover {
+  border-color: color-mix(in srgb, var(--gold) 34%, transparent);
+  transform: translateY(-2px);
+  box-shadow: 0 20px 44px -26px var(--glow-card);
+}
+/* Nothing moves for anyone who asked the OS for less motion; the border still
+   answers, so the card is still visibly the one under the cursor. */
+@media (prefers-reduced-motion: reduce) {
+  .card-lift:hover { transform: none; }
+}
+
+/* THE RAIL. Jose, 2026-08-19: light mode should not be a white page, and the
      site's navy should appear in it. The sidebar is the right place for it: it is
      chrome, not content, so it can carry the brand at full strength without
      fighting the document it frames. Navy in both themes, so the app reads as one
@@ -192,6 +218,7 @@
   --scrollbar: rgba(255, 255, 255, 0.09);
   --scrollbar-hover: rgba(255, 255, 255, 0.18);
   --glow-gold: rgba(255, 214, 10, 0.40);
+  --glow-card: rgba(255, 214, 10, 0.40);
   --glow-signal: rgba(38, 208, 124, 0.55);
   --glow-gold-soft: rgba(255, 214, 10, 0.13);
   --ambient-gold: rgba(255, 214, 10, 0.05);
