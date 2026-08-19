@@ -9,7 +9,7 @@ import {
   Settings, LogOut, PanelLeftClose, PanelLeftOpen, ShieldBan, Route, Menu, X,
   Flame, FileText, Snowflake,
 } from "lucide-react";
-import { cn, Linkedin } from "./ui";
+import { cn, Linkedin, LinkedInMark } from "./ui";
 import { CompanyMark } from "./CompanyMark";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import type { Workspace } from "@/lib/portal/types";
@@ -29,9 +29,6 @@ type NavGroup = { group: string; items: NavItem[] };
 // Google Maps is where local businesses do, and the logo says which faster than
 // any generic radar glyph. They take className so they drop into NavItem.icon
 // beside the lucide icons without special-casing the renderer.
-function LinkedInMark({ className }: { className?: string }) {
-  return <Linkedin className={className} width={16} height={16} />;
-}
 function MapsMark({ className }: { className?: string }) {
   return (
     <img
@@ -114,7 +111,7 @@ function buildNav(w: Workspace | null, enabled: Set<string>, slug: string, lists
         { key: "target-lists", label: "Target Lists", icon: Target, badge: w && w.coldLeads > 0 ? w.coldLeads.toLocaleString() : undefined },
         ...listItems,
         { key: "email", label: "Email Campaigns", icon: Mail },
-        { key: "linkedin", label: "LinkedIn Campaigns", icon: Linkedin },
+        { key: "linkedin", label: "LinkedIn Campaigns", icon: LinkedInMark },
       ],
     },
     {

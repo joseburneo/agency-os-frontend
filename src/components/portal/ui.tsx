@@ -33,6 +33,14 @@ export function Linkedin({ width = 24, height = 24, ...props }: React.SVGProps<S
 }
 
 // `// LABEL` — the dim terminal section marker used across the CRM.
+// The LinkedIn mark in LinkedIn's blue, wherever the source matters (Find
+// Prospects, LinkedIn Campaigns). It reads the --li-blue token rather than
+// hardcoding, because #0A66C2 is tuned for a white page and goes muddy on the
+// navy rail: globals.css lightens it inside .rail.
+export function LinkedInMark({ className }: { className?: string }) {
+  return <Linkedin className={className} width={16} height={16} style={{ color: "var(--li-blue)" }} />;
+}
+
 export function SectionLabel({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
     <div className={cn("text-[11px] uppercase tracking-[0.2em] text-muted-foreground", className)}>

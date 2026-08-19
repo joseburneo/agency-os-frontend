@@ -80,6 +80,11 @@
      dark type whichever way the page is painted. */
   --ink-inverse: #0A0E1A;
 
+  /* LinkedIn's own blue. Brand marks keep their brand colour, the same way the
+     Google Maps pin does; a monochrome logo beside a full-colour one looks like
+     one of them failed to load. */
+  --li-blue: #0A66C2;
+
   /* THE RAIL. Jose, 2026-08-19: light mode should not be a white page, and the
      site's navy should appear in it. The sidebar is the right place for it: it is
      chrome, not content, so it can carry the brand at full strength without
@@ -315,6 +320,8 @@ code, kbd, pre, samp {
   --signal-ink: #26D07C;
   --accent: rgba(255, 214, 10, 0.14);
   --accent-foreground: #FFD60A;
+  /* #0A66C2 goes muddy on navy: LinkedIn's own dark UI lightens it too. */
+  --li-blue: #4DA3E8;
 }
 
 /* The constellation paints behind the rail's contents.

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Radar, Search, Loader2, Sparkles, X, Check, Users, Building2, Lock, Download } from "lucide-react";
-import { cn, Panel, SectionLabel, ModuleHeader, CompanyMark } from "@/components/portal/ui";
+import { cn, Panel, SectionLabel, ModuleHeader, CompanyMark, LinkedInMark } from "@/components/portal/ui";
 
 // ---------------------------------------------------------------- types
 
@@ -355,7 +355,7 @@ export function ProspectingView({ slug, canExport }: { slug: string; canExport: 
   return (
     <div className="space-y-4">
       <ModuleHeader
-        icon={Radar}
+        icon={LinkedInMark}
         title="Find Prospects"
         desc="Describe the market you want. Correct the filters. See who is really there."
       />
