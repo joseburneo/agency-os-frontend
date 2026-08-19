@@ -784,75 +784,39 @@ export const loadMagnetBrief = cache(async function loadMagnetBrief(slug: string
 });
 
 
-// Warm + meeting counts for EVERY workspace, in one query.
+// The three sidebar numbers for every workspace, in ONE query.
 //
-// This used to be loadCrm() called once per workspace inside loadWorkspaces(), which
-// meant two Render API calls each. With 44 workspaces (5 clients, 39 magnets) that was
-// 88 concurrent requests on every page load under /w/ — the layout calls
-// loadWorkspaces(), so opening the CRM fired all of them just to label the sidebar
-// switcher. Each response carried the workspace's full prospect list, so memory on the
-// single Render instance climbed from its usual ~320 MB to the 2 GB ceiling and the
-// service was OOM-killed and restarted (2026-08-19). While it restarted, loadCrm's
-// 15s AbortSignal fired and the board rendered EMPTY — counts in the sidebar, zero in
-// every column, "Could not load the briefing".
+// Two earlier shapes failed here and both are worth remembering. Asking per workspace
+// meant 83 queries, doubled to 166 per navigation because the layout and
+// generateMetadata both call loadWorkspaces — that is what made a sidebar click sit
+// dead for three seconds. Fetching every row and counting in JavaScript removed the
+// round trips but hit PostgREST's 1000-row response cap, so magnet_leads (1606) and
+// target_list_leads (1111) came back truncated and the counts were quietly too low.
 //
-// The switcher only ever needed two numbers per workspace. engaged_prospects is small
-// (under a thousand rows), so one select of two columns answers all 44 at once.
-const crmCountsByWorkspace = cache(async function crmCountsByWorkspace(): Promise<Map<string, { warm: number; meetings: number }>> {
-  const out = new Map<string, { warm: number; meetings: number }>();
+// public.workspace_counts (migration 031) has Postgres do the counting and returns one
+// small row per workspace. Nothing to truncate, nothing to add up here.
+type WsCounts = { leads: number; warm: number; meetings: number };
+const ZERO: WsCounts = { leads: 0, warm: 0, meetings: 0 };
+
+const loadWorkspaceCounts = cache(async function loadWorkspaceCounts(): Promise<Map<string, WsCounts>> {
+  const out = new Map<string, WsCounts>();
   const sb = db();
   if (!sb) return out;
   const { data } = await sb
-    .from("engaged_prospects")
-    .select("workspace_id,status")
-    .limit(20000);
-  for (const r of (data ?? []) as { workspace_id?: string; status?: string }[]) {
-    const k = String(r.workspace_id ?? "");
-    if (!k) continue;
-    const cur = out.get(k) ?? { warm: 0, meetings: 0 };
-    cur.warm += 1;
-    if (r.status === "meeting_booked") cur.meetings += 1;
-    out.set(k, cur);
+    .from("workspace_counts")
+    .select("workspace_id,lead_count,warm_count,meeting_count");
+  for (const r of (data ?? []) as Record<string, unknown>[]) {
+    const id = String(r.workspace_id ?? "");
+    if (!id) continue;
+    out.set(id, {
+      leads: Number(r.lead_count ?? 0),
+      warm: Number(r.warm_count ?? 0),
+      meetings: Number(r.meeting_count ?? 0),
+    });
   }
   return out;
 });
 
-
-// Cold-lead counts for EVERY workspace, in three queries instead of one per workspace.
-//
-// leadCountFor() asks per workspace, and for a magnet it asks twice (find the magnet,
-// then count its leads). With 39 magnets and 5 clients that was 83 queries — and the
-// layout calls loadWorkspaces on every navigation, twice, so a single click on a
-// sidebar module fired 166. That is why clicking a tab sat dead for ~3 seconds.
-//
-// Both lead tables are small (a few thousand rows), so one column-only select of each
-// answers all 44 workspaces at once and we count in memory.
-const loadLeadCounts = cache(async function loadLeadCounts(): Promise<Map<string, number>> {
-  const out = new Map<string, number>();
-  const sb = db();
-  if (!sb) return out;
-  const [magnets, magnetLeads, listLeads] = await Promise.all([
-    sb.from("magnets").select("id,workspace_id").limit(5000),
-    sb.from("magnet_leads").select("magnet_id").limit(50000),
-    sb.from("target_list_leads").select("workspace_id").limit(50000),
-  ]);
-  const wsOfMagnet = new Map<string, string>();
-  for (const m of (magnets.data ?? []) as { id?: string; workspace_id?: string }[]) {
-    if (m.id && m.workspace_id) wsOfMagnet.set(String(m.id), String(m.workspace_id));
-  }
-  for (const l of (magnetLeads.data ?? []) as { magnet_id?: string }[]) {
-    const ws = wsOfMagnet.get(String(l.magnet_id ?? ""));
-    if (ws) out.set(ws, (out.get(ws) ?? 0) + 1);
-  }
-  for (const l of (listLeads.data ?? []) as { workspace_id?: string }[]) {
-    const ws = String(l.workspace_id ?? "");
-    if (ws) out.set(ws, (out.get(ws) ?? 0) + 1);
-  }
-  return out;
-});
-
-// cache() dedupes within a single render pass. generateMetadata and the layout body
-// both need this, and without it every navigation paid for the whole thing twice.
 export const loadWorkspaces = cache(async function loadWorkspaces(): Promise<Workspace[] | null> {
   const sb = db();
   if (!sb) return null;
@@ -864,14 +828,12 @@ export const loadWorkspaces = cache(async function loadWorkspaces(): Promise<Wor
     .order("name", { ascending: true });
   if (!rows) return null;
 
-  // One query for every workspace's warm/meeting numbers, instead of one CRM fetch
-  // each. See crmCountsByWorkspace above for what that cost us.
-  // Two prepared maps, then pure assembly: no per-workspace round trip at all.
-  const [counts, leads] = await Promise.all([crmCountsByWorkspace(), loadLeadCounts()]);
+  // One query, then pure assembly: no per-workspace round trip at all.
+  const counts = await loadWorkspaceCounts();
   return rows.map((row) => {
     const id = String((row as Record<string, unknown>).id ?? "");
-    const w = workspaceFromRow(row as Record<string, unknown>, leads.get(id) ?? 0);
-    const c = counts.get(id) ?? { warm: 0, meetings: 0 };
+    const c = counts.get(id) ?? ZERO;
+    const w = workspaceFromRow(row as Record<string, unknown>, c.leads);
     w.warmLeads = c.warm;
     w.meetings = c.meetings;
     return w;
