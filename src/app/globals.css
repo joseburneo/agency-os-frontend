@@ -326,7 +326,9 @@ code, kbd, pre, samp {
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  opacity: 0.9;
+  /* Texture, not foreground. It sits under the navigation and must never compete
+     with a label for attention. */
+  opacity: 0.45;
 }
 .rail > *:not(.rail-bg) {
   position: relative;

@@ -90,14 +90,11 @@ export function RailConstellation() {
           n.x += n.vx; n.y += n.vy;
           if (n.x < 0 || n.x > w) n.vx *= -1;
           if (n.y < 0 || n.y > h) n.vy *= -1;
-          if (active) {
-            const dx = mx - n.x, dy = my - n.y;
-            const d = Math.sqrt(dx * dx + dy * dy);
-            if (d < 220 && d > 0) {
-              const f = ((220 - d) / 220) * 0.06;
-              n.vx += (dx / d) * f; n.vy += (dy / d) * f;
-            }
-          }
+          // The hero attracts nodes to the cursor. Here that was the whole
+          // problem: a screen-wide field disperses the pull, a 264px rail does
+          // not, so all 25 nodes converged into one bright knot that sat on top
+          // of the nav. The cursor still lights the field up, it just no longer
+          // moves it, so nothing can ever pile onto the text.
           n.vx *= 0.985; n.vy *= 0.985;
           if (Math.abs(n.vx) < 0.05) n.vx += (Math.random() - 0.5) * 0.02;
           if (Math.abs(n.vy) < 0.05) n.vy += (Math.random() - 0.5) * 0.02;
@@ -117,12 +114,12 @@ export function RailConstellation() {
             const mdx = (a.x + b.x) / 2 - mx;
             const mdy = (a.y + b.y) / 2 - my;
             const md = Math.sqrt(mdx * mdx + mdy * mdy);
-            if (md < 200) boost = (1 - md / 200) * 0.6;
+            if (md < 200) boost = (1 - md / 200) * 0.16;
           }
           ctx.strokeStyle = boost > 0
             ? `rgba(255,214,10,${(t * 0.4 + boost * 0.6).toFixed(3)})`
             : `rgba(255,255,255,${(t * 0.1).toFixed(3)})`;
-          ctx.lineWidth = boost > 0.3 ? 1.2 : 0.6;
+          ctx.lineWidth = 0.6;
           ctx.beginPath();
           ctx.moveTo(a.x, a.y);
           ctx.lineTo(b.x, b.y);
@@ -139,10 +136,10 @@ export function RailConstellation() {
         const px = a.x + (b.x - a.x) * p.t;
         const py = a.y + (b.y - a.y) * p.t;
         const fade = Math.sin(p.t * Math.PI);
-        ctx.fillStyle = `rgba(255,214,10,${(fade * 0.9).toFixed(3)})`;
-        ctx.beginPath(); ctx.arc(px, py, 2.5, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = `rgba(255,214,10,${(fade * 0.18).toFixed(3)})`;
-        ctx.beginPath(); ctx.arc(px, py, 8, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = `rgba(255,214,10,${(fade * 0.45).toFixed(3)})`;
+        ctx.beginPath(); ctx.arc(px, py, 2, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = `rgba(255,214,10,${(fade * 0.08).toFixed(3)})`;
+        ctx.beginPath(); ctx.arc(px, py, 7, 0, Math.PI * 2); ctx.fill();
       }
 
       for (const n of nodes) {
@@ -152,12 +149,12 @@ export function RailConstellation() {
         const md = Math.sqrt(dx * dx + dy * dy);
         const near = active && md < 160;
         ctx.fillStyle = near
-          ? `rgba(255,214,10,${(0.5 + (1 - md / 160) * 0.5).toFixed(3)})`
+          ? `rgba(255,214,10,${(0.25 + (1 - md / 160) * 0.35).toFixed(3)})`
           : "rgba(245,245,240,0.45)";
         ctx.beginPath(); ctx.arc(n.x, n.y, n.r * breathe, 0, Math.PI * 2); ctx.fill();
         if (near) {
-          ctx.fillStyle = `rgba(255,214,10,${((1 - md / 160) * 0.15).toFixed(3)})`;
-          ctx.beginPath(); ctx.arc(n.x, n.y, 12, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = `rgba(255,214,10,${((1 - md / 160) * 0.07).toFixed(3)})`;
+          ctx.beginPath(); ctx.arc(n.x, n.y, 10, 0, Math.PI * 2); ctx.fill();
         }
       }
     };
