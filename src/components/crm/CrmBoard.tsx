@@ -671,6 +671,41 @@ function findInlineQuoteStart(root: HTMLElement): { node: Text; offset: number }
 
 type MailParts = { main: string; quoted: string; empty: boolean; mainBlank: boolean };
 
+
+// The boilerplate tail: OUR signature block and the GDPR paragraph, repeated in full on
+// every outbound message. The API already strips both from the plain-text body, but the
+// HTML render is the original mail, so a four-message thread became a page of letterhead
+// with sentences hidden in it.
+//
+// Folded into the same "···" the quoted trail uses rather than given a control of its
+// own: it is the same idea — words that were really sent, that nobody rereads.
+const BOILERPLATE_START = [
+  /as a gdpr compliant/i,
+  /jos[ée]\s*r\.\s*burneo/i,
+  /co-?founder\s*&?\s*(ceo|head of growth)/i,
+  /\bunsubscribe\b/i,
+];
+
+function findBoilerplateStart(root: HTMLElement): HTMLElement | null {
+  // Block-level children only: splitting mid-paragraph would cut a sentence in half.
+  const blocks = Array.from(root.querySelectorAll<HTMLElement>("p,div,td,tr,table,br + *"));
+  for (const el of blocks) {
+    const t = (el.textContent || "").trim();
+    if (t.length < 8) continue;
+    if (BOILERPLATE_START.some((re) => re.test(t))) {
+      // Climb to the outermost block that STARTS with this text, so the whole
+      // signature table folds rather than its first cell.
+      let node: HTMLElement = el;
+      while (node.parentElement && node.parentElement !== root
+             && (node.parentElement.textContent || "").trim().startsWith(t.slice(0, 24))) {
+        node = node.parentElement;
+      }
+      return node;
+    }
+  }
+  return null;
+}
+
 function splitMail(raw: string): MailParts {
   if (typeof window === "undefined") return { main: "", quoted: "", empty: true, mainBlank: false };
   // Sanitize first (scripts, event handlers, javascript: URLs all die here — the
@@ -693,6 +728,17 @@ function splitMail(raw: string): MailParts {
     const holder = document.createElement("div");
     holder.appendChild(range.extractContents());
     quoted = holder.innerHTML;
+  }
+  // Then the same treatment for our own letterhead, appended to whatever the quote
+  // split already collected so one toggle reveals both.
+  const boiler = findBoilerplateStart(clean);
+  if (boiler && clean.lastChild) {
+    const r2 = document.createRange();
+    r2.setStartBefore(boiler);
+    r2.setEndAfter(clean.lastChild);
+    const h2 = document.createElement("div");
+    h2.appendChild(r2.extractContents());
+    quoted = h2.innerHTML + quoted;
   }
   // "Empty" = nothing a human would see in the main part (sanitizer ate everything,
   // or whitespace-only markup). The caller then falls back to the plain-text bubble
@@ -2872,11 +2918,54 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
   );
 }
 
+
+// THE DIRECTIVE LINE — the one sentence in charge.
+//
+// The card already said this three times, in three corners, with no hierarchy: the
+// copilot said "Waiting on them", the left rail said "Next step: whatsapp · Aug 23",
+// and the header said "8d ago". So you read all three and decided for yourself, on
+// every card, every time. actNow() has always known the answer; it was just never
+// given the top of the screen.
+//
+// It carries its own action, because a sentence telling you what to do and no way to do
+// it is only half a fix: the button jumps to the channel that sentence is about.
+function DirectiveLine({ d, onAct }: { d: Detail; onAct: (ch: Chan) => void }) {
+  const a = actNow(d);
+  const ch: Chan = d.waiting_on === "us"
+    ? (toChan(d.last_channel) ?? "email")
+    : (toChan(d.next?.next_channel) ?? "email");
+  const tone = {
+    green: { bar: "border-signal/40 bg-signal/[0.06]", txt: "text-signal-ink" },
+    gold:  { bar: "border-gold/40 bg-gold/[0.06]",     txt: "text-gold-ink" },
+    muted: { bar: "border-border bg-secondary/30",     txt: "text-muted-foreground" },
+  }[a.tone];
+  const act = d.waiting_on === "us" ? "Reply" : "Follow up";
+  return (
+    <div className={`flex items-center gap-3 flex-wrap px-4 lg:px-5 py-2.5 border-b ${tone.bar}`}>
+      <span className={`text-[13px] font-semibold shrink-0 ${tone.txt}`}>{a.title}</span>
+      <span className="text-[12.5px] text-muted-foreground min-w-0 flex-1">{a.detail}</span>
+      {d.waiting_on !== "closed" && d.status !== "meeting_booked" && (
+        <button type="button" onClick={() => onAct(ch)}
+          className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-gold/40 bg-gold/10 px-2.5 py-1 text-[11.5px] font-medium text-gold-ink hover:bg-gold/16 transition-colors">
+          {act} on {CHANNEL_META[ch].label}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function toChan(v: string | null | undefined): Chan | null {
+  const k = String(v || "").toLowerCase();
+  return k === "email" || k === "linkedin" || k === "whatsapp" || k === "call" ? (k as Chan) : null;
+}
+
 // The 3-column workspace. useComposer lives here so the centre Composer and the right-rail
 // Copilot share one draft. Keyed by prospect id so switching cards resets the draft.
 function RecordBody({ d, id, themName, reload, both }: { d: Detail; id: number; themName: string; reload: (f?: boolean) => void; both: () => void }) {
   const c = useComposer(d, both);
   return (
+    <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+    <DirectiveLine d={d} onAct={(ch) => { c.setChan(ch); c.setSent(null); }} />
     <div className="flex-1 min-h-0 overflow-y-auto lg:overflow-hidden grid grid-cols-1 lg:grid-cols-[23%_1fr_30%]">
       {/* LEFT rail */}
       <div className="lg:overflow-y-auto p-4 lg:p-5 lg:border-r border-border">
@@ -2908,6 +2997,7 @@ function RecordBody({ d, id, themName, reload, both }: { d: Detail; id: number; 
       <div className="lg:overflow-y-auto p-4 lg:p-5">
         <Copilot c={c} />
       </div>
+    </div>
     </div>
   );
 }
