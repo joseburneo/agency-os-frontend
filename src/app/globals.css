@@ -29,41 +29,46 @@
 
      The page tone is a far lighter cousin of the brand cream (#F5F0E8), warm enough
      to belong to Luxvance and light enough not to read as beige. */
-  --background: #EFEBE2;   /* warmer and deeper: a white page next to a navy rail reads as unfinished */
-  --foreground: #1A1A1A;
+  /* COOL light, not cream. The warm palette is the PRINT brand (Cream #F5F0E8
+     lives under print deliverables), and applying it to a screen is why light
+     mode looked like a different company from the navy dark mode. These neutrals
+     are cousins of the navy instead of cousins of the print gold, so both themes
+     read as one product. */
+  --background: #EDF0F5;
+  --foreground: #0A0E1A;   /* the brand navy IS the ink, 16.9:1 on the page */
 
   --card: #FFFFFF;
-  --card-foreground: #1A1A1A;
+  --card-foreground: #0A0E1A;
 
   --popover: #FFFFFF;
-  --popover-foreground: #1A1A1A;
+  --popover-foreground: #0A0E1A;
 
   --primary: #C9A84C;
-  --primary-foreground: #1A1A1A;
+  --primary-foreground: #0A0E1A;
 
-  --secondary: rgba(26, 26, 26, 0.05); /* hover panel */
-  --secondary-foreground: #1A1A1A;
+  --secondary: rgba(10, 14, 26, 0.05); /* hover panel */
+  --secondary-foreground: #0A0E1A;
 
-  --muted: rgba(26, 26, 26, 0.04);
-  --muted-foreground: #5F6875;         /* 5.6:1 on white */
+  --muted: rgba(10, 14, 26, 0.04);
+  --muted-foreground: #4A5468;         /* navy-derived, 6.7:1 */
   /* The third level of grey, for the small labels that were written as
      `text-muted-foreground/60`. An opacity modifier is a dark-theme device: over white it
      blends TOWARDS the background and destroys the text (/50 measured 2.09:1). One token
      that is legible in both, and the hierarchy comes from size and weight instead. */
-  --subtle: #667080;                   /* 5.0:1 on white */
+  --subtle: #5D6779;                   /* navy-derived, 5.0:1 */
 
   --accent: rgba(201, 168, 76, 0.16);
   --accent-foreground: #8A6D1F;
 
   --warning: #C9A84C;
-  --warning-foreground: #1A1A1A;
+  --warning-foreground: #0A0E1A;
 
   --destructive: #DC2626;
   --destructive-foreground: #FFFFFF;
 
   /* An edge you can actually see. Inputs, buttons and tabs on a white panel had a 12%
      border (1.27:1) and read as floating text with no affordance at all. */
-  --border: rgba(26, 26, 26, 0.18);
+  --border: rgba(10, 14, 26, 0.16);
   --input: rgba(26, 26, 26, 0.03);
   --ring: #C9A84C;
 
@@ -135,12 +140,12 @@
   /* Chrome */
   /* The panel divider stays quieter than --border, because a panel now also separates
      from the page by its own colour rather than leaning entirely on its outline. */
-  --hairline: rgba(26, 26, 26, 0.13);
-  --scrollbar: rgba(26, 26, 26, 0.16);
-  --scrollbar-hover: rgba(26, 26, 26, 0.28);
+  --hairline: rgba(10, 14, 26, 0.12);
+  --scrollbar: rgba(10, 14, 26, 0.16);
+  --scrollbar-hover: rgba(10, 14, 26, 0.28);
   /* The modal scrim. 60% black is right over near-black and turns a white page into mud,
      which is what made the lead panel unpleasant to read. Light needs a lighter veil. */
-  --overlay: rgba(26, 26, 26, 0.38);
+  --overlay: rgba(10, 14, 26, 0.42);
   /* The neon glow is a dark-theme device. On white it reads as a printing error, so it
      is switched off by making its colour transparent rather than by forking the rules. */
   --glow-gold: rgba(201, 168, 76, 0);
