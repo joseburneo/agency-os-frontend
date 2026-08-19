@@ -441,20 +441,28 @@ export function WorkspaceSidebar({ slug, ws, workspaces, lists = [], demo = fals
       </aside>
 
       {/* ---- Desktop rail (lg and up): the original sticky collapsible aside ---- */}
+      {/* Holds the space the fixed rail occupies, so the board still lays out as a
+          row instead of sliding under the navy. */}
+      <div
+        aria-hidden
+        className={cn(
+          "hidden lg:block shrink-0 transition-[width] duration-200",
+          collapsed ? "w-[76px]" : "w-[264px]"
+        )}
+      />
       <aside
         className={cn(
-          // A rail runs the height of the screen. As a rounded card it ended
-          // partway down the page with the cream showing under it, which reads as
-          // an orphaned panel rather than navigation.
+          // FIXED, not pulled up with negative margins. The rail sits inside
+          // <main>, which is the scroll container, and a scroll container does not
+          // expose overflow above its block-start edge: -mt-8 was applied and then
+          // clipped, which is why a 32px cream band (exactly main's lg:p-8) stayed
+          // across the top while -ml-8 reached the left edge fine.
           //
-          // It lives inside <main>, which owns the page padding and the scroll, so
-          // it cancels that padding with negative margins on the lg breakpoint it
-          // appears at (lg:p-8 -> lg:-my-8 lg:-ml-8) and takes the full viewport
-          // height with its own scroll. Moving it out to the body would mean
-          // teaching the root layout about slugs, which is a worse trade than four
-          // margin utilities that undo exactly one known padding.
-          "rail shrink-0 sticky top-0 h-screen overflow-y-auto overscroll-contain",
-          "hidden lg:flex flex-col gap-4 px-3 py-6 lg:-my-8 lg:-ml-8",
+          // Taking it out of flow ends the argument. The spacer below holds the
+          // row's geometry, and both read the same `collapsed` state, so the width
+          // can never drift between them.
+          "rail hidden lg:flex flex-col gap-4 px-3 py-6",
+          "fixed left-0 top-0 z-30 h-screen overflow-y-auto overscroll-contain",
           "border-r border-rail-border transition-[width] duration-200",
           collapsed ? "w-[76px]" : "w-[264px]"
         )}
