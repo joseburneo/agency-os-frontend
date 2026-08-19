@@ -56,6 +56,9 @@ type Card = {
   build_url: string;
   build_status: string | null;
   build_delivered: boolean;
+  // none | built | sent | opened — derived on the server from facts we hold, not
+  // from a status field somebody has to remember to update.
+  build_state?: "none" | "built" | "sent" | "opened";
   has_phone: boolean;
   has_linkedin: boolean;
   reply_snippet: string;
@@ -121,6 +124,7 @@ type Detail = Card & {
   build_first_opened_at: string | null;
   build_last_opened_at: string | null;
   build_open_count: number;      // the prospect's opens
+  build_state?: "none" | "built" | "sent" | "opened";
   build_any_open_count?: number; // every visit including our own previews
   live_channel: string;
   // Where they stand on LinkedIn, cached server-side (migration 032). "connected" is the
@@ -411,6 +415,32 @@ function CompanyAvatar({ logo, domain, label, channelLogo, channelName, tint, si
       )}
     </span>
   );
+}
+
+// The magnet's state in one glance: a coloured mark and a word, grey when there
+// is nothing. The four states are a ladder and each rung is a fact — the build
+// exists, its link went out in a message, the prospect opened it — so the card
+// can never again claim something was delivered just because it finished
+// building.
+const BUILD_STATE: Record<string, { label: string; cls: string; title: string }> = {
+  none:   { label: "No Build", cls: "text-muted-foreground/50", title: "No magnet built yet" },
+  built:  { label: "Built",    cls: "text-gold-ink",  title: "Built, never sent to them" },
+  sent:   { label: "Sent",     cls: "text-gold-ink",  title: "The link went out in a message" },
+  opened: { label: "Opened",   cls: "text-signal-ink", title: "They opened it" },
+};
+
+function BuildChip({ state, href }: { state?: string; href?: string }) {
+  const st = BUILD_STATE[state ?? "none"] ?? BUILD_STATE.none;
+  const on = (state ?? "none") !== "none";
+  const body = (
+    <span className={`inline-flex items-center gap-1 text-[10px] ${st.cls}`} title={st.title}>
+      <Magnet className="w-3.5 h-3.5" />
+      {st.label}
+    </span>
+  );
+  return on && href
+    ? <a href={href} target="_blank" rel="noreferrer" className="hover:opacity-80 transition-opacity">{body}</a>
+    : body;
 }
 
 // Our own way in. Every link WE click to look at a magnet carries preview=1, so
@@ -2118,9 +2148,14 @@ function BuildCard({ d, onChanged, autoOptimize = false }: { d: Detail; onChange
       .catch(() => { setBuilding(false); setErr("Could not start the Build."); });
   };
 
-  const statusLine = d.build_delivered
-    ? { txt: "Delivered to prospect", cls: "text-signal-ink" }
-    : d.build_published ? { txt: "Published · link live", cls: "text-gold-ink" }
+  // The same ladder the board card shows, spelled out. It used to read
+  // "Delivered to prospect" the moment the build finished, which was a claim
+  // about the prospect based on a fact about us.
+  const state = d.build_state ?? (d.build_url ? "built" : "none");
+  const statusLine =
+    state === "opened" ? { txt: "They opened it", cls: "text-signal-ink" }
+    : state === "sent" ? { txt: "Sent · waiting for them to open", cls: "text-gold-ink" }
+    : state === "built" ? { txt: "Built · not sent yet", cls: "text-gold-ink" }
     : { txt: "Built · link not resolving", cls: "text-danger" };
   // The open signal: THE follow-up trigger. "Opened 20m ago" means they are
   // looking at it right now, so reach out while the tab is still warm.
@@ -2133,7 +2168,7 @@ function BuildCard({ d, onChanged, autoOptimize = false }: { d: Detail; onChange
   const opened = d.build_last_opened_at
     ? { txt: `They opened it ${timeAgo(d.build_last_opened_at)}${(d.build_open_count || 0) > 1 ? ` · ${d.build_open_count} visits` : ""}`,
         hot: Date.now() - new Date(d.build_last_opened_at).getTime() < 3600000 }
-    : d.build_delivered
+    : state === "sent"
       ? { txt: (d.build_any_open_count || 0) > 0 ? "Not opened by them (only our previews)" : "Not opened yet",
           hot: false }
       : null;
@@ -3489,8 +3524,8 @@ function ProspectRow({ r, onOpen }: { r: Card; onOpen: (id: number) => void }) {
         <div className={`text-sm tabular-nums ${mine ? "text-gold-ink" : "text-foreground"}`}>{timeAgo(r.last_reply_at)}</div>
       </td>
       <td className="px-3 py-3">
-        <span className={`inline-block w-2 h-2 rounded-full ${r.build_delivered ? "bg-signal" : r.has_build ? "bg-gold" : "bg-muted-foreground/40"}`}
-          title={r.build_delivered ? "Build delivered" : r.has_build ? "Build ready" : "No Build"} />
+        <span className={`inline-block w-2 h-2 rounded-full ${r.build_state === "opened" ? "bg-signal" : r.build_state && r.build_state !== "none" ? "bg-gold" : "bg-muted-foreground/40"}`}
+          title={(BUILD_STATE[r.build_state ?? "none"] ?? BUILD_STATE.none).title} />
       </td>
       <td className="px-4 py-3 text-right">
         {r.waiting_on === "us" ? (
@@ -3643,8 +3678,7 @@ function BoardCard({ r, onOpen }: { r: Card; onOpen: (id: number) => void }) {
         <TileAction href={r.phone ? `tel:${r.phone.replace(/[^\d+]/g, "")}` : undefined} active={!!r.phone} title="Call" color="#e6e6e6"><Phone className="w-3.5 h-3.5" /></TileAction>
         <TileAction href={waHref} active={!!r.phone} title="WhatsApp" color="#25D366"><MessageCircle className="w-3.5 h-3.5" /></TileAction>
         <TileAction href={r.linkedin_url || liHref} active={!!r.has_linkedin} title="LinkedIn profile" color="#0A66C2"><Linkedin width={14} height={14} /></TileAction>
-        <TileAction href={previewUrl(r.build_url)} active={!!r.build_url} title={r.build_delivered ? "Build delivered — open" : "Build ready — open"} color={r.build_delivered ? "#26D07C" : "#FFD60A"}><Magnet className="w-3.5 h-3.5" /></TileAction>
-        {r.build_delivered && <span className="text-[9px] text-signal-ink ml-0.5" title="Build delivered to prospect">sent</span>}
+        <BuildChip state={r.build_state} href={previewUrl(r.build_url)} />
       </div>
     </div>
   );
@@ -3692,7 +3726,7 @@ function TodoRow({ r, onOpen, onChanged }: { r: Card; onOpen: (id: number) => vo
         <TileAction href={r.phone ? `tel:${r.phone.replace(/[^\d+]/g, "")}` : undefined} active={!!r.phone} title="Call" color="#e6e6e6"><Phone className="w-3.5 h-3.5" /></TileAction>
         <TileAction href={waHref} active={!!r.phone} title="WhatsApp" color="#25D366"><MessageCircle className="w-3.5 h-3.5" /></TileAction>
         <TileAction href={r.linkedin_url || (r.name ? linkedinSearchUrl(r.name, r.company) : undefined)} active={!!r.has_linkedin} title="LinkedIn" color="#0A66C2"><Linkedin width={14} height={14} /></TileAction>
-        <TileAction href={previewUrl(r.build_url)} active={!!r.build_url} title="Build" color={r.build_delivered ? "#26D07C" : "#FFD60A"}><Magnet className="w-3.5 h-3.5" /></TileAction>
+        <BuildChip state={r.build_state} href={previewUrl(r.build_url)} />
       </div>
       <button onClick={done} disabled={busy} title="Mark this step done — logs the touch and passes the ball to them"
         className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-signal/40 px-2.5 py-1.5 text-xs text-signal-ink hover:bg-signal/10 disabled:opacity-40 transition-colors">
