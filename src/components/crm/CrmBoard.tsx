@@ -2316,6 +2316,8 @@ function ChannelStrip({ d, onChannel }: { d: Detail; onChannel: (ch: Chan) => vo
 }
 
 function ContactActions({ d, onChanged, compact }: { d: Detail; onChanged: () => void; compact?: boolean }) {
+  // A profile we have PROVEN does not resolve counts as missing, not as present.
+  const needsLinkedin = !d.linkedin_url || d.linkedin?.state === "bad_profile";
   const [finding, setFinding] = useState(false);
   const [findNote, setFindNote] = useState<string | null>(null);
   // Once Clay has run and come back empty for this contact, don't offer another
@@ -2424,10 +2426,30 @@ function ContactActions({ d, onChanged, compact }: { d: Detail; onChanged: () =>
           strip cannot do — correct a wrong number, or go buy one. */}
       {editing ? phoneEditor : d.phone ? (
         compact ? (
-          <button onClick={() => { setDraftPhone(d.phone); setEditing(true); }}
-            className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-gold-ink transition-colors">
-            <PenLine className="w-3 h-3" /> Edit number
-          </button>
+          <div className="flex flex-col gap-1.5">
+            <button onClick={() => { setDraftPhone(d.phone); setEditing(true); }}
+              className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-gold-ink transition-colors">
+              <PenLine className="w-3 h-3" /> Edit number
+            </button>
+            {/* Clay's waterfall returns a LinkedIn profile as well as a mobile, and it
+                saves the profile even when no number comes back. So the button belongs
+                here too: a contact with a phone but a dead or missing LinkedIn has a gap
+                Clay can close, and before this it was only offered when the phone was the
+                thing missing. */}
+            {needsLinkedin && !triedClay && (
+              <button onClick={shopClay} disabled={finding}
+                title="Runs a paid Clay lookup. It returns a LinkedIn profile as well as a mobile."
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-[11.5px] text-foreground hover:border-gold/40 disabled:opacity-40 transition-colors">
+                {finding
+                  ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Searching Clay…</>
+                  : <><Favicon domain="clay.com" label="Clay" size={13} /> Find LinkedIn with Clay</>}
+              </button>
+            )}
+            {needsLinkedin && triedClay && (
+              <span className="text-[11px] text-subtle">Searched Clay — no profile found</span>
+            )}
+            {findNote && <span className="text-[11px] text-muted-foreground">{findNote}</span>}
+          </div>
         ) : (
         <div className="flex items-center gap-1.5">
           <a href={d.wa_link || `https://wa.me/${d.phone.replace(/[^\d]/g, "")}`} target="_blank" rel="noreferrer"
@@ -2787,7 +2809,13 @@ function DealRail({ d, both, reload, onChannel }: { d: Detail; both: () => void;
                 <CopyBtn value={d.email} />
               </div>
             )}
-            {d.linkedin_url && (
+            {/* A LinkedIn URL we have PROVEN does not resolve is worse than no URL: it
+                reads as a working handle, it gets copied into searches, and it sends
+                people to a 404. Manav's card carried
+                linkedin.com/in/manavbhatiagrowthhacker for weeks. So a dead profile is
+                shown as a gap to fill, not as a link — same shape as having none, plus
+                the reason. */}
+            {d.linkedin_url && d.linkedin?.state !== "bad_profile" ? (
               <div className="group flex items-center gap-2 text-[12.5px]">
                 <Favicon domain="linkedin.com" label="LinkedIn" size={16} />
                 <a href={d.linkedin_url} target="_blank" rel="noreferrer"
@@ -2797,8 +2825,17 @@ function DealRail({ d, both, reload, onChannel }: { d: Detail; both: () => void;
                 </a>
                 <CopyBtn value={d.linkedin_url} />
               </div>
+            ) : (
+              <>
+                {d.linkedin?.state === "bad_profile" && (
+                  <div className="flex items-center gap-2 text-[11px] text-gold-ink">
+                    <Favicon domain="linkedin.com" label="LinkedIn" size={14} className="opacity-40 grayscale" />
+                    <span className="flex-1">Profile link is dead — Clay can find the real one</span>
+                  </div>
+                )}
+                <AddLinkedin d={d} onChanged={() => reload(true)} />
+              </>
             )}
-            {!d.linkedin_url && <AddLinkedin d={d} onChanged={() => reload(true)} />}
             {siteUrl && (
               <div className="group flex items-center gap-2 text-[12.5px]">
                 <Favicon domain={domainOf(d.email)} label={d.company} size={16} />
