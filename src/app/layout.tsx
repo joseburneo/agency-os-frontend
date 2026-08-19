@@ -1,13 +1,19 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, JetBrains_Mono } from "next/font/google";
+import { Inter, Inter_Tight, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { THEME_BOOT_SCRIPT } from "@/components/theme/ThemeToggle";
 
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
+// The website's exact faces (luxvance.com loads Inter + Inter Tight). Inter reads;
+// Inter Tight gives headings the tighter, more confident set the site uses.
+const inter = Inter({ variable: "--font-lv-inter", subsets: ["latin"] });
+const interTight = Inter_Tight({ variable: "--font-lv-inter-tight", subsets: ["latin"], weight: ["600", "700", "800"] });
 // Terminal / code mono for the whole CRM (the "off the radar" look-and-feel).
-const geistMono = JetBrains_Mono({ variable: "--font-geist-mono", subsets: ["latin"], weight: ["400", "500", "700", "800"] });
+// JetBrains Mono stays, but as the LABEL face it is on the website: eyebrows,
+// badges, numbers and code. It was the body face here, which is why long
+// paragraphs read like a terminal dump instead of a document.
+const mono = JetBrains_Mono({ variable: "--font-lv-mono", subsets: ["latin"], weight: ["400", "500", "700", "800"] });
 
 export const metadata: Metadata = {
   title: "Luxvance CRM",
@@ -45,7 +51,7 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} h-screen flex overflow-hidden antialiased bg-background text-foreground font-mono`}>
+      <body className={`${inter.variable} ${interTight.variable} ${mono.variable} h-screen flex overflow-hidden antialiased bg-background text-foreground`}>
         <Sidebar />
         <div className="flex-1 flex flex-col h-screen overflow-hidden">
           {/* pb-24 on mobile clears the fixed bottom tab bar so nothing hides behind it */}

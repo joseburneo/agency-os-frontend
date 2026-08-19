@@ -517,7 +517,23 @@ export function TargetListsView({
             </thead>
             <tbody>
               {leads.map((l) => (
-                <tr key={l.id} className="border-b border-border last:border-0 hover:bg-white/[0.02] transition-colors">
+                // The whole row opens the card. Everything we researched on this
+                // person lives in the preview, and hiding it behind one small
+                // button meant most of the work was never seen.
+                //
+                // The guard is what makes that safe: a click that started on a
+                // button, a link or a field belongs to that control, not to the
+                // row. Checking the event target once here beats adding
+                // stopPropagation to a dozen call sites and forgetting the
+                // thirteenth the next time someone adds a button.
+                <tr
+                  key={l.id}
+                  onClick={(e) => {
+                    if ((e.target as HTMLElement).closest("button,a,input,textarea,select,label")) return;
+                    openPreview(l);
+                  }}
+                  className="border-b border-border last:border-0 hover:bg-secondary cursor-pointer transition-colors"
+                >
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2.5">
                       <CompanyMark name={l.company} domain={l.domain} />

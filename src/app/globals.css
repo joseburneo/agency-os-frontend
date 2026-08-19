@@ -107,8 +107,15 @@
   --ambient-blue: rgba(120, 140, 200, 0.03);
 
   /* Typography */
-  --font-lv-sans: var(--font-geist-sans), "Inter", "Helvetica Neue", sans-serif;
-  --font-lv-serif: var(--font-geist-mono), monospace;
+  /* Faithful to luxvance.com: Inter reads, Inter Tight leads, JetBrains Mono
+     labels. The app used to set EVERYTHING in mono, which is a labelling face:
+     it gave the product its terminal character and made every paragraph, brief
+     and email preview harder to read than it needed to be. */
+  --font-lv-sans: var(--font-lv-inter), "Inter", system-ui, -apple-system, sans-serif;
+  --font-lv-display: var(--font-lv-inter-tight), var(--font-lv-inter), "Inter", sans-serif;
+  --font-lv-code: var(--font-lv-mono), ui-monospace, "SF Mono", Menlo, monospace;
+  /* Old name, kept so nothing that still points at it silently loses its face. */
+  --font-lv-serif: var(--font-lv-code);
 }
 
 .dark {
@@ -213,7 +220,8 @@
   --color-cyan: var(--cyan);
 
   --font-sans: var(--font-lv-sans);
-  --font-mono: var(--font-lv-serif);
+  --font-display: var(--font-lv-display);
+  --font-mono: var(--font-lv-code);
 }
 
 html {
@@ -226,8 +234,24 @@ html.dark {
 body {
   background-color: var(--background);
   color: var(--foreground);
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   letter-spacing: -0.01em;
+}
+
+/* Headings take the website's tighter display face and its negative tracking. */
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+/* The terminal voice, kept exactly where it belongs. Every eyebrow in this app is
+   an .uppercase label ("// WHERE_YOU_STAND", "TARGETED LISTS", "COLD") and every
+   figure is .tabular-nums, so one rule holds the character across 165 call sites
+   without touching one of them. Reading text is the only thing that changed. */
+.uppercase,
+.tabular-nums,
+code, kbd, pre, samp {
+  font-family: var(--font-mono);
 }
 
 /* Terminal panels: one neutral hairline, flat. No glass, no heavy shadow. */

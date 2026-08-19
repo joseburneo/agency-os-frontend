@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import type { Lead } from "@/lib/portal/types";
 import { Linkedin, Panel, SectionLabel, cn } from "./ui";
+import { CompanyMark } from "./CompanyMark";
 
 // The cockpit, as the prospect would work it, with THEIR ten people in it.
 //
@@ -129,9 +130,25 @@ export function MagnetPipeline({ leads, owner }: { leads: Lead[]; owner?: string
                   : "border-border bg-card/40 hover:bg-card"
               )}
             >
-              <span className="block text-[13.5px] font-medium text-foreground truncate">{l.name}</span>
-              <span className="block text-[12px] text-muted-foreground truncate">{l.role}</span>
-              <span className="block text-[12px] text-subtle truncate mt-0.5">{l.company}</span>
+              <span className="flex items-start gap-2.5">
+                <CompanyMark name={l.company} domain={l.domain} size={26} />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13.5px] font-semibold text-foreground truncate leading-tight">
+                    {l.company}
+                  </span>
+                  <span className="block text-[12.5px] text-foreground/80 truncate mt-1 leading-tight">
+                    {l.name}
+                  </span>
+                  <span className="block text-[11.5px] text-subtle truncate leading-tight">{l.role}</span>
+                </span>
+              </span>
+              {l.whyNowDate && (
+                <span className="mt-2 flex items-center gap-1.5 text-[10.5px] text-subtle">
+                  <span className="inline-block w-1 h-1 rounded-full bg-signal" />
+                  <span className="tabular-nums">{l.whyNowDate}</span>
+                  <span className="uppercase tracking-wider">signal</span>
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -146,14 +163,21 @@ export function MagnetPipeline({ leads, owner }: { leads: Lead[]; owner?: string
             <>
               <Panel>
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="text-[16px] font-semibold text-foreground">{open.name}</div>
-                    <div className="text-[13px] text-muted-foreground mt-0.5">
-                      {open.role}{open.company ? ` · ${open.company}` : ""}
+                  <div className="flex items-start gap-3 min-w-0">
+                    <CompanyMark name={open.company} domain={open.domain} size={40} />
+                    <div className="min-w-0">
+                      <div className="text-[17px] font-semibold text-foreground leading-tight">{open.name}</div>
+                      <div className="text-[13px] text-muted-foreground mt-1 leading-snug">
+                        {open.role}
+                      </div>
+                      <div className="text-[13px] text-foreground/80 leading-snug">
+                        {open.company}
+                        {open.sector ? <span className="text-subtle"> · {open.sector}</span> : null}
+                      </div>
+                      {open.country && (
+                        <div className="text-[12px] text-subtle mt-0.5">{open.country}</div>
+                      )}
                     </div>
-                    {open.country && (
-                      <div className="text-[12px] text-subtle mt-0.5">{open.country}</div>
-                    )}
                   </div>
                   <span className="shrink-0 rounded-full border border-border px-2.5 py-1 text-[11px] uppercase tracking-wider text-muted-foreground">
                     {STAGES.find((x) => x.key === stageOf(open))?.label ?? "Cold"}
