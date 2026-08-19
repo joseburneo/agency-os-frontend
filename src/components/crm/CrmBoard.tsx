@@ -1263,6 +1263,23 @@ function useComposer(d: Detail, onSent: () => void) {
 
   const clearChat = () => { setCoLog([]); setCoStream(""); persistChat([]); };
 
+  // A connection request IS composing: the text becomes the note, and a note roughly
+  // doubles acceptance — which matters beyond this one prospect, because acceptance rate
+  // is a signal LinkedIn watches when deciding whether to restrict an account.
+  const invite = () => {
+    setSending(true);
+    fetch(`${API}/api/crm/prospect/${id}/linkedin/invite`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ note: text }),
+    })
+      .then(async (r) => {
+        if (r.ok) { setSent("invited"); setDraft(chan, ""); onSent(); }
+        else { const e = await r.json().catch(() => ({})); setSent("err:" + (e.detail || r.status)); }
+      })
+      .catch((e) => setSent("err:" + e))
+      .finally(() => setSending(false));
+  };
+
   const send = () => {
     setSending(true);
     fetch(`${API}/api/crm/prospect/${id}/send`, {
@@ -1388,7 +1405,7 @@ function useComposer(d: Detail, onSent: () => void) {
   const canSendChannel = (chan === "whatsapp" && !!d.phone)
     || (chan === "linkedin" && !!d.linkedin?.can_message);
   const gmailLive = d.live_channel === "gmail";
-  return { d, chan, setChan, text, setDraft, send, logTouch, refresh: onSent, askCopilot, drafting, sending, sent, setSent, co, setCo, coBusy, coLog, coCtx, coStream, coSaved, clearChat, canSendEmail, canSendChannel, gmailLive, threadKey, sendOpts, fromKey, setFromKey, selectedOpt, threadAcct, routeTo, routeCc, setRouteCc, ccAdd, setCcAdd, clientCc, sigInfo };
+  return { d, chan, setChan, text, setDraft, send, logTouch, refresh: onSent, askCopilot, drafting, sending, sent, setSent, co, setCo, coBusy, coLog, coCtx, coStream, coSaved, clearChat, canSendEmail, canSendChannel, invite, gmailLive, threadKey, sendOpts, fromKey, setFromKey, selectedOpt, threadAcct, routeTo, routeCc, setRouteCc, ccAdd, setCcAdd, clientCc, sigInfo };
 }
 type ComposerCtl = ReturnType<typeof useComposer>;
 
@@ -1701,7 +1718,7 @@ function CallPanel({ d, onTouched }: { d: Detail; onTouched: () => void }) {
 }
 
 function Composer({ c }: { c: ComposerCtl }) {
-  const { d, chan, setChan, text, setDraft, send, logTouch, drafting, sending, sent, setSent, canSendEmail, canSendChannel, gmailLive, sendOpts, fromKey, setFromKey, selectedOpt, threadAcct, routeTo, routeCc, setRouteCc, ccAdd, setCcAdd, clientCc } = c;
+  const { d, chan, setChan, text, setDraft, send, invite, logTouch, drafting, sending, sent, setSent, canSendEmail, canSendChannel, gmailLive, sendOpts, fromKey, setFromKey, selectedOpt, threadAcct, routeTo, routeCc, setRouteCc, ccAdd, setCcAdd, clientCc } = c;
   // Compact by default so an empty composer never steals the conversation's space; it opens
   // on click or as soon as there's a draft (incl. one the copilot / Draft-with-AI wrote).
   const [open, setOpen] = useState(false);
@@ -1831,10 +1848,11 @@ function Composer({ c }: { c: ComposerCtl }) {
           click cleared it — so after one send there was no Send button and the
           only way back was LinkedIn and return. It now sits above the row and
           clears the moment you type again. */}
-      {(sent === "ok" || sent === "touched") && (
+      {(sent === "ok" || sent === "touched" || sent === "invited") && (
         <div className="flex items-center gap-2 text-sm text-signal-ink">
           <Check className="w-4 h-4" />
-          {sent === "ok" ? "Sent. Cadence advanced."
+          {sent === "invited" ? "Invitation sent. You can write once they accept."
+            : sent === "ok" ? "Sent. Cadence advanced."
             : `Logged as ${CHANNEL_META[chan].label} touch. Ball's in their court now.`}
         </div>
       )}
@@ -1858,6 +1876,19 @@ function Composer({ c }: { c: ComposerCtl }) {
               {sending ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending…</>
                 : <><Send className="w-4 h-4" /> {selectedOpt?.via === "gmail" ? `Send from ${selectedOpt.eaccount}` : "Send via Instantly"}</>}
             </button>
+          ) : chan === "linkedin" && d.linkedin?.state === "not_connected" ? (
+            <>
+              <button onClick={invite} disabled={sending}
+                className="neon-btn inline-flex items-center gap-2 rounded-lg bg-gold px-4 py-2 text-sm font-semibold text-ink-inverse hover:bg-gold-hi disabled:opacity-40 transition-colors">
+                {sending ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending…</>
+                  : <><Send className="w-4 h-4" /> Send invitation{text.trim() ? " with note" : ""}</>}
+              </button>
+              <span className="text-[11px] text-muted-foreground">
+                {text.trim()
+                  ? `Note: ${Math.min(text.trim().length, 300)}/300 characters`
+                  : "Add a note above — it roughly doubles acceptance"}
+              </span>
+            </>
           ) : canSendChannel && text.trim() ? (
             <>
               <button onClick={send} disabled={sending || !text.trim()}
