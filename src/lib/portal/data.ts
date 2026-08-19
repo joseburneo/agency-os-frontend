@@ -798,7 +798,7 @@ export const loadMagnetBrief = cache(async function loadMagnetBrief(slug: string
 //
 // The switcher only ever needed two numbers per workspace. engaged_prospects is small
 // (under a thousand rows), so one select of two columns answers all 44 at once.
-async function crmCountsByWorkspace(): Promise<Map<string, { warm: number; meetings: number }>> {
+const crmCountsByWorkspace = cache(async function crmCountsByWorkspace(): Promise<Map<string, { warm: number; meetings: number }>> {
   const out = new Map<string, { warm: number; meetings: number }>();
   const sb = db();
   if (!sb) return out;
@@ -815,9 +815,45 @@ async function crmCountsByWorkspace(): Promise<Map<string, { warm: number; meeti
     out.set(k, cur);
   }
   return out;
-}
+});
 
-export async function loadWorkspaces(): Promise<Workspace[] | null> {
+
+// Cold-lead counts for EVERY workspace, in three queries instead of one per workspace.
+//
+// leadCountFor() asks per workspace, and for a magnet it asks twice (find the magnet,
+// then count its leads). With 39 magnets and 5 clients that was 83 queries — and the
+// layout calls loadWorkspaces on every navigation, twice, so a single click on a
+// sidebar module fired 166. That is why clicking a tab sat dead for ~3 seconds.
+//
+// Both lead tables are small (a few thousand rows), so one column-only select of each
+// answers all 44 workspaces at once and we count in memory.
+const loadLeadCounts = cache(async function loadLeadCounts(): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  const sb = db();
+  if (!sb) return out;
+  const [magnets, magnetLeads, listLeads] = await Promise.all([
+    sb.from("magnets").select("id,workspace_id").limit(5000),
+    sb.from("magnet_leads").select("magnet_id").limit(50000),
+    sb.from("target_list_leads").select("workspace_id").limit(50000),
+  ]);
+  const wsOfMagnet = new Map<string, string>();
+  for (const m of (magnets.data ?? []) as { id?: string; workspace_id?: string }[]) {
+    if (m.id && m.workspace_id) wsOfMagnet.set(String(m.id), String(m.workspace_id));
+  }
+  for (const l of (magnetLeads.data ?? []) as { magnet_id?: string }[]) {
+    const ws = wsOfMagnet.get(String(l.magnet_id ?? ""));
+    if (ws) out.set(ws, (out.get(ws) ?? 0) + 1);
+  }
+  for (const l of (listLeads.data ?? []) as { workspace_id?: string }[]) {
+    const ws = String(l.workspace_id ?? "");
+    if (ws) out.set(ws, (out.get(ws) ?? 0) + 1);
+  }
+  return out;
+});
+
+// cache() dedupes within a single render pass. generateMetadata and the layout body
+// both need this, and without it every navigation paid for the whole thing twice.
+export const loadWorkspaces = cache(async function loadWorkspaces(): Promise<Workspace[] | null> {
   const sb = db();
   if (!sb) return null;
 
@@ -830,17 +866,14 @@ export async function loadWorkspaces(): Promise<Workspace[] | null> {
 
   // One query for every workspace's warm/meeting numbers, instead of one CRM fetch
   // each. See crmCountsByWorkspace above for what that cost us.
-  const counts = await crmCountsByWorkspace();
-  return Promise.all(
-    rows.map(async (row) => {
-      // Magnet workspaces count their own magnet_leads, client workspaces our
-      // campaign leads — the two are different tables and different owners.
-      const count = await leadCountFor(row as Record<string, unknown>);
-      const w = workspaceFromRow(row as Record<string, unknown>, count);
-      const c = counts.get(String(row.id ?? "")) ?? { warm: 0, meetings: 0 };
-      w.warmLeads = c.warm;
-      w.meetings = c.meetings;
-      return w;
-    })
-  );
-}
+  // Two prepared maps, then pure assembly: no per-workspace round trip at all.
+  const [counts, leads] = await Promise.all([crmCountsByWorkspace(), loadLeadCounts()]);
+  return rows.map((row) => {
+    const id = String((row as Record<string, unknown>).id ?? "");
+    const w = workspaceFromRow(row as Record<string, unknown>, leads.get(id) ?? 0);
+    const c = counts.get(id) ?? { warm: 0, meetings: 0 };
+    w.warmLeads = c.warm;
+    w.meetings = c.meetings;
+    return w;
+  });
+})
