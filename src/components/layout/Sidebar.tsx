@@ -19,7 +19,12 @@ export function Sidebar() {
   // One nav per context: the workspace sidebar takes over inside /w/<slug>.
   if (pathname?.startsWith("/w/")) return null;
   return (
-    <aside className="hidden md:flex w-[60px] h-screen border-r border-border bg-card flex-col items-center shrink-0 py-4">
+    // Same navy rail as inside a workspace. It was the last surface still on the
+    // page colour, so moving between /campaigns and /w/<slug> looked like moving
+    // between two products. `rail` re-points the semantic tokens inside itself, so
+    // the nav below keeps using text-foreground and bg-secondary and simply lands
+    // on the navy versions.
+    <aside className="rail hidden md:flex w-[60px] h-screen border-r border-rail-border flex-col items-center shrink-0 py-4">
       {/* logomark */}
       <Link href="/" aria-label="Luxvance" className="mb-6 text-lg font-bold tracking-tight text-foreground">
         L<span className="text-gold-ink">V</span>
