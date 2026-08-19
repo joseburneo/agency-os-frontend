@@ -783,6 +783,40 @@ export const loadMagnetBrief = cache(async function loadMagnetBrief(slug: string
   };
 });
 
+
+// Warm + meeting counts for EVERY workspace, in one query.
+//
+// This used to be loadCrm() called once per workspace inside loadWorkspaces(), which
+// meant two Render API calls each. With 44 workspaces (5 clients, 39 magnets) that was
+// 88 concurrent requests on every page load under /w/ — the layout calls
+// loadWorkspaces(), so opening the CRM fired all of them just to label the sidebar
+// switcher. Each response carried the workspace's full prospect list, so memory on the
+// single Render instance climbed from its usual ~320 MB to the 2 GB ceiling and the
+// service was OOM-killed and restarted (2026-08-19). While it restarted, loadCrm's
+// 15s AbortSignal fired and the board rendered EMPTY — counts in the sidebar, zero in
+// every column, "Could not load the briefing".
+//
+// The switcher only ever needed two numbers per workspace. engaged_prospects is small
+// (under a thousand rows), so one select of two columns answers all 44 at once.
+async function crmCountsByWorkspace(): Promise<Map<string, { warm: number; meetings: number }>> {
+  const out = new Map<string, { warm: number; meetings: number }>();
+  const sb = db();
+  if (!sb) return out;
+  const { data } = await sb
+    .from("engaged_prospects")
+    .select("workspace_id,status")
+    .limit(20000);
+  for (const r of (data ?? []) as { workspace_id?: string; status?: string }[]) {
+    const k = String(r.workspace_id ?? "");
+    if (!k) continue;
+    const cur = out.get(k) ?? { warm: 0, meetings: 0 };
+    cur.warm += 1;
+    if (r.status === "meeting_booked") cur.meetings += 1;
+    out.set(k, cur);
+  }
+  return out;
+}
+
 export async function loadWorkspaces(): Promise<Workspace[] | null> {
   const sb = db();
   if (!sb) return null;
@@ -794,22 +828,18 @@ export async function loadWorkspaces(): Promise<Workspace[] | null> {
     .order("name", { ascending: true });
   if (!rows) return null;
 
-  // All workspaces in parallel. This used to be a sequential loop — one lead
-  // count plus two CRM fetches per workspace, one after another — and with ten
-  // workspaces that chain blew the 60s prerender budget whenever the Render API
-  // was slow or mid-deploy, failing the whole Vercel build on "/".
+  // One query for every workspace's warm/meeting numbers, instead of one CRM fetch
+  // each. See crmCountsByWorkspace above for what that cost us.
+  const counts = await crmCountsByWorkspace();
   return Promise.all(
     rows.map(async (row) => {
-      const [count, crm] = await Promise.all([
-        // Magnet workspaces count their own magnet_leads, client workspaces our
-        // campaign leads — the two are different tables and different owners.
-        leadCountFor(row as Record<string, unknown>),
-        // Warm/meetings from the same CRM source (wired for Luxvance today).
-        loadCrm(String(row.slug)),
-      ]);
+      // Magnet workspaces count their own magnet_leads, client workspaces our
+      // campaign leads — the two are different tables and different owners.
+      const count = await leadCountFor(row as Record<string, unknown>);
       const w = workspaceFromRow(row as Record<string, unknown>, count);
-      w.warmLeads = crm.warm;
-      w.meetings = crm.meetings;
+      const c = counts.get(String(row.id ?? "")) ?? { warm: 0, meetings: 0 };
+      w.warmLeads = c.warm;
+      w.meetings = c.meetings;
       return w;
     })
   );
