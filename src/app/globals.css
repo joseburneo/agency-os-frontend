@@ -317,22 +317,25 @@ code, kbd, pre, samp {
   --accent-foreground: #FFD60A;
 }
 
-/* The constellation paints behind the rail's contents. Lifting the siblings here
-   rather than adding a wrapper keeps the sidebar markup untouched: an absolutely
-   positioned canvas would otherwise paint OVER in-flow content in the same
-   stacking context, and the nav would end up under the stars. */
+/* The constellation paints behind the rail's contents.
+   
+   A NEGATIVE z-index, and nothing at all on the siblings. The first version gave
+   every child `z-index: 1` to lift it over the canvas, which put the workspace
+   switcher and the nav on the SAME level: the dropdown then rendered under the
+   nav items, showing straight through to them.
+   
+   .rail already isolates, so it forms a stacking context and z-index -1 cannot
+   escape it. Inside that context the paint order is the rail's own background,
+   then negative-z children, then everything in flow — which is exactly the layer
+   this wants, with each child free to manage its own z-index again. */
 .rail > .rail-bg {
   position: absolute;
   inset: 0;
-  z-index: 0;
+  z-index: -1;
   pointer-events: none;
   /* Texture, not foreground. It sits under the navigation and must never compete
      with a label for attention. */
   opacity: 0.45;
-}
-.rail > *:not(.rail-bg) {
-  position: relative;
-  z-index: 1;
 }
 
 /* Terminal panels: one neutral hairline, flat. No glass, no heavy shadow. */
