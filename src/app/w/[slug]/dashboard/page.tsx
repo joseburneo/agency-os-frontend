@@ -7,6 +7,7 @@ import {
 import { getWorkspace, getWorkspaceData } from "@/lib/portal/mock";
 import { loadPortal, loadMagnetBrief } from "@/lib/portal/data";
 import { MagnetOverview } from "@/components/portal/MagnetOverview";
+import { LinkedInPanel } from "@/components/portal/LinkedInPanel";
 import { enabledModules } from "@/lib/portal/modules";
 import { SectionLabel, StatTile, ModuleHeader, ChannelDots, Panel, Pill, HeatDot, Linkedin } from "@/components/portal/ui";
 import type { CrmStage, OutreachChannel, CrmSummary } from "@/lib/portal/types";
@@ -104,6 +105,10 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
           </span>
         }
       />
+
+      {/* LinkedIn budget: only renders where a LinkedIn account is actually connected,
+          so a workspace without one sees nothing rather than a row of zeros. */}
+      <LinkedInPanel workspace={slug} />
 
       {/* HERO — the one line that should make a skeptical MD lean in. Only for a
           workspace with a live inbox; a pre-launch build has nothing warm to say. */}

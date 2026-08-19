@@ -1173,6 +1173,20 @@ type CoContext = {
 function useComposer(d: Detail, onSent: () => void) {
   const id = d.id;
   const [chan, setChan] = useState<Chan>("email");
+  // The weekly invitation budget, fetched once and shown beside the button that spends
+  // it. Jose's reason, and it is the right one: "so I am conscious of who I send to
+  // instead of hitting the button blindly." A number you have to go to another screen
+  // for is a number nobody checks.
+  const [liQuota, setLiQuota] = useState<{ sent_this_week: number; cap: number; remaining: number;
+                                           messages_this_week?: number } | null>(null);
+  const ws = useContext(WorkspaceCtx);
+  useEffect(() => {
+    if (chan !== "linkedin" || liQuota) return;
+    fetch(`${API}/api/crm/linkedin/status${ws ? `?workspace=${encodeURIComponent(ws)}` : ""}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (j?.quota) setLiQuota(j.quota); })
+      .catch(() => {});
+  }, [chan, liQuota, ws]);
   const [drafts, setDrafts] = useState<Record<Chan, string>>({ email: "", linkedin: "", whatsapp: "", call: "" });
   const [drafting, setDrafting] = useState(false);
   const [sending, setSending] = useState(false);
@@ -1405,7 +1419,7 @@ function useComposer(d: Detail, onSent: () => void) {
   const canSendChannel = (chan === "whatsapp" && !!d.phone)
     || (chan === "linkedin" && !!d.linkedin?.can_message);
   const gmailLive = d.live_channel === "gmail";
-  return { d, chan, setChan, text, setDraft, send, logTouch, refresh: onSent, askCopilot, drafting, sending, sent, setSent, co, setCo, coBusy, coLog, coCtx, coStream, coSaved, clearChat, canSendEmail, canSendChannel, invite, gmailLive, threadKey, sendOpts, fromKey, setFromKey, selectedOpt, threadAcct, routeTo, routeCc, setRouteCc, ccAdd, setCcAdd, clientCc, sigInfo };
+  return { d, chan, setChan, text, setDraft, send, logTouch, refresh: onSent, askCopilot, drafting, sending, sent, setSent, co, setCo, coBusy, coLog, coCtx, coStream, coSaved, clearChat, canSendEmail, canSendChannel, invite, liQuota, gmailLive, threadKey, sendOpts, fromKey, setFromKey, selectedOpt, threadAcct, routeTo, routeCc, setRouteCc, ccAdd, setCcAdd, clientCc, sigInfo };
 }
 type ComposerCtl = ReturnType<typeof useComposer>;
 
@@ -1718,7 +1732,7 @@ function CallPanel({ d, onTouched }: { d: Detail; onTouched: () => void }) {
 }
 
 function Composer({ c }: { c: ComposerCtl }) {
-  const { d, chan, setChan, text, setDraft, send, invite, logTouch, drafting, sending, sent, setSent, canSendEmail, canSendChannel, gmailLive, sendOpts, fromKey, setFromKey, selectedOpt, threadAcct, routeTo, routeCc, setRouteCc, ccAdd, setCcAdd, clientCc } = c;
+  const { d, chan, setChan, text, setDraft, send, invite, logTouch, drafting, sending, sent, setSent, canSendEmail, canSendChannel, liQuota, gmailLive, sendOpts, fromKey, setFromKey, selectedOpt, threadAcct, routeTo, routeCc, setRouteCc, ccAdd, setCcAdd, clientCc } = c;
   // Compact by default so an empty composer never steals the conversation's space; it opens
   // on click or as soon as there's a draft (incl. one the copilot / Draft-with-AI wrote).
   const [open, setOpen] = useState(false);
@@ -1888,6 +1902,12 @@ function Composer({ c }: { c: ComposerCtl }) {
                   ? `Note: ${Math.min(text.trim().length, 300)}/300 characters`
                   : "Add a note above — it roughly doubles acceptance"}
               </span>
+              {liQuota && (
+                <span className={`text-[11px] tabular-nums ${liQuota.remaining <= 10 ? "text-gold-ink" : "text-subtle"}`}
+                  title="Our own weekly limit, set at half of LinkedIn's real ceiling. LinkedIn publishes no remaining-invitations figure.">
+                  {liQuota.remaining} of {liQuota.cap} invitations left this week · our limit
+                </span>
+              )}
             </>
           ) : canSendChannel && text.trim() ? (
             <>
