@@ -67,7 +67,11 @@ function buildNav(w: Workspace | null, enabled: Set<string>, slug: string, lists
   // Each target list is its own menu item under the "Targeted lists" header, so Paul
   // reaches List 1 / List 2 / List 3 / VIP in one click. They deep-link into the one
   // target-lists page via ?list=<key>, which the table reads to preselect the tab.
-  const listItems: NavItem[] = lists.map((l) => ({
+  // Sub-items only when there is more than one list. With a single list the
+  // parent already IS that list, so the child just repeats it — and repeats its
+  // name, which is how "Find Prospects" ended up in the menu twice: a list built
+  // from Find Prospects is named after it.
+  const listItems: NavItem[] = (lists.length > 1 ? lists : []).map((l) => ({
     key: `list-${l.key}`,
     label: shortListLabel(l.name),
     icon: Target,
@@ -99,17 +103,20 @@ function buildNav(w: Workspace | null, enabled: Set<string>, slug: string, lists
       ],
     },
     {
+      // A list is what sourcing PRODUCES, so it lives beside the tools that make
+      // it rather than with the campaigns that consume it. One list can feed
+      // several campaigns, and it exists before any of them do.
       group: "Prospecting",
       items: [
         { key: "prospecting", label: "Find Prospects", icon: LinkedInMark },
         { key: "local", label: "Find Local Businesses", icon: MapsMark },
+        { key: "target-lists", label: "Target Lists", icon: Target, badge: w && w.coldLeads > 0 ? w.coldLeads.toLocaleString() : undefined },
+        ...listItems,
       ],
     },
     {
       group: "Campaigns",
       items: [
-        { key: "target-lists", label: "Target Lists", icon: Target, badge: w && w.coldLeads > 0 ? w.coldLeads.toLocaleString() : undefined },
-        ...listItems,
         { key: "email", label: "Email Campaigns", icon: Mail },
         { key: "linkedin", label: "LinkedIn Campaigns", icon: LinkedInMark },
       ],

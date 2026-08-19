@@ -402,7 +402,7 @@ export function TargetListsView({
     <div className="flex flex-col gap-6">
       <ModuleHeader
         icon={Target}
-        title="Targeted Cold Leads"
+        title="Target Lists"
         desc="Your hyper-targeted cold leads. The enriched lists that feed the cold outreach: email, LinkedIn and LinkedIn Ads audiences."
         meta={
           <span className="inline-flex items-center gap-2 text-[11px] text-muted-foreground">
