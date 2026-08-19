@@ -122,8 +122,8 @@ type Detail = Card & {
   live_channel: string;
   // Where they stand on LinkedIn, cached server-side (migration 032). "connected" is the
   // only state LinkedIn lets you message in, so it is the only one that offers a Send.
-  linkedin?: { state: "connected" | "invited" | "not_connected" | "unknown";
-               can_message: boolean; invited_at?: string | null; handle?: string | null };
+  linkedin?: { state: "connected" | "invited" | "not_connected" | "bad_profile" | "unknown";
+               can_message: boolean; can_invite?: boolean; invited_at?: string | null; handle?: string | null };
   can_send_email: boolean;
   intent_label: string;
   intent_summary: string;
@@ -896,6 +896,7 @@ function LinkedInStatus({ d }: { d: Detail }) {
     connected:     { text: "Connected · you can message", cls: "text-signal-ink", dot: "bg-signal" },
     invited:       { text: d.linkedin?.invited_at ? `Invited ${fmtDate(d.linkedin.invited_at)} · waiting` : "Invitation pending", cls: "text-gold-ink", dot: "bg-gold" },
     not_connected: { text: "Not connected · invite first", cls: "text-muted-foreground", dot: "bg-muted-foreground/50" },
+    bad_profile:   { text: "Profile link is dead · fix it", cls: "text-gold-ink", dot: "bg-gold" },
     unknown:       { text: "No LinkedIn profile on file", cls: "text-subtle", dot: "bg-subtle/50" },
   }[st];
   return (
@@ -923,6 +924,7 @@ function linkedinHint(d: Detail): string {
     return `Invitation pending${since} — you can write once they accept`;
   }
   if (st === "not_connected") return "Not connected yet — send an invitation first";
+  if (st === "bad_profile") return "That LinkedIn URL does not resolve — fix the profile first";
   return "No LinkedIn profile on file";
 }
 
@@ -1960,7 +1962,7 @@ function Composer({ c }: { c: ComposerCtl }) {
               {sending ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending…</>
                 : <><Send className="w-4 h-4" /> {selectedOpt?.via === "gmail" ? `Send from ${selectedOpt.eaccount}` : "Send via Instantly"}</>}
             </button>
-          ) : chan === "linkedin" && d.linkedin?.state === "not_connected" ? (
+          ) : chan === "linkedin" && d.linkedin?.can_invite ? (
             <>
               <button onClick={invite} disabled={sending}
                 className="neon-btn inline-flex items-center gap-2 rounded-lg bg-gold px-4 py-2 text-sm font-semibold text-ink-inverse hover:bg-gold-hi disabled:opacity-40 transition-colors">
@@ -2268,7 +2270,8 @@ function ChannelStrip({ d, onChannel }: { d: Detail; onChannel: (ch: Chan) => vo
     { ch: "linkedin", logo: "linkedin.com", label: "LinkedIn",
       state: li === "connected" ? "connected"
            : li === "invited" ? "invitation pending"
-           : li === "not_connected" ? "not connected" : "no profile",
+           : li === "not_connected" ? "not connected"
+           : li === "bad_profile" ? "profile link is dead" : "no profile",
       tone: li === "connected" ? "go" : li === "unknown" ? "off" : "warn",
       action: li === "connected" ? "Write" : li === "not_connected" ? "Invite" : null,
       note: li === "not_connected" && q ? `${q.remaining} of ${q.cap} invitations left · our limit` : undefined },
