@@ -42,9 +42,16 @@ export function SectionLabel({ children, className }: { children: React.ReactNod
   );
 }
 
+// A panel is a piece of paper, and paper has margins. This had none, so every
+// caller that did not think to add padding rendered text flush against the
+// border: the magnet dashboard shipped that way and read as broken rather than
+// plain. Padding belongs to the primitive, not to the memory of 68 call sites.
+//
+// twMerge resolves the override, so a panel that must be full-bleed (a table, a
+// list that draws its own rows) passes p-0 and wins.
 export function Panel({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={cn("rounded-xl border border-border bg-card", className)}>{children}</div>
+    <div className={cn("rounded-xl border border-border bg-card p-5", className)}>{children}</div>
   );
 }
 

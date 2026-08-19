@@ -238,11 +238,16 @@ body {
   letter-spacing: -0.01em;
 }
 
-/* Headings take the website's tighter display face and its negative tracking. */
+/* Headings take the website's display face and its tracking, which tightens as
+   the type gets bigger: luxvance.com sets -0.02em on section heads and -0.03 to
+   -0.04em on display sizes. Tracking that does not scale is what makes a big
+   heading look loose and a small one look cramped. */
 h1, h2, h3, h4 {
   font-family: var(--font-display);
   letter-spacing: -0.02em;
 }
+h1 { letter-spacing: -0.035em; }
+h2 { letter-spacing: -0.03em; }
 
 /* The terminal voice, kept exactly where it belongs. Every eyebrow in this app is
    an .uppercase label ("// WHERE_YOU_STAND", "TARGETED LISTS", "COLD") and every

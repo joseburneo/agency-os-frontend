@@ -492,7 +492,7 @@ export function TargetListsView({
       </div>
 
       {/* Table */}
-      <Panel className="overflow-hidden">
+      <Panel className="overflow-hidden p-0">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>

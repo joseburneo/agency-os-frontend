@@ -513,7 +513,7 @@ export function ProspectingView({ slug, canExport }: { slug: string; canExport: 
           )}
 
           {rows && rows.length > 0 && (
-            <Panel className="overflow-hidden">
+            <Panel className="overflow-hidden p-0">
               <div className="flex items-center justify-between gap-3 border-b border-border px-3 py-2">
                 <div className="text-[12px] text-muted-foreground">
                   <span className="font-medium text-foreground">{rows.length}</span> shown
