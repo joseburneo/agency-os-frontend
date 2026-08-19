@@ -3737,7 +3737,7 @@ const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: "they", label: "↙ They replied (newest)" },
   { key: "we", label: "↗ We sent (newest)" },
   { key: "heat", label: "🔥 Priority (hottest)" },
-  { key: "stalled", label: "🕒 Most stalled" },
+  { key: "stalled", label: "🧊 Coldest (longest silent)" },
 ];
 function catRank(cat: string): number {
   const c = (cat || "").toLowerCase();
@@ -3764,10 +3764,9 @@ const FILTERS: { key: FilterKey; label: string; group: string; brand?: string; t
   { key: "hot",      label: "🔥 Hot",            group: "Status", test: (c) => c.heat >= 70 },
   { key: "wants",    label: "📅 Wants meeting",   group: "Status", test: (c) => c.wants_meeting },
   { key: "meetings", label: "✅ Booked",          group: "Status", test: (c) => c.status === "meeting_booked" },
-  { key: "build_sent",  label: "🧲 Build sent",        group: "Build", test: (c) => c.build_delivered },
-  // The goldmine state: the asset exists, the prospect has never seen it. 44 cards on day one.
-  { key: "build_ready", label: "💤 Build never sent",  group: "Build", test: (c) => c.has_build && !c.build_delivered },
-  { key: "no_build",    label: "No Build",             group: "Build", test: (c) => !c.has_build },
+  // The three Build filters are gone (Jose, 2026-08-19): nobody narrowed the
+  // board by them. Their keys stay in FilterKey so a saved filter set from before
+  // today does not crash on an unknown key; it simply matches nothing.
   // The brand marks, not a telephone receiver and a paperclip. These filters are
   // about reaching someone ON WhatsApp and ON LinkedIn, and the logo says that
   // faster than any glyph.
@@ -3970,11 +3969,33 @@ export function CrmBoard({ workspace, basePath = "/crm", live = true, canBuild =
       {/* filter chip bar — combinable (AND), Master-Inbox style: isolate the exact cohort to work.
           The sort selector lives HERE, next to the cards it orders (Jose, 30 jul). */}
       <div className="flex items-center gap-1.5 flex-wrap mb-3">
-        <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortKey)}
-          title="Sort each column"
-          className="bg-card border border-border rounded-full px-2.5 py-1 text-[11px] text-muted-foreground hover:text-foreground focus:outline-none focus:ring-1 focus:ring-gold/40 cursor-pointer shrink-0">
-          {SORT_OPTIONS.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
-        </select>
+        {/* Search leads the row: it is the control reached for most, and it was
+            sitting at the far right behind everything else. */}
+        <div className="relative w-[240px] shrink-0">
+          <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search name, company, email…"
+            className="w-full bg-card border border-border rounded-full pl-8 pr-8 py-1.5 text-[12px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-gold/50"
+          />
+          {q && (
+            <button onClick={() => setQ("")} aria-label="Clear search"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+        {/* Labelled, because a lone pill reading "They replied (newest)" beside a
+            row of filters looks like another filter. */}
+        <label className="inline-flex items-center gap-1.5 shrink-0">
+          <span className="text-[10px] uppercase tracking-[0.14em] text-subtle">Sort</span>
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortKey)}
+            title="Sort each column"
+            className="bg-card border border-border rounded-full px-2.5 py-1 text-[11px] text-muted-foreground hover:text-foreground focus:outline-none focus:ring-1 focus:ring-gold/40 cursor-pointer">
+            {SORT_OPTIONS.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
+          </select>
+        </label>
         <span className="w-px h-4 bg-border mx-1" />
         {FILTERS.filter((f) => f.group !== "Status").map((f) => {
           const on = filters.has(f.key);
@@ -4000,24 +4021,6 @@ export function CrmBoard({ workspace, basePath = "/crm", live = true, canBuild =
             can only empty by selecting the text and deleting it is a small daily
             tax. */}
         <div className="ml-auto flex items-center gap-2 shrink-0">
-          <div className="relative w-[220px]">
-            <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Search name, company, email…"
-              className="w-full bg-card border border-border rounded-full pl-8 pr-8 py-1.5 text-[12px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-gold/50"
-            />
-            {q && (
-              <button
-                onClick={() => setQ("")}
-                aria-label="Clear search"
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
           <div className="flex items-center bg-card border border-border rounded-full p-0.5">
             {([["board", LayoutGrid, "Board"], ["queue", List, "Queue"], ["todos", Check, "To-dos"]] as const).map(
               ([key, Icon, label]) => (
