@@ -799,6 +799,16 @@ function isChannelConvo(c: Convo): boolean {
   return c.kind === "linkedin" || c.kind === "whatsapp";
 }
 
+// Which pipe a conversation came through, for the filter above the thread. Note this
+// is NOT tied to the composer's channel: reading the email while answering on WhatsApp
+// is the normal case, not an edge one, so picking a channel to write in must never
+// hide the conversation you are writing about.
+function convoChannel(c: Convo): "email" | "linkedin" | "whatsapp" {
+  if (c.kind === "linkedin") return "linkedin";
+  if (c.kind === "whatsapp") return "whatsapp";
+  return "email";
+}
+
 // A single campaign thread: a labeled, collapsible block. The burner + a REPLIED/no-reply
 // badge sit in the header so Jose knows at a glance which mailbox ran it and whether the
 // prospect ever answered. Open by default only for the primary (most-recent replied) one.
@@ -924,6 +934,9 @@ function Conversation({ id, themName, themCompany = "", themDomain = "", fallbac
   id: number; themName: string; themCompany?: string; themDomain?: string; fallback?: string; refreshKey?: number;
 }) {
   const [convos, setConvos] = useState<Convo[] | null>(null);
+  // Reading filter, deliberately separate from the composer's channel: answering on
+  // WhatsApp while reading what they said by email is the normal case.
+  const [chanFilter, setChanFilter] = useState<"all" | "email" | "linkedin" | "whatsapp">("all");
   const [uniboxUrl, setUniboxUrl] = useState<string>("");
   const [failed, setFailed] = useState(false);
   const seq = useRef(0);
@@ -961,6 +974,15 @@ function Conversation({ id, themName, themCompany = "", themDomain = "", fallbac
       : <div className="text-sm text-muted-foreground p-2">No email thread found in Instantly.</div>;
   }
   const repliedCount = convos.filter((c) => c.replied).length;
+  // Counts per pipe, so the filter can say how much is behind each one and hide itself
+  // when there is only ever email — most prospects, and no reason to add a control.
+  const perChannel = convos.reduce((acc, c) => {
+    const k = convoChannel(c);
+    acc[k] = (acc[k] ?? 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+  const channels = (["email", "linkedin", "whatsapp"] as const).filter((k) => perChannel[k]);
+  const shown = chanFilter === "all" ? convos : convos.filter((c) => convoChannel(c) === chanFilter);
   return (
     <div className="space-y-2.5">
       <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.12em] text-gold-ink">
@@ -974,8 +996,25 @@ function Conversation({ id, themName, themCompany = "", themDomain = "", fallbac
           </a>
         )}
       </div>
-      {convos.map((c, i) => (
-        <ConvoBlock key={c.eaccount} c={c} themName={themName} themCompany={themCompany}
+      {channels.length > 1 && (
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {(["all", ...channels] as const).map((k) => {
+            const on = chanFilter === k;
+            const src = k === "all" ? null : SRC[k as Src];
+            return (
+              <button key={k} type="button" onClick={() => setChanFilter(k)}
+                className={`inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[11px] transition-colors ${
+                  on ? "border-gold/40 bg-gold/10 text-gold-ink" : "border-border text-muted-foreground hover:border-gold/30"}`}>
+                {src && <Favicon domain={src.logo} label={src.name} size={12} />}
+                {k === "all" ? "All" : SRC[k as Src].name}
+                <span className="tabular-nums text-subtle">{k === "all" ? convos.length : perChannel[k]}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {shown.map((c, i) => (
+        <ConvoBlock key={`${c.channel}-${c.eaccount}`} c={c} themName={themName} themCompany={themCompany}
           themDomain={themDomain} defaultOpen={i === 0} />
       ))}
     </div>
