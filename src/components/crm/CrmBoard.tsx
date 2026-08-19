@@ -117,7 +117,8 @@ type Detail = Card & {
   build_published: boolean;
   build_first_opened_at: string | null;
   build_last_opened_at: string | null;
-  build_open_count: number;
+  build_open_count: number;      // the prospect's opens
+  build_any_open_count?: number; // every visit including our own previews
   live_channel: string;
   can_send_email: boolean;
   intent_label: string;
@@ -373,6 +374,15 @@ function CompanyAvatar({ logo, domain, label, channelLogo, channelName, tint, si
       )}
     </span>
   );
+}
+
+// Our own way in. Every link WE click to look at a magnet carries preview=1, so
+// the beacon files the visit as agency instead of as the prospect opening it.
+// The link we COPY and send must never carry it: that one has to stay exactly the
+// URL the prospect receives, token and all.
+function previewUrl(u?: string | null): string | undefined {
+  if (!u) return undefined;
+  return u + (u.includes("?") ? "&" : "?") + "preview=1";
 }
 
 // Brand favicon for a channel tab (real logos: Gmail / LinkedIn / WhatsApp), phone glyph
@@ -1896,11 +1906,20 @@ function BuildCard({ d, onChanged, autoOptimize = false }: { d: Detail; onChange
     : d.build_published ? { txt: "Published · link live", cls: "text-gold-ink" }
     : { txt: "Built · link not resolving", cls: "text-danger" };
   // The open signal: THE follow-up trigger. "Opened 20m ago" means they are
-  // looking at it right now — reach out while the tab is still warm.
+  // looking at it right now, so reach out while the tab is still warm.
+  //
+  // These counts are the PROSPECT's only. They used to include ours: opening the
+  // link from a phone or from the sent mail carries no agency cookie, so our own
+  // checks were filed as prospect opens, and six of seventeen first opens on
+  // record landed within nine minutes of the link going out. Our previews now say
+  // so in their own words rather than masquerading as a signal.
   const opened = d.build_last_opened_at
-    ? { txt: `Opened ${timeAgo(d.build_last_opened_at)}${(d.build_open_count || 0) > 1 ? ` · ${d.build_open_count} visits` : ""}`,
+    ? { txt: `They opened it ${timeAgo(d.build_last_opened_at)}${(d.build_open_count || 0) > 1 ? ` · ${d.build_open_count} visits` : ""}`,
         hot: Date.now() - new Date(d.build_last_opened_at).getTime() < 3600000 }
-    : d.build_delivered ? { txt: "Not opened yet", hot: false } : null;
+    : d.build_delivered
+      ? { txt: (d.build_any_open_count || 0) > 0 ? "Not opened by them (only our previews)" : "Not opened yet",
+          hot: false }
+      : null;
 
   return (
     <div>
@@ -1912,7 +1931,7 @@ function BuildCard({ d, onChanged, autoOptimize = false }: { d: Detail; onChange
 
       {building ? (
         <div className="flex items-center gap-2 rounded-xl border border-gold/30 bg-gold/8 px-4 py-3 text-sm text-gold-ink">
-          <Loader2 className="w-4 h-4 animate-spin" /> Building… sourcing ~50 real leads + copy (about a minute).
+          <Loader2 className="w-4 h-4 animate-spin" /> Building… researching 10 leads with a dated signal each, plus copy (a couple of minutes).
         </div>
       ) : d.build_url ? (
         <div className="bg-card border border-border rounded-xl p-4 space-y-3">
@@ -1936,7 +1955,7 @@ function BuildCard({ d, onChanged, autoOptimize = false }: { d: Detail; onChange
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <a href={d.build_url} target="_blank" rel="noreferrer"
+            <a href={previewUrl(d.build_url)} target="_blank" rel="noreferrer"
               className="inline-flex items-center gap-1.5 rounded-lg bg-gold/10 border border-gold/40 px-3 py-2 text-sm text-gold-ink hover:bg-gold/15 transition-colors">
               Open the Build <ExternalLink className="w-3.5 h-3.5" />
             </a>
@@ -2636,7 +2655,7 @@ function DealRail({ d, both, reload }: { d: Detail; both: () => void; reload: (f
           <div className="mb-2 space-y-1.5">
             <div className="flex items-center gap-2 text-[12px]">
               <span style={{ color: build.c }}>● {build.t}</span>
-              {d.build_url && <a href={d.build_url} target="_blank" rel="noreferrer" className="ml-auto text-gold-ink hover:underline shrink-0">Open</a>}
+              {d.build_url && <a href={previewUrl(d.build_url)} target="_blank" rel="noreferrer" className="ml-auto text-gold-ink hover:underline shrink-0">Open</a>}
             </div>
             {/* The whole link, readable. It is what gets pasted into the reply, so
                 hiding it behind a truncated slug meant opening the Build to read
@@ -3120,7 +3139,7 @@ function BoardCard({ r, onOpen }: { r: Card; onOpen: (id: number) => void }) {
         <TileAction href={r.phone ? `tel:${r.phone.replace(/[^\d+]/g, "")}` : undefined} active={!!r.phone} title="Call" color="#e6e6e6"><Phone className="w-3.5 h-3.5" /></TileAction>
         <TileAction href={waHref} active={!!r.phone} title="WhatsApp" color="#25D366"><MessageCircle className="w-3.5 h-3.5" /></TileAction>
         <TileAction href={r.linkedin_url || liHref} active={!!r.has_linkedin} title="LinkedIn profile" color="#0A66C2"><Link2 className="w-3.5 h-3.5" /></TileAction>
-        <TileAction href={r.build_url || undefined} active={!!r.build_url} title={r.build_delivered ? "Build delivered — open" : "Build ready — open"} color={r.build_delivered ? "#26D07C" : "#FFD60A"}><Magnet className="w-3.5 h-3.5" /></TileAction>
+        <TileAction href={previewUrl(r.build_url)} active={!!r.build_url} title={r.build_delivered ? "Build delivered — open" : "Build ready — open"} color={r.build_delivered ? "#26D07C" : "#FFD60A"}><Magnet className="w-3.5 h-3.5" /></TileAction>
         {r.build_delivered && <span className="text-[9px] text-signal-ink ml-0.5" title="Build delivered to prospect">sent</span>}
       </div>
     </div>
@@ -3169,7 +3188,7 @@ function TodoRow({ r, onOpen, onChanged }: { r: Card; onOpen: (id: number) => vo
         <TileAction href={r.phone ? `tel:${r.phone.replace(/[^\d+]/g, "")}` : undefined} active={!!r.phone} title="Call" color="#e6e6e6"><Phone className="w-3.5 h-3.5" /></TileAction>
         <TileAction href={waHref} active={!!r.phone} title="WhatsApp" color="#25D366"><MessageCircle className="w-3.5 h-3.5" /></TileAction>
         <TileAction href={r.linkedin_url || (r.name ? linkedinSearchUrl(r.name, r.company) : undefined)} active={!!r.has_linkedin} title="LinkedIn" color="#0A66C2"><Link2 className="w-3.5 h-3.5" /></TileAction>
-        <TileAction href={r.build_url || undefined} active={!!r.build_url} title="Build" color={r.build_delivered ? "#26D07C" : "#FFD60A"}><Magnet className="w-3.5 h-3.5" /></TileAction>
+        <TileAction href={previewUrl(r.build_url)} active={!!r.build_url} title="Build" color={r.build_delivered ? "#26D07C" : "#FFD60A"}><Magnet className="w-3.5 h-3.5" /></TileAction>
       </div>
       <button onClick={done} disabled={busy} title="Mark this step done — logs the touch and passes the ball to them"
         className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-signal/40 px-2.5 py-1.5 text-xs text-signal-ink hover:bg-signal/10 disabled:opacity-40 transition-colors">

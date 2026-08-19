@@ -55,10 +55,13 @@ export default async function WorkspaceLayout({
 
   return (
     <div className="w-full">
-      {/* Open tracking, magnets only: the beacon fires client-side (past any ISR
-          cache) and the API route drops agency visits, so only the prospect's
-          own opens reach the CRM card. */}
-      {kind === "magnet" && mode !== "agency" && <VisitBeacon slug={slug} />}
+      {/* Open tracking, magnets only. The beacon fires client-side (past any ISR
+          cache) and the route ATTRIBUTES the visit rather than dropping it: our
+          own previews are recorded as agency, the delivered link's token marks
+          the prospect, anything else is unknown. It renders for agency sessions
+          too now, because "Jose looked at it" is worth knowing and is only
+          misleading when it is silently filed as the prospect. */}
+      {kind === "magnet" && <VisitBeacon slug={slug} />}
       {demo && <DemoBanner name={ws.name} />}
       {/* Mobile: column (sticky top bar above content). Desktop: original row. */}
       <div className="flex flex-col lg:flex-row lg:gap-6 lg:items-start">
