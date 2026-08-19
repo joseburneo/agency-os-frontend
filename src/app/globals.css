@@ -289,6 +289,8 @@ code, kbd, pre, samp {
    re-colours all 31 token usages in the sidebar at once. Restyling them one by
    one would have meant finding the thirty-second next time someone adds a row. */
 .rail {
+  position: relative;
+  isolation: isolate;
   background: var(--rail);
   color: var(--rail-foreground);
   --foreground: var(--rail-foreground);
@@ -309,6 +311,22 @@ code, kbd, pre, samp {
   --signal-ink: #26D07C;
   --accent: rgba(255, 214, 10, 0.14);
   --accent-foreground: #FFD60A;
+}
+
+/* The constellation paints behind the rail's contents. Lifting the siblings here
+   rather than adding a wrapper keeps the sidebar markup untouched: an absolutely
+   positioned canvas would otherwise paint OVER in-flow content in the same
+   stacking context, and the nav would end up under the stars. */
+.rail > .rail-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.9;
+}
+.rail > *:not(.rail-bg) {
+  position: relative;
+  z-index: 1;
 }
 
 /* Terminal panels: one neutral hairline, flat. No glass, no heavy shadow. */

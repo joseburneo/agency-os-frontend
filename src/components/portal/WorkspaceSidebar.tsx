@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { RailConstellation } from "@/components/portal/RailConstellation";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useState, useEffect } from "react";
 import {
@@ -413,6 +414,7 @@ export function WorkspaceSidebar({ slug, ws, workspaces, lists = [], demo = fals
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
+        <RailConstellation />
         <div className="flex items-center justify-between">
           {isAgency ? (
             <Link
@@ -468,6 +470,7 @@ export function WorkspaceSidebar({ slug, ws, workspaces, lists = [], demo = fals
         )}
       >
         {/* Top row: back to agency (expanded) + collapse toggle */}
+        <RailConstellation />
         <div className={cn("flex items-center", collapsed ? "justify-center" : "justify-between")}>
           {isAgency && !collapsed && (
             <Link

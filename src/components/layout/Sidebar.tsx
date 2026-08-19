@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { RailConstellation } from "@/components/portal/RailConstellation";
 import { usePathname } from "next/navigation";
 import { LayoutGrid, BookOpen } from "lucide-react";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
@@ -25,6 +26,7 @@ export function Sidebar() {
     // the nav below keeps using text-foreground and bg-secondary and simply lands
     // on the navy versions.
     <aside className="rail hidden md:flex w-[60px] h-screen border-r border-rail-border flex-col items-center shrink-0 py-4">
+      <RailConstellation />
       {/* logomark */}
       <Link href="/" aria-label="Luxvance" className="mb-6 text-lg font-bold tracking-tight text-foreground">
         L<span className="text-gold-ink">V</span>
