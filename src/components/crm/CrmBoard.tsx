@@ -2742,6 +2742,7 @@ function FoldSection({ id, title, children, defaultOpen = true }: {
 }
 
 function DealRail({ d, both, reload, onChannel }: { d: Detail; both: () => void; reload: (f?: boolean) => void; onChannel: (ch: Chan) => void }) {
+  const [editContact, setEditContact] = useState(false);
   // Agency only — see CanBuildCtx. A client sees the rest of the rail unchanged.
   const canBuild = useContext(CanBuildCtx);
   const [tools, setTools] = useState(false);
@@ -2862,7 +2863,19 @@ function DealRail({ d, both, reload, onChannel }: { d: Detail; both: () => void;
           here ONCE, as a real link; the phone lives here too. Reading someone and
           reaching them are no longer two separate rails. */}
       <div>
-        <div className="text-[10px] uppercase tracking-[0.16em] text-subtle font-semibold mb-2">Contact</div>
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[10px] uppercase tracking-[0.16em] text-subtle font-semibold">Contact</span>
+          <button type="button" onClick={() => setEditContact((v) => !v)}
+            title={editContact ? "Stop editing" : "Edit every contact field"}
+            className="inline-flex items-center gap-1 text-[10.5px] text-muted-foreground hover:text-gold-ink transition-colors">
+            <PenLine className="w-3 h-3" /> {editContact ? "Done" : "Edit"}
+          </button>
+        </div>
+        {editContact ? (
+          <div className="rounded-lg border border-gold/30 bg-card p-3">
+            <ContactEditor d={d} onDone={() => { setEditContact(false); reload(true); }} />
+          </div>
+        ) : (
         <div className="rounded-lg border border-border bg-card overflow-hidden">
           {/* identity */}
           <div className="px-3 py-2.5">
@@ -2978,6 +2991,7 @@ function DealRail({ d, both, reload, onChannel }: { d: Detail; both: () => void;
             <ContactActions d={d} onChanged={() => reload(true)} compact />
           </div>
         </div>
+        )}
       </div>
 
       <div>
