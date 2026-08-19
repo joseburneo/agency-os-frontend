@@ -443,8 +443,20 @@ export function WorkspaceSidebar({ slug, ws, workspaces, lists = [], demo = fals
       {/* ---- Desktop rail (lg and up): the original sticky collapsible aside ---- */}
       <aside
         className={cn(
-          "rail rounded-2xl p-3 shrink-0 self-start sticky top-4 hidden lg:flex flex-col gap-4 transition-[width] duration-200",
-          collapsed ? "w-[72px]" : "w-[248px]"
+          // A rail runs the height of the screen. As a rounded card it ended
+          // partway down the page with the cream showing under it, which reads as
+          // an orphaned panel rather than navigation.
+          //
+          // It lives inside <main>, which owns the page padding and the scroll, so
+          // it cancels that padding with negative margins on the lg breakpoint it
+          // appears at (lg:p-8 -> lg:-my-8 lg:-ml-8) and takes the full viewport
+          // height with its own scroll. Moving it out to the body would mean
+          // teaching the root layout about slugs, which is a worse trade than four
+          // margin utilities that undo exactly one known padding.
+          "rail shrink-0 sticky top-0 h-screen overflow-y-auto overscroll-contain",
+          "hidden lg:flex flex-col gap-4 px-3 py-6 lg:-my-8 lg:-ml-8",
+          "border-r border-rail-border transition-[width] duration-200",
+          collapsed ? "w-[76px]" : "w-[264px]"
         )}
       >
         {/* Top row: back to agency (expanded) + collapse toggle */}
