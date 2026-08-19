@@ -83,7 +83,12 @@ export const DEMO_MODULES: ModuleKey[] = ["dashboard", "prospecting", "target-li
 // back. The wall is at the buy, not at the search — the backend refuses to
 // export for kind='magnet' — so the demo can feel the product at exactly the
 // moment it is most persuasive and still cannot walk off with a list.
-export const MAGNET_MODULES: ModuleKey[] = ["dashboard", "prospecting", "target-lists", "library"];
+// CRM joined the set on 2026-08-19. It is the module that IS the product, and the
+// prospect had never seen it: "your team would work in here" was a promise instead
+// of a demonstration. It is only safe to offer because it is populated — the
+// magnet's own ten leads, in the real Cold/MQL/SQL vocabulary — since an empty tab
+// reads as an unfinished product, which is exactly why the others stay out.
+export const MAGNET_MODULES: ModuleKey[] = ["dashboard", "prospecting", "target-lists", "crm", "library"];
 
 // Per-magnet extras: a magnet that has advanced past "gift" into a live deal can
 // earn additional modules (e.g. the proposal delivered as a Client Success
