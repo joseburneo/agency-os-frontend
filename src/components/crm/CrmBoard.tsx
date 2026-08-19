@@ -835,6 +835,17 @@ const FILTER_BRAND: Record<string, { name: string; logo?: string }> = {
 // already, reach that stays invisible if you have to go looking for it.
 function LinkedInStatus({ d }: { d: Detail }) {
   const st = d.linkedin?.state ?? "unknown";
+  // The weekly budget lives here, beside the state, and not only inside the composer.
+  // Jose's reason: "so I am conscious of who I send to instead of hitting the button
+  // blindly." A limit you have to open a channel tab to see is a limit nobody reads.
+  const ws = useContext(WorkspaceCtx);
+  const [q, setQ] = useState<{ remaining: number; cap: number } | null>(null);
+  useEffect(() => {
+    fetch(`${API}/api/crm/linkedin/status${ws ? `?workspace=${encodeURIComponent(ws)}` : ""}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (j?.quota) setQ(j.quota); })
+      .catch(() => {});
+  }, [ws]);
   const look = {
     connected:     { text: "Connected · you can message", cls: "text-signal-ink", dot: "bg-signal" },
     invited:       { text: d.linkedin?.invited_at ? `Invited ${fmtDate(d.linkedin.invited_at)} · waiting` : "Invitation pending", cls: "text-gold-ink", dot: "bg-gold" },
@@ -842,10 +853,18 @@ function LinkedInStatus({ d }: { d: Detail }) {
     unknown:       { text: "No LinkedIn profile on file", cls: "text-subtle", dot: "bg-subtle/50" },
   }[st];
   return (
-    <div className="flex items-center gap-1.5 text-[11px]">
-      <Favicon domain="linkedin.com" size={12} className={st === "unknown" ? "opacity-30 grayscale" : ""} />
-      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${look.dot}`} />
-      <span className={look.cls}>{look.text}</span>
+    <div className="flex flex-col gap-0.5">
+      <div className="flex items-center gap-1.5 text-[11px]">
+        <Favicon domain="linkedin.com" size={12} className={st === "unknown" ? "opacity-30 grayscale" : ""} />
+        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${look.dot}`} />
+        <span className={look.cls}>{look.text}</span>
+      </div>
+      {q && (st === "not_connected" || st === "invited") && (
+        <span className={`pl-[18px] text-[10.5px] tabular-nums ${q.remaining <= 10 ? "text-gold-ink" : "text-subtle"}`}
+          title="Our own weekly limit, set at half of LinkedIn's real ceiling. LinkedIn publishes no remaining-invitations figure.">
+          {q.remaining} of {q.cap} invitations left this week · our limit
+        </span>
+      )}
     </div>
   );
 }
@@ -1181,12 +1200,12 @@ function useComposer(d: Detail, onSent: () => void) {
                                            messages_this_week?: number } | null>(null);
   const ws = useContext(WorkspaceCtx);
   useEffect(() => {
-    if (chan !== "linkedin" || liQuota) return;
+    if (liQuota) return;
     fetch(`${API}/api/crm/linkedin/status${ws ? `?workspace=${encodeURIComponent(ws)}` : ""}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => { if (j?.quota) setLiQuota(j.quota); })
       .catch(() => {});
-  }, [chan, liQuota, ws]);
+  }, [liQuota, ws]);
   const [drafts, setDrafts] = useState<Record<Chan, string>>({ email: "", linkedin: "", whatsapp: "", call: "" });
   const [drafting, setDrafting] = useState(false);
   const [sending, setSending] = useState(false);
@@ -1739,7 +1758,12 @@ function Composer({ c }: { c: ComposerCtl }) {
   // Stay expanded while there's a draft, while drafting, and right after a send/failure so the
   // "Sent · cadence advanced" confirmation is visible (send clears the text, which would
   // otherwise collapse the box in the auto-drafted flow before the user sees the result).
-  const expanded = open || !!text.trim() || drafting || sending || !!sent;
+  // Also expanded when the only useful action on this channel is a button rather than a
+  // message. On LinkedIn with no connection yet the action row IS the interface, and
+  // collapsing it hid the Send invitation button behind a click into a box nobody had a
+  // reason to click.
+  const needsAction = chan === "linkedin" && d.linkedin?.state === "not_connected";
+  const expanded = open || needsAction || !!text.trim() || drafting || sending || !!sent;
 
   return (
     <div className="border border-border rounded-xl bg-popover/95 p-4 space-y-2.5">
