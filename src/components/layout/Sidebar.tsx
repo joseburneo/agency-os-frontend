@@ -25,7 +25,7 @@ export function Sidebar() {
     // between two products. `rail` re-points the semantic tokens inside itself, so
     // the nav below keeps using text-foreground and bg-secondary and simply lands
     // on the navy versions.
-    <aside className="rail hidden md:flex w-[60px] h-screen border-r border-rail-border flex-col items-center shrink-0 py-4">
+    <aside className="rail relative hidden md:flex w-[60px] h-screen border-r border-rail-border flex-col items-center shrink-0 py-4">
       <RailConstellation />
       {/* logomark */}
       <Link href="/" aria-label="Luxvance" className="mb-6 text-lg font-bold tracking-tight text-foreground">

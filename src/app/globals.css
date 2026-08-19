@@ -289,7 +289,11 @@ code, kbd, pre, samp {
    re-colours all 31 token usages in the sidebar at once. Restyling them one by
    one would have meant finding the thirty-second next time someone adds a row. */
 .rail {
-  position: relative;
+  /* NO position here. It used to say `position: relative` so the constellation had
+     something to anchor to, and it silently beat the `fixed` utility on the
+     desktop rail: same specificity, and this rule ships later, so the rail
+     detached from the viewport and floated back into the page. The elements that
+     need a containing block declare it themselves. */
   isolation: isolate;
   background: var(--rail);
   color: var(--rail-foreground);
