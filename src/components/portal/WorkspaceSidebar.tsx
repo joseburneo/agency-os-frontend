@@ -7,7 +7,7 @@ import { useState, useEffect } from "react";
 import {
   LayoutDashboard, Target, Mail, Brain, ChevronsUpDown, ArrowLeft, Check,
   Settings, LogOut, PanelLeftClose, PanelLeftOpen, ShieldBan, Route, Menu, X,
-  Flame, FileText, Radar,
+  Flame, FileText, Snowflake,
 } from "lucide-react";
 import { cn, Linkedin } from "./ui";
 import { CompanyMark } from "./CompanyMark";
@@ -24,6 +24,26 @@ type NavItem = {
   indent?: boolean; // a sub-item under its parent (the individual lists)
 };
 type NavGroup = { group: string; items: NavItem[] };
+
+// Brand marks for the two sourcing routes. LinkedIn is where people come from,
+// Google Maps is where local businesses do, and the logo says which faster than
+// any generic radar glyph. They take className so they drop into NavItem.icon
+// beside the lucide icons without special-casing the renderer.
+function LinkedInMark({ className }: { className?: string }) {
+  return <Linkedin className={className} width={16} height={16} />;
+}
+function MapsMark({ className }: { className?: string }) {
+  return (
+    <img
+      src="https://www.google.com/s2/favicons?domain=maps.google.com&sz=64"
+      alt=""
+      width={15}
+      height={15}
+      className={cn("rounded-[3px]", className)}
+    />
+  );
+}
+
 type WsLite = { slug: string; name: string; accent: string; kind?: string; domain?: string; isAgency?: boolean };
 type ListLite = { key: string; name: string; count: number };
 
@@ -60,37 +80,52 @@ function buildNav(w: Workspace | null, enabled: Set<string>, slug: string, lists
   }));
   const groups: NavGroup[] = [
     {
+      // Where you land and what the agents know. Both are read constantly and
+      // belong to no pipeline, so they lead without a header (Jose, 2026-08-19).
       group: "",
       items: [
         { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-        { key: "crm", label: "Opportunities", icon: Flame, badge: w && w.warmLeads > 0 ? String(w.warmLeads) : undefined },
         // "<Client> Brain" — the client's name owns the module (Jose, 2026-07-25):
         // Arco Irish Brain, Kcal Brain. The agent's editable memory, not a "library".
         { key: "library", label: w?.name ? `${w.name} Brain` : "Brain", icon: Brain },
-        { key: "roadmap", label: "Client Success Roadmap", icon: Route },
-        { key: "proposal", label: "Commercial Proposal", icon: FileText },
       ],
     },
     {
-      group: "Targeted lists",
+      // Two pipelines, one CRM. The split is not temperature, it is who opens the
+      // conversation: hot is reactive (they wrote, you answer), cold is proactive
+      // (you write first, by hand). A cold contact crosses into hot on its first
+      // reply, which is why they are siblings and not separate products.
+      group: "CRM",
       items: [
-        // Find Prospects sits ABOVE the finished lists on purpose: it is where a
-        // list comes from, so the menu reads in the order the work happens.
-        { key: "prospecting", label: "Find Prospects", icon: Radar },
-        { key: "target-lists", label: "Targeted Cold Leads", icon: Target, badge: w && w.coldLeads > 0 ? w.coldLeads.toLocaleString() : undefined },
+        { key: "crm", label: "Hot Pipeline", icon: Flame, badge: w && w.warmLeads > 0 ? String(w.warmLeads) : undefined },
+        { key: "cold", label: "Cold Pipeline", icon: Snowflake },
+      ],
+    },
+    {
+      group: "Prospecting",
+      items: [
+        { key: "prospecting", label: "Find Prospects", icon: LinkedInMark },
+        { key: "local", label: "Find Local Businesses", icon: MapsMark },
+      ],
+    },
+    {
+      group: "Campaigns",
+      items: [
+        { key: "target-lists", label: "Target Lists", icon: Target, badge: w && w.coldLeads > 0 ? w.coldLeads.toLocaleString() : undefined },
         ...listItems,
-      ],
-    },
-    {
-      group: "Cold outreach",
-      items: [
         { key: "email", label: "Email Campaigns", icon: Mail },
         { key: "linkedin", label: "LinkedIn Campaigns", icon: Linkedin },
       ],
     },
     {
+      // Reference and guardrails. Consulted, not worked, so they sit below the
+      // daily surfaces and above Settings, which is where you change things.
       group: "",
-      items: [{ key: "blocklist", label: "Blocklist", icon: ShieldBan }],
+      items: [
+        { key: "roadmap", label: "Client Success Roadmap", icon: Route },
+        { key: "proposal", label: "Commercial Proposal", icon: FileText },
+        { key: "blocklist", label: "Blocklist", icon: ShieldBan },
+      ],
     },
   ];
   // Per-workspace visibility: keep only enabled modules, drop now-empty groups.

@@ -26,7 +26,9 @@ const RETIRED: ModuleKey[] = ["cadence", "whatsapp", "content", "linkedin-ads", 
 export const ALL_MODULES: ModuleKey[] = [
   "dashboard",
   "crm",
+  "cold",
   "prospecting",
+  "local",
   "target-lists",
   "email",
   "linkedin",
@@ -43,14 +45,14 @@ const OVERRIDES: Record<string, ModuleKey[]> = {
   // from the VIP lists (no LinkedIn sequencer running), so the LinkedIn Campaigns
   // module stays hidden until one exists — an empty tab reads as a broken product
   // (Jose, 2026-08-03).
-  "arco-irish": ["dashboard", "crm", "target-lists", "email", "library", "blocklist", "roadmap"],
+  "arco-irish": ["dashboard", "crm", "cold", "target-lists", "email", "library", "blocklist", "roadmap"],
 
   // Kcal and Connect Resources — email-led outbound. Same shape as Arco but without
   // LinkedIn: both ran on email only, and an empty LinkedIn tab reads as a broken
   // product rather than a channel they have not switched on. Add "linkedin" back the
   // day either one starts a LinkedIn sequence.
-  "kcal": ["dashboard", "crm", "target-lists", "email", "library", "blocklist", "roadmap"],
-  "connect-resources": ["dashboard", "crm", "target-lists", "email", "library", "blocklist", "roadmap"],
+  "kcal": ["dashboard", "crm", "cold", "target-lists", "email", "library", "blocklist", "roadmap"],
+  "connect-resources": ["dashboard", "crm", "cold", "target-lists", "email", "library", "blocklist", "roadmap"],
 };
 
 export function enabledModules(slug: string): ModuleKey[] {

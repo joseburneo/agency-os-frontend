@@ -6,7 +6,13 @@
 
 export type ModuleKey =
   | "dashboard"
+  // The CRM is two pipelines now: "crm" is the hot one (they replied, we answer)
+  // and "cold" is the manual one (we open the conversation, one at a time).
+  | "cold"
   | "prospecting"
+  // Local businesses come from Google Maps via Apify, not from LinkedIn. Different
+  // source, different avatar, so its own entry rather than a mode of the other.
+  | "local"
   | "target-lists"
   | "email"
   | "linkedin"
