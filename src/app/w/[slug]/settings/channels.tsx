@@ -30,7 +30,10 @@ type Account = {
   status: string;
 };
 
-type Info = { accounts: Account[]; configured: boolean };
+// `null` = not asked yet; `"down"` = asked and got no answer. Those are different
+// things and used to render identically — disabled buttons and no words — which
+// reads as a dead feature rather than a service that is briefly unreachable.
+type Info = { accounts: Account[]; configured: boolean } | "down" | null;
 
 type Provider = { key: string; name: string; domain: string };
 
@@ -97,7 +100,7 @@ function Mark({ domain, name, size = 22 }: { domain: string; name: string; size?
 }
 
 export function ChannelConnect({ slug }: { slug: string }) {
-  const [info, setInfo] = useState<Info | null>(null);
+  const [info, setInfo] = useState<Info>(null);
   const [busy, setBusy] = useState("");
   const [picking, setPicking] = useState("");
   const [err, setErr] = useState("");
@@ -106,8 +109,8 @@ export function ChannelConnect({ slug }: { slug: string }) {
   const load = useCallback(() => {
     fetch(`/api/crm/channels?workspace=${encodeURIComponent(slug)}`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((j) => setInfo(j ? { accounts: j.accounts ?? [], configured: !!j.configured } : null))
-      .catch(() => setInfo(null));
+      .then((j) => setInfo(j ? { accounts: j.accounts ?? [], configured: !!j.configured } : "down"))
+      .catch(() => setInfo("down"));
   }, [slug]);
 
   useEffect(load, [load]);
@@ -174,10 +177,11 @@ export function ChannelConnect({ slug }: { slug: string }) {
     }
   };
 
+  const ok = info && info !== "down" ? info : null;
   const live = (channel: string) =>
-    (info?.accounts ?? []).filter((a) => a.channel === channel && a.enabled);
+    (ok?.accounts ?? []).filter((a) => a.channel === channel && a.enabled);
 
-  const ready = !!info?.configured;
+  const ready = !!ok?.configured;
 
   return (
     <div className="flex flex-col gap-4">
@@ -221,7 +225,13 @@ export function ChannelConnect({ slug }: { slug: string }) {
         </div>
       )}
 
-      {info && !ready && (
+      {info === "down" && (
+        <div className="rounded-lg border border-gold/25 bg-gold/[0.06] px-3.5 py-2.5 text-[12px] text-foreground">
+          We cannot reach the connection service right now. Nothing is broken on your
+          side — press Refresh in a minute.
+        </div>
+      )}
+      {ok && !ready && (
         <div className="rounded-lg border border-gold/25 bg-gold/[0.06] px-3.5 py-2.5 text-[12px] text-foreground">
           Connecting accounts is not switched on yet. We are on it.
         </div>
