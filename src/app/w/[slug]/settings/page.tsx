@@ -4,12 +4,13 @@ import { getWorkspace } from "@/lib/portal/mock";
 import { loadWorkspaces } from "@/lib/portal/data";
 import { WORKSPACES } from "@/lib/portal/mock";
 import { portalMode } from "@/lib/portal/access";
-import { hasOwnPassword } from "@/lib/portal/auth";
+import { hasOwnPassword, hasUsers, MIN_PASSWORD } from "@/lib/portal/auth";
 import { ModuleHeader, Panel, SectionLabel, Pill } from "@/components/portal/ui";
 
 const ERRORS: Record<string, string> = {
-  short: "Your new password needs at least 6 characters.",
-  badcurrent: "Your current password did not match.",
+  short: `Your new password needs at least ${MIN_PASSWORD} characters.`,
+  badcurrent: "Your email or current password did not match.",
+  email: "Enter the email you sign in with.",
   unauthorized: "You are not signed in to this workspace.",
   save: "Could not save — the credentials column may not be migrated yet.",
 };
@@ -32,6 +33,9 @@ export default async function SettingsPage({
   if (!ws) notFound();
 
   const ownPassword = await hasOwnPassword(slug);
+  // Per-person login (portal_users): the password belongs to a HUMAN, so the form
+  // needs to know which one. The workspace cookie only proves the scope.
+  const perPerson = await hasUsers(slug);
 
   return (
     <div className="flex flex-col gap-7 max-w-2xl">
@@ -66,7 +70,13 @@ export default async function SettingsPage({
           <SectionLabel>Change password</SectionLabel>
         </div>
 
-        {!ownPassword && (
+        {perPerson && mode === "agency" && (
+          <div className="rounded-lg border border-gold/25 bg-gold/[0.06] px-3.5 py-2.5 text-[12px] text-foreground">
+            This workspace signs in per person. To give someone a new password, send them a
+            reset link from the CRM instead of changing it here.
+          </div>
+        )}
+        {!ownPassword && !perPerson && (
           <div className="rounded-lg border border-gold/25 bg-gold/[0.06] px-3.5 py-2.5 text-[12px] text-foreground">
             You are using a temporary password. Set your own below to secure your workspace.
           </div>
@@ -84,7 +94,22 @@ export default async function SettingsPage({
 
         <form method="post" action="/api/account/password" className="flex flex-col gap-3">
           <input type="hidden" name="slug" value={slug} />
-          {mode !== "agency" && (
+          {perPerson && (
+            <label className="flex flex-col gap-1.5">
+              <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                Your email
+              </span>
+              <input
+                type="email"
+                name="email"
+                required
+                autoComplete="username"
+                placeholder="you@company.com"
+                className="h-11 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm text-foreground placeholder:text-subtle outline-none focus:border-gold/50"
+              />
+            </label>
+          )}
+          {(perPerson || mode !== "agency") && (
             <label className="flex flex-col gap-1.5">
               <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
                 {ownPassword ? "Current password" : "Temporary password"}
@@ -104,7 +129,7 @@ export default async function SettingsPage({
               type="password"
               name="new"
               required
-              minLength={6}
+              minLength={MIN_PASSWORD}
               autoComplete="new-password"
               className="h-11 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm text-foreground outline-none focus:border-gold/50"
             />

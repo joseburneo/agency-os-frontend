@@ -2,7 +2,15 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import { AGENCY_COOKIE, wsCookie, scopeToken, parseWsKeys } from "@/lib/portal/gate";
-import { getWorkspaceHash, verifyPassword, setWorkspacePassword } from "@/lib/portal/auth";
+import {
+  getWorkspaceHash,
+  verifyPassword,
+  setWorkspacePassword,
+  hasUsers,
+  verifyUser,
+  setUserPassword,
+  MIN_PASSWORD,
+} from "@/lib/portal/auth";
 
 // Change a workspace's password (self-serve). The requester must already hold
 // that workspace's cookie, or be the agency. The current password is verified
@@ -34,7 +42,21 @@ export async function POST(request: NextRequest) {
   const isThisWs = jar.get(wsCookie(slug))?.value === (await scopeToken(secret, `ws:${slug}`));
   if (!isAgency && !isThisWs) return back(request, slug, "unauthorized");
 
-  if (next.length < 6) return back(request, slug, "short");
+  if (next.length < MIN_PASSWORD) return back(request, slug, "short");
+
+  // A workspace on per-person login verifies at sign-in against portal_users, so
+  // the change has to land THERE. Writing it to workspaces.password_hash (the
+  // legacy shared key) saved happily and locked the person out — the exact way
+  // Paul lost access on 2026-08-20. Identity comes from the email + the current
+  // password, because the workspace cookie carries a scope, not a person.
+  if (await hasUsers(slug)) {
+    const email = String(form.get("email") ?? "").trim();
+    if (!email) return back(request, slug, "email");
+    const user = await verifyUser(slug, email, current);
+    if (!user) return back(request, slug, "badcurrent");
+    const ok = await setUserPassword(user.id, next);
+    return ok ? back(request, slug) : back(request, slug, "save");
+  }
 
   // Non-agency must prove the current password.
   if (!isAgency) {

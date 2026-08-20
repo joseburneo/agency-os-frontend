@@ -117,7 +117,7 @@ export function inviteExpiry(): string {
 export async function redeemInvite(
   token: string,
   password: string,
-): Promise<{ ok: true; email: string } | { ok: false; reason: string }> {
+): Promise<{ ok: true; email: string; slug: string | null } | { ok: false; reason: string }> {
   const sb = db();
   if (!sb) return { ok: false, reason: "no database" };
   if (password.length < MIN_PASSWORD) {
@@ -125,7 +125,7 @@ export async function redeemInvite(
   }
   const { data, error } = await sb
     .from("portal_users")
-    .select("id,email,invite_expires_at,disabled_at")
+    .select("id,email,invite_expires_at,disabled_at,workspaces(slug)")
     .eq("invite_token_hash", await tokenHash(token))
     .maybeSingle();
   if (error || !data) return { ok: false, reason: "This link is not valid." };
@@ -143,7 +143,12 @@ export async function redeemInvite(
     })
     .eq("id", data.id as string);
   if (upErr) return { ok: false, reason: "Could not save the password. Try again." };
-  return { ok: true, email: data.email as string };
+  // The slug travels back so the "Go to sign in" button can point at the person's
+  // OWN workspace gate. Sending them to the bare /gate lands them on the AGENCY
+  // gate, where a client's credentials can never match — which is exactly how
+  // Paul got locked out minutes after setting his password (2026-08-20).
+  const ws = (data as { workspaces?: { slug?: string } | null }).workspaces;
+  return { ok: true, email: data.email as string, slug: ws?.slug ?? null };
 }
 
 // Jose's call (2026-08-05): 8, not 12. These are people we onboard by hand, the
@@ -228,4 +233,59 @@ export async function verifyUser(
     full_name: (data!.full_name as string | null) ?? null,
     role: (data!.role as string) || "client",
   };
+}
+
+/** Sign a client in WITHOUT knowing which workspace they belong to.
+ *
+ *  The bare app.luxvance.com — and the "Go to sign in" button after setting a
+ *  password — both land on the AGENCY gate, which only ever checked agency
+ *  credentials. A client typing a perfectly correct email and password there was
+ *  told they "didn't match", with no way to discover the /w/<slug> URL that would
+ *  have worked. Now the agency gate resolves the person from their email and
+ *  drops them into their own workspace instead.
+ *
+ *  Returns the first workspace whose stored hash verifies. */
+export async function verifyUserAnyWorkspace(
+  email: string,
+  password: string,
+): Promise<{ user: PortalUser; slug: string } | null> {
+  const sb = db();
+  if (!sb) return null;
+  const mail = email.trim().toLowerCase();
+  if (!mail || !password) return null;
+  const { data, error } = await sb
+    .from("portal_users")
+    .select("id, email, full_name, role, password_hash, workspaces!inner(slug)")
+    .eq("email", mail)
+    .not("workspace_id", "is", null)
+    .is("disabled_at", null);
+  if (error || !data?.length) return null;
+  for (const row of data as unknown as Array<{
+    id: string; email: string; full_name: string | null; role: string;
+    password_hash: string | null; workspaces: { slug: string } | null;
+  }>) {
+    const slug = row.workspaces?.slug;
+    if (!slug || !row.password_hash) continue;
+    if (!(await verifyPassword(password, row.password_hash))) continue;
+    void sb.from("portal_users").update({ last_login_at: new Date().toISOString() })
+      .eq("id", row.id).then(() => {}, () => {});
+    return {
+      user: { id: row.id, email: row.email, full_name: row.full_name ?? null, role: row.role || "client" },
+      slug,
+    };
+  }
+  return null;
+}
+
+/** Change one PERSON's password (portal_users), not the workspace's shared one.
+ *  A workspace on per-person login verifies at sign-in against portal_users, so
+ *  writing a change to workspaces.password_hash silently locks the user out. */
+export async function setUserPassword(userId: string, password: string): Promise<boolean> {
+  const sb = db();
+  if (!sb) return false;
+  const { error } = await sb
+    .from("portal_users")
+    .update({ password_hash: await hashPassword(password), password_set_at: new Date().toISOString() })
+    .eq("id", userId);
+  return !error;
 }

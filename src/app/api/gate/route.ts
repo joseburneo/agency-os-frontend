@@ -1,7 +1,14 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { AGENCY_COOKIE, wsCookie, scopeToken, parseWsKeys } from "@/lib/portal/gate";
-import { getWorkspaceHash, verifyPassword, hasUsers, verifyUser, verifyAgencyUser } from "@/lib/portal/auth";
+import {
+  getWorkspaceHash,
+  verifyPassword,
+  hasUsers,
+  verifyUser,
+  verifyAgencyUser,
+  verifyUserAnyWorkspace,
+} from "@/lib/portal/auth";
 
 // Validates a submitted key against the agency password OR the target
 // workspace's key, then sets the matching scope cookie. The agency password
@@ -87,6 +94,20 @@ export async function POST(request: NextRequest) {
     const res = NextResponse.redirect(new URL(next, request.url), { status: 303 });
     res.cookies.set(AGENCY_COOKIE, await scopeToken(secret, "agency"), COOKIE_OPTS);
     return res;
+  }
+
+  // 1b) A CLIENT who landed on the agency gate. The bare app.luxvance.com and the
+  //     "Go to sign in" button after setting a password both send people here, and
+  //     before this branch a client's correct credentials were rejected with no hint
+  //     that /w/<slug> was the URL they needed. Resolve them from their email and
+  //     drop them straight into their own workspace.
+  if (secret && scope === "agency" && email && password) {
+    const hit = await verifyUserAnyWorkspace(email, password);
+    if (hit) {
+      const res = NextResponse.redirect(new URL(`/w/${hit.slug}`, request.url), { status: 303 });
+      res.cookies.set(wsCookie(hit.slug), await scopeToken(secret, `ws:${hit.slug}`), COOKIE_OPTS);
+      return res;
+    }
   }
 
   // 2) This workspace. A client workspace with real users signs in with EMAIL +

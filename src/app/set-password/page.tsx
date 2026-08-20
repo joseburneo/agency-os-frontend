@@ -8,14 +8,19 @@ import { MIN_PASSWORD } from "@/lib/portal/auth";
 export default async function SetPasswordPage({
   searchParams,
 }: {
-  searchParams: Promise<{ t?: string; error?: string; done?: string }>;
+  searchParams: Promise<{ t?: string; error?: string; done?: string; slug?: string }>;
 }) {
-  const { t = "", error, done } = await searchParams;
+  const { t = "", error, done, slug } = await searchParams;
 
   if (done) {
+    // Straight to their OWN workspace gate. Bare /gate is the agency gate, where a
+    // client's credentials cannot match by design.
+    const signIn = slug
+      ? `/gate?scope=${encodeURIComponent(slug)}&next=${encodeURIComponent(`/w/${slug}`)}`
+      : "/gate";
     return (
       <Shell title="Password saved" blurb="You can sign in with your email and your new password.">
-        <a href="/gate"
+        <a href={signIn}
           className="mt-1 grid h-11 place-items-center rounded-lg bg-gold text-sm font-bold text-ink-inverse transition-colors hover:bg-gold-hi">
           Go to sign in
         </a>

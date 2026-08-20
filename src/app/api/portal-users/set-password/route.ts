@@ -50,5 +50,9 @@ export async function POST(request: NextRequest) {
     note(ip);
     return back(request, token, result.reason);
   }
-  return NextResponse.redirect(new URL("/set-password?done=1", request.url), { status: 303 });
+  const done = new URL("/set-password", request.url);
+  done.searchParams.set("done", "1");
+  // Carry the workspace so the confirmation page can send them to THEIR gate.
+  if (result.slug) done.searchParams.set("slug", result.slug);
+  return NextResponse.redirect(done, { status: 303 });
 }
