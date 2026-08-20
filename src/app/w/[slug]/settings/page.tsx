@@ -1,11 +1,12 @@
 import { notFound } from "next/navigation";
 import { Settings as SettingsIcon, ShieldCheck, KeyRound } from "lucide-react";
 import { getWorkspace } from "@/lib/portal/mock";
-import { loadWorkspaces } from "@/lib/portal/data";
+import { loadWorkspaces, loadWorkspaceKind } from "@/lib/portal/data";
 import { WORKSPACES } from "@/lib/portal/mock";
 import { portalMode } from "@/lib/portal/access";
 import { hasOwnPassword, hasUsers, MIN_PASSWORD } from "@/lib/portal/auth";
 import { ModuleHeader, Panel, SectionLabel, Pill } from "@/components/portal/ui";
+import { ChannelConnect } from "./channels";
 import { PasswordField } from "@/components/portal/PasswordField";
 
 const ERRORS: Record<string, string> = {
@@ -37,13 +38,20 @@ export default async function SettingsPage({
   // Per-person login (portal_users): the password belongs to a HUMAN, so the form
   // needs to know which one. The workspace cookie only proves the scope.
   const perPerson = await hasUsers(slug);
+  // Connections are for paying client workspaces only. 41 of the 46 workspaces are
+  // magnets — a prospect's gift, reachable on the bare link with no password — and
+  // offering one of them a "connect your LinkedIn" button would be asking a stranger
+  // for their session. The backend refuses them outright; this only hides the panel.
+  const canConnect = (await loadWorkspaceKind(slug)) === "client";
 
   return (
     <div className="flex flex-col gap-7 max-w-2xl">
       <ModuleHeader
         icon={SettingsIcon}
         title="Settings"
-        desc={`Manage the ${ws.name} workspace login.`}
+        desc={canConnect
+          ? `Connect your accounts and manage the ${ws.name} login.`
+          : `Manage the ${ws.name} workspace login.`}
       />
 
       {/* Signed-in state */}
@@ -63,6 +71,13 @@ export default async function SettingsPage({
         </div>
         <Pill tone={mode === "agency" ? "gold" : "green"}>{mode === "agency" ? "Agency" : "Client"}</Pill>
       </Panel>
+
+      {/* Connections — LinkedIn, email, WhatsApp */}
+      {canConnect && (
+        <Panel className="p-5">
+          <ChannelConnect slug={slug} />
+        </Panel>
+      )}
 
       {/* Change password */}
       <Panel className="p-5 flex flex-col gap-4">
