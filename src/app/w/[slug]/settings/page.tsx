@@ -6,6 +6,7 @@ import { WORKSPACES } from "@/lib/portal/mock";
 import { portalMode } from "@/lib/portal/access";
 import { hasOwnPassword, hasUsers, MIN_PASSWORD } from "@/lib/portal/auth";
 import { ModuleHeader, Panel, SectionLabel, Pill } from "@/components/portal/ui";
+import { PasswordField } from "@/components/portal/PasswordField";
 
 const ERRORS: Record<string, string> = {
   short: `Your new password needs at least ${MIN_PASSWORD} characters.`,
@@ -110,30 +111,22 @@ export default async function SettingsPage({
             </label>
           )}
           {(perPerson || mode !== "agency") && (
-            <label className="flex flex-col gap-1.5">
-              <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
-                {ownPassword ? "Current password" : "Temporary password"}
-              </span>
-              <input
-                type="password"
-                name="current"
-                required
-                autoComplete="current-password"
-                className="h-11 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm text-foreground outline-none focus:border-gold/50"
-              />
-            </label>
-          )}
-          <label className="flex flex-col gap-1.5">
-            <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">New password</span>
-            <input
-              type="password"
-              name="new"
+            <PasswordField
+              name="current"
+              label={ownPassword ? "Current password" : "Temporary password"}
               required
-              minLength={MIN_PASSWORD}
-              autoComplete="new-password"
-              className="h-11 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm text-foreground outline-none focus:border-gold/50"
+              autoComplete="current-password"
+              invalid={error === "badcurrent"}
             />
-          </label>
+          )}
+          <PasswordField
+            name="new"
+            label="New password"
+            required
+            minLength={MIN_PASSWORD}
+            autoComplete="new-password"
+            invalid={error === "short"}
+          />
           <button
             type="submit"
             className="mt-1 h-11 rounded-lg bg-gold text-sm font-bold text-ink-inverse transition-colors hover:bg-gold-hi self-start px-6"

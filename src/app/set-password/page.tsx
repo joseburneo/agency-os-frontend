@@ -1,5 +1,6 @@
 import { KeyRound } from "lucide-react";
 import { MIN_PASSWORD } from "@/lib/portal/auth";
+import { PasswordField } from "@/components/portal/PasswordField";
 
 // Where an invite / reset link lands. The token stays in the URL only long enough
 // to be posted back with the new password; nothing about the account is revealed
@@ -35,17 +36,13 @@ export default async function SetPasswordPage({
     >
       <form method="post" action="/api/portal-users/set-password" className="flex flex-col gap-3">
         <input type="hidden" name="token" value={t} />
-        <label className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">New password</label>
-        <input
-          type="password" name="password" autoFocus required minLength={MIN_PASSWORD}
-          autoComplete="new-password" placeholder="••••••••"
-          className="h-11 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm text-foreground placeholder:text-subtle outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/40"
+        <PasswordField
+          name="password" label="New password" autoFocus required
+          minLength={MIN_PASSWORD} autoComplete="new-password"
         />
-        <label className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Repeat it</label>
-        <input
-          type="password" name="confirm" required minLength={MIN_PASSWORD}
-          autoComplete="new-password" placeholder="••••••••"
-          className="h-11 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm text-foreground placeholder:text-subtle outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/40"
+        <PasswordField
+          name="confirm" label="Repeat it" required
+          minLength={MIN_PASSWORD} autoComplete="new-password"
         />
         <p className="text-[11px] text-subtle">At least {MIN_PASSWORD} characters.</p>
         {error && <p className="text-[12px] text-red-400">{decodeURIComponent(error)}</p>}

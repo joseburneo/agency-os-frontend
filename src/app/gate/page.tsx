@@ -1,6 +1,7 @@
 import { Lock, ShieldCheck } from "lucide-react";
 import { prettySlug } from "@/lib/portal/gate";
 import { hasUsers } from "@/lib/portal/auth";
+import { PasswordField } from "@/components/portal/PasswordField";
 
 // Scope-aware access gate. Pure server component + HTML form (no client JS).
 // scope="agency" → Jose's command centre; scope=<slug> → that client's portal.
@@ -73,18 +74,14 @@ export default async function GatePage({
               />
             </>
           )}
-          <label className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
-            {isAgency ? "Password or agency key" : withEmail ? "Password" : "Access key"}
-          </label>
-          <input
-            type="password"
+          <PasswordField
             name="password"
+            label={isAgency ? "Password or agency key" : withEmail ? "Password" : "Access key"}
             autoFocus={!withEmail}
             required
             autoComplete={withEmail ? "current-password" : "off"}
             placeholder="••••••••••••"
-            aria-invalid={error ? true : undefined}
-            className="h-11 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm text-foreground placeholder:text-subtle outline-none focus:border-gold/50 focus:ring-1 focus:ring-gold/40"
+            invalid={Boolean(error)}
           />
           {error === "rate" ? (
             <p className="text-[12px] text-red-400">Too many attempts. Wait a few minutes.</p>
