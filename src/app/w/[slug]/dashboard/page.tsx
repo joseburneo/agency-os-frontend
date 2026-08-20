@@ -65,7 +65,11 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
     return {
       ...l,
       n,
-      email: leads.filter((x) => x.hasEmail).length,
+      // Confirmed and catch-all counted apart. Rolling them together would claim
+      // ten confirmed addresses when four of the servers refused to confirm
+      // anything, and the whole point of this list is that the numbers are checkable.
+      email: leads.filter((x) => x.emailQuality === "verified").length,
+      maybe: leads.filter((x) => x.emailQuality === "catch_all").length,
       li: leads.filter((x) => x.linkedin).length,
       ready: leads.filter((x) => x.hasDraft).length,
     };
@@ -264,7 +268,9 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
                       <div className="h-full rounded-full bg-signal" style={{ width: `${pct}%` }} />
                     </div>
                     <div className="mt-1 text-[10px] text-muted-foreground tabular-nums">
-                      {l.email.toLocaleString()} email · {l.li.toLocaleString()} LinkedIn
+                      {l.email.toLocaleString()} confirmed
+                      {l.maybe > 0 && ` · ${l.maybe.toLocaleString()} catch-all`} ·{" "}
+                      {l.li.toLocaleString()} LinkedIn
                     </div>
                   </div>
                   <div className="w-16 text-right shrink-0">

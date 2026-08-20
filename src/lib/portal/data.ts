@@ -109,10 +109,14 @@ async function leadCountFor(wsRow: Record<string, unknown>): Promise<number> {
 }
 
 // The columns the magnet workspace renders. Addresses are back (Jose, 2026-08-19):
-// ten verified ones cost about $0.28, and withholding them protected an asset worth
-// cents while making the whole gift read as a teaser. Only a VERIFIED address is
-// rendered, which is what email_status records: bouncing the prospect's first send
-// would be the worst possible demonstration from a deliverability company.
+// ten of them cost about $0.28, and withholding them protected an asset worth cents
+// while making the whole gift read as a teaser.
+// Since 2026-08-20 email_status carries a TIER rather than a pass mark. Demanding a
+// confirmed address killed 78% of one build's pool, because Allegro, Vinted and Too
+// Good To Go run catch-all mail: the addresses were fine, the servers just refuse to
+// say so. A labelled catch-all beats a deleted lead, and a lead with no address at
+// all still ships on LinkedIn, which is a real channel in this platform.
+
 const MAGNET_COLS =
   "id,full_name,role,company,sector,domain,country,linkedin_url,linkedin_company," +
   "why_now,why_now_url,why_now_date,email,email_status,status," +
@@ -154,7 +158,16 @@ async function loadMagnetLists(
   const leads: Lead[] = rows.map((r) => {
     const subject = String(r.email_subject ?? "");
     const body = String(r.email_copy ?? "");
-    const verifiedEmail = r.email_status ? String(r.email ?? "") : "";
+    // Three tiers, not two (Jose, 2026-08-20). "verified" is MillionVerifier ok.
+    // "catch_all" is a server that confirms nobody, which is most large European
+    // companies; it ships WITH a label instead of being deleted. Anything else
+    // means no address, and the lead still ships on LinkedIn alone.
+    // The older builds wrote "db" and "million_verifier" here, both of which came
+    // through the full MV to BounceBan waterfall, so they read as verified.
+    const status = String(r.email_status ?? "");
+    const quality: Lead["emailQuality"] | undefined =
+      status === "catch_all" ? "catch_all" : status ? "verified" : undefined;
+    const verifiedEmail = quality ? String(r.email ?? "") : "";
     return {
       id: String(r.id),
       listId: listId(r),
@@ -163,10 +176,11 @@ async function loadMagnetLists(
       company: String(r.company ?? ""),
       sector: String(r.sector ?? ""),
       domain: String(r.domain ?? ""),
-      // Only a verified address is shown. An unverified one is treated exactly
-      // like no address at all rather than displayed with a caveat: the prospect
-      // will paste whatever is on screen into a real send.
+      // The address is shown with how sure we are of it, never bare. The prospect
+      // will paste whatever is on screen into a real send, so the label has to
+      // travel with the address rather than sit in a footnote.
       emailDisplay: verifiedEmail,
+      emailQuality: quality,
       linkedin: Boolean(r.linkedin_url),
       linkedinUrl: (r.linkedin_url as string | null) || undefined,
       linkedinCompany: (r.linkedin_company as string | null) || undefined,

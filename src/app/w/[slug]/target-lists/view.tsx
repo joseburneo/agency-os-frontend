@@ -208,6 +208,33 @@ function WriteOutreach({ listId, pending }: { listId: string; pending: number })
  *  the card's whole job is a conversation. Showing a button that can only 409 is
  *  worse than showing why it is not there.
  */
+/** 0 confirmed, 1 catch-all, 2 no address. Sorts the strongest rows to the top. */
+function emailRank(l: Lead): number {
+  if (l.emailQuality === "verified") return 0;
+  if (l.emailQuality === "catch_all") return 1;
+  return 2;
+}
+
+/** How sure we are of an address, next to the address itself.
+ *
+ *  A catch-all server accepts every address and confirms none, which is how most
+ *  large European companies are set up. The address is almost certainly right and
+ *  we will not say that it is confirmed, so it travels with the caveat attached.
+ *  Hiding the caveat in a footnote would be worse than not showing the address:
+ *  whoever reads this row is about to paste it into a real send.
+ */
+function EmailTier({ quality }: { quality?: "verified" | "catch_all" }) {
+  if (quality !== "catch_all") return null;
+  return (
+    <span
+      className="shrink-0 text-[9px] uppercase tracking-[0.10em] text-warn"
+      title="Their mail server accepts every address and will not confirm any single one. The address is very likely right, but we cannot prove it. LinkedIn is the safer first touch here."
+    >
+      catch-all
+    </span>
+  );
+}
+
 function WorkLeadButton({ leadId, slug, hasEmail }: { leadId: string; slug: string; hasEmail: boolean }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -343,8 +370,13 @@ export function TargetListsView({
       .filter((l) =>
         !term ? true : [l.name, l.company, l.sector, l.role, l.hrLeadName ?? ""].some((f) => f.toLowerCase().includes(term))
       )
-      // Well-ordered: ready-to-send first, then have-email, then the rest.
-      .sort((a, b) => Number(b.hasDraft) - Number(a.hasDraft) || Number(b.hasEmail) - Number(a.hasEmail));
+      // Well-ordered: ready-to-send first, then by how sure we are of the address
+      // (confirmed, then catch-all, then LinkedIn only). Whoever opens this table
+      // reads three rows and decides, so the three strongest have to be on top.
+      .sort(
+        (a, b) =>
+          Number(b.hasDraft) - Number(a.hasDraft) || emailRank(a) - emailRank(b)
+      );
   }, [data.leads, activeList, q]);
 
   // Copy with the old portal's graceful fallback: clipboard API when available,
@@ -600,8 +632,19 @@ export function TargetListsView({
                   </td>
                   <td className="px-4 py-3">
                     <div className="text-foreground">{l.name}</div>
-                    <div className="text-[11px] text-muted-foreground font-mono">
-                      {l.hasEmail ? l.emailDisplay : "—"}
+                    <div className="text-[11px] text-muted-foreground font-mono flex items-center gap-1.5">
+                      {l.hasEmail ? (
+                        <>
+                          <span className="truncate">{l.emailDisplay}</span>
+                          <EmailTier quality={l.emailQuality} />
+                        </>
+                      ) : l.linkedin ? (
+                        <span className="text-[10px] uppercase tracking-[0.10em] text-info">
+                          LinkedIn
+                        </span>
+                      ) : (
+                        "—"
+                      )}
                     </div>
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">{l.role}</td>

@@ -55,6 +55,11 @@ type Card = {
   has_build: boolean;
   build_url: string;
   build_status: string | null;
+  // Why the last build ended the way it did, and the funnel behind it. Without
+  // these, a failed build and a prospect who never had one looked identical on
+  // reload: both rendered "No Build yet.".
+  build_error?: string;
+  build_stats?: Record<string, number> | null;
   build_delivered: boolean;
   // none | built | sent | opened — derived on the server from facts we hold, not
   // from a status field somebody has to remember to update.
@@ -441,6 +446,35 @@ function BuildChip({ state, href }: { state?: string; href?: string }) {
   return on && href
     ? <a href={href} target="_blank" rel="noreferrer" className="hover:opacity-80 transition-opacity">{body}</a>
     : body;
+}
+
+// The funnel a build actually ran, on the card that reports it. "Widen the avatar"
+// is advice; "sourced 42, 9 passed the fit gate" is a diagnosis, and the two need
+// very different fixes. Only the steps that ran are shown, so a build that died in
+// sourcing does not pretend it ever reached the addresses.
+const BUILD_FUNNEL: [string, string][] = [
+  ["sourced", "sourced"],
+  ["fit", "fit"],
+  ["with_signal", "signal"],
+  ["verified", "confirmed"],
+  ["catch_all", "catch-all"],
+  ["linkedin_only", "LinkedIn only"],
+  ["shipped", "shipped"],
+];
+
+function BuildFunnel({ stats }: { stats: Record<string, number> }) {
+  const steps = BUILD_FUNNEL.filter(([k]) => typeof stats[k] === "number");
+  if (!steps.length) return null;
+  return (
+    <div className="mt-1.5 flex flex-wrap gap-x-2 gap-y-0.5 text-[10.5px] opacity-80 tabular-nums">
+      {steps.map(([k, label], i) => (
+        <span key={k}>
+          {i > 0 && <span className="mr-2 opacity-50">→</span>}
+          {stats[k]} {label}
+        </span>
+      ))}
+    </div>
+  );
 }
 
 // Our own way in. Every link WE click to look at a magnet carries preview=1, so
@@ -2133,7 +2167,11 @@ function BuildCard({ d, onChanged, autoOptimize = false }: { d: Detail; onChange
     fetch(`${API}/api/crm/prospect/${id}`).then((r) => r.json()).then((j) => {
       if (!alive.current) return;
       if (j.build_url && j.build_url !== d.build_url) { setBuilding(false); onChanged(); }
-      else if (j.build_status === "error") { setBuilding(false); setErr("Build failed. Check credits or niche coverage, then retry."); }
+      // The real reason, from the row. The old fixed string ("check credits or
+      // niche coverage") guessed, and it guessed wrong on the build that made us
+      // look: nothing was out of credit, the address gate had rejected 78% of a
+      // perfectly good pool.
+      else if (j.build_status === "error") { setBuilding(false); setErr(j.build_error || "The build failed. Open the run log to see where."); }
       else setTimeout(poll, 6000);
     }).catch(() => { if (alive.current) setTimeout(poll, 8000); });
   };
@@ -2854,14 +2892,16 @@ function DealRail({ d, both, reload, onChannel }: { d: Detail; both: () => void;
             clearInterval(timer);
             setStarting(false);
             if (j.build_status === "error") {
-              setBuildErr("The build failed. Check the Render logs, then try again.");
+              setBuildErr(j.build_error || "The build failed. Open the card to see where.");
             }
             both();
           }
         }, 8000);
-        // Measured: a real build is two to four minutes (research, a Clay search
-        // the agent may retry, a fit pass and fifty pieces of copy). Ten minutes
-        // is the point where it is genuinely not coming back.
+        // Measured on 2026-08-20, not estimated: a build that ships is 5m29s and
+        // one that gives up is 6m34s, most of it spent buying addresses one at a
+        // time. Ten minutes is the point where it is genuinely not coming back —
+        // and even then the run row keeps the outcome, so giving up on the poll no
+        // longer means losing the answer.
         setTimeout(() => { clearInterval(timer); setStarting(false); }, 600000);
       })
       .catch(() => {
@@ -2901,8 +2941,17 @@ function DealRail({ d, both, reload, onChannel }: { d: Detail; both: () => void;
       body: JSON.stringify({ note }),
     }).then((r) => { if (r.ok) { setNoteSaved(true); reload(true); } }).finally(() => setNoteBusy(false));
   };
+  // A thin build is real and openable, and it is NOT ready to send: fewer leads
+  // survived than the threshold to hand it over. It gets its own colour so the
+  // link never gets pasted into a reply by muscle memory.
   const build = d.build_url
-    ? (d.build_delivered ? { t: "Delivered", c: "#26D07C" } : d.build_published ? { t: "Published", c: "#FFD60A" } : { t: "Built", c: "#f0b45f" })
+    ? d.build_status === "thin"
+      ? { t: "Draft, too thin to send", c: "#f0b45f" }
+      : d.build_delivered
+        ? { t: "Delivered", c: "#26D07C" }
+        : d.build_published
+          ? { t: "Published", c: "#FFD60A" }
+          : { t: "Built", c: "#f0b45f" }
     : null;
   const owe = d.waiting_on === "us";
   return (
@@ -3166,6 +3215,21 @@ function DealRail({ d, both, reload, onChannel }: { d: Detail; both: () => void;
         ) : (
           <div className="text-[12px] text-muted-foreground mb-2">No Build yet.</div>
         )}
+        {/* The outcome of the last attempt, from the row and not from a timer.
+            The old rail only ever showed a failure while the polling that started
+            it was still alive, so reopening the card erased the fact that a build
+            had run at all. It cost a prospect a day: the MessageFlow build failed
+            on 20 Aug and the card said "No Build yet." */}
+        {d.build_error && (
+          <div className={`mb-2 rounded-lg border px-3 py-2 text-[12px] leading-snug ${
+            d.build_status === "thin"
+              ? "border-warn/30 bg-warn/[0.07] text-warn"
+              : "border-danger/30 bg-danger/[0.07] text-danger"
+          }`}>
+            {d.build_error}
+            {d.build_stats && <BuildFunnel stats={d.build_stats} />}
+          </div>
+        )}
         {/* Every click changes something HERE, under the cursor. The previous
             version only expanded a panel further down the rail, so from where you
             clicked nothing moved and the button read as dead. It still takes two
@@ -3174,7 +3238,8 @@ function DealRail({ d, both, reload, onChannel }: { d: Detail; both: () => void;
         {building ? (
           <div className="flex items-center gap-2 rounded-lg border border-gold/30 bg-gold/[0.06] px-3 py-2 text-[12.5px] text-gold-ink">
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            Building… researching, sourcing in Clay and writing the copy. Two to four minutes.
+            Building… researching, sourcing in Clay and writing the copy. About five
+            minutes. You can leave this card, it finishes on its own.
           </div>
         ) : confirmBuild ? (
           <div className="flex items-center gap-1.5">

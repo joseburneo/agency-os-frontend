@@ -78,6 +78,13 @@ export interface Lead {
   linkedinUrl?: string; // real profile URL (owner view) for the "View" link
   linkedinCompany?: string; // the company's LinkedIn page
   hasEmail: boolean;
+  // How sure we are of the address, when there is one. "verified" is MillionVerifier
+  // ok. "catch_all" is a mail server that accepts everything and will not confirm a
+  // single person, which is most large European companies: the address is almost
+  // certainly right and we will not claim that it is. Shown with a label rather than
+  // withheld (Jose, 2026-08-20), because withholding it also threw away the LinkedIn
+  // route beside it and shrank one build from nine leads to two.
+  emailQuality?: "verified" | "catch_all";
   hasDraft: boolean;
   // Draft/Preview payload — present in the owner (client) view so Paul can read
   // and send the rendered Email 1. Built server-side; mailto carries the raw
