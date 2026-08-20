@@ -6,6 +6,7 @@ import { WORKSPACES } from "@/lib/portal/mock";
 import { portalMode } from "@/lib/portal/access";
 import { hasOwnPassword, hasUsers, MIN_PASSWORD } from "@/lib/portal/auth";
 import { ModuleHeader, Panel, SectionLabel, Pill } from "@/components/portal/ui";
+import { ChannelConnect } from "./channels";
 import { PasswordField } from "@/components/portal/PasswordField";
 
 const ERRORS: Record<string, string> = {
@@ -43,7 +44,7 @@ export default async function SettingsPage({
       <ModuleHeader
         icon={SettingsIcon}
         title="Settings"
-        desc={`Manage the ${ws.name} workspace login.`}
+        desc={`Connect your accounts and manage the ${ws.name} login.`}
       />
 
       {/* Signed-in state */}
@@ -62,6 +63,11 @@ export default async function SettingsPage({
           </div>
         </div>
         <Pill tone={mode === "agency" ? "gold" : "green"}>{mode === "agency" ? "Agency" : "Client"}</Pill>
+      </Panel>
+
+      {/* Connect your accounts — LinkedIn, email, WhatsApp */}
+      <Panel className="p-5">
+        <ChannelConnect slug={slug} />
       </Panel>
 
       {/* Change password */}
