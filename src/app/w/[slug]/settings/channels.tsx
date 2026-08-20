@@ -42,6 +42,10 @@ type Row = {
   title: string;
   blurb: string;
   providers: Provider[];
+  // Several mailboxes on one workspace is normal and wanted: the real address plus
+  // the burner domains outbound goes from. One LinkedIn profile and one WhatsApp
+  // number is the norm, so there the second button is a repair, not an addition.
+  multi?: boolean;
 };
 
 const ROWS: Row[] = [
@@ -55,6 +59,7 @@ const ROWS: Row[] = [
     channel: "email",
     title: "Email",
     blurb: "One-to-one replies stay on the same thread as everything else.",
+    multi: true,
     providers: [
       { key: "email", name: "Gmail", domain: "gmail.com" },
       { key: "outlook", name: "Outlook", domain: "outlook.com" },
@@ -284,7 +289,7 @@ export function ChannelConnect({ slug }: { slug: string }) {
                   {busy === row.providers[0].key ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   ) : null}
-                  {connected ? "Reconnect" : "Connect"}
+                  {!connected ? "Connect" : row.multi ? "Add another" : "Reconnect"}
                   {!single && <ChevronRight className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-90" : ""}`} />}
                 </button>
               </div>
