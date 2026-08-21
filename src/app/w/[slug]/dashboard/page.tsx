@@ -40,7 +40,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ slug
   const magnet = await loadMagnetBrief(slug);
   if (magnet) {
     return (
-      <MagnetOverview slug={slug} name={magnet.name} owner={magnet.owner} brief={magnet.brief} domain={magnet.domain} leadCount={magnet.leadCount} />
+      <MagnetOverview slug={slug} name={magnet.name} owner={magnet.owner} brief={magnet.brief} domain={magnet.domain} leadCount={magnet.leadCount} reach={magnet.reach} />
     );
   }
 

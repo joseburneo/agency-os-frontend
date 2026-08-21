@@ -45,8 +45,16 @@ const arr = (v: unknown): string[] =>
   Array.isArray(v) ? v.map((x) => (typeof x === "string" ? x.trim() : "")).filter(Boolean) : [];
 
 export function MagnetOverview({
-  slug, name, owner, brief, domain, leadCount = 0,
-}: { slug: string; name: string; owner: string; brief: Brief; domain?: string; leadCount?: number }) {
+  slug, name, owner, brief, domain, leadCount = 0, reach,
+}: {
+  slug: string; name: string; owner: string; brief: Brief; domain?: string;
+  leadCount?: number;
+  // How reachable the list is, split three ways rather than rounded up into one
+  // claim. See loadMagnetBrief: a number a prospect can check beats a number that
+  // sounds better, and telling a confirmed mailbox from a catch-all server is the
+  // expertise being sold.
+  reach?: { verified: number; catchAll: number; linkedin: number };
+}) {
   const pa = (brief.primary_audience ?? {}) as Record<string, unknown>;
   const secondary = Array.isArray(brief.secondary_audiences)
     ? (brief.secondary_audiences as Record<string, unknown>[])
@@ -355,13 +363,34 @@ export function MagnetOverview({
               {str(pa.label) || "Your targeted leads"}
             </div>
             <div className="text-[12.5px] text-muted-foreground mt-0.5">
-              Each one with their LinkedIn profile, the dated reason we picked them, an
-              address where their mail server would confirm one, and the email and LinkedIn
-              message already written.
+              Each one with the dated reason we picked them and its source, the email and
+              the LinkedIn message already written, and every way in we could confirm.
             </div>
           </div>
           <ArrowRight className="w-4 h-4 text-gold-ink ml-auto shrink-0" />
         </Link>
+        {reach && (reach.verified + reach.catchAll + reach.linkedin) > 0 && (
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-[11.5px] tabular-nums">
+            {reach.verified > 0 && (
+              <span className="text-signal-ink" title="MillionVerifier confirmed the mailbox exists.">
+                {reach.verified} confirmed
+              </span>
+            )}
+            {reach.catchAll > 0 && (
+              <span className="text-warn" title="Their mail server accepts every address and confirms none, which is how most large companies are set up. The address follows their exact pattern, so it is very likely right.">
+                {reach.catchAll} catch-all
+              </span>
+            )}
+            {reach.linkedin > 0 && (
+              <span style={{ color: "var(--info)" }} title="A LinkedIn profile we verified, with the message written.">
+                {reach.linkedin} on LinkedIn
+              </span>
+            )}
+            <span className="text-subtle">
+              We separate a confirmed mailbox from a catch-all server. Most lists do not.
+            </span>
+          </div>
+        )}
       </section>
       )}
 

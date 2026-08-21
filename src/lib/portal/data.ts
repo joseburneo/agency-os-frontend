@@ -806,14 +806,33 @@ export const loadMagnetBrief = cache(async function loadMagnetBrief(slug: string
   if (!brief || Object.keys(brief).length === 0) return null;
 
   // A magnet built as a plan (no list yet) hides the "Your list" section rather
-  // than linking to an empty Target Lists page.
+  // than linking to an empty pipeline.
   const leadCount = await leadCountFor(data as Record<string, unknown>);
+  // How reachable the list actually is, split three ways. A round "10 verified
+  // emails" is the kind of number a prospect stops believing the moment one
+  // bounces; "3 confirmed, 5 catch-all, 10 on LinkedIn" is checkable, and knowing
+  // the difference is exactly the expertise we are selling. Measured on the two
+  // magnets built 2026-08-21: one lead in ten was actually confirmed.
+  const reach = { verified: 0, catchAll: 0, linkedin: 0 };
+  if (magnet) {
+    const { data: rows } = await sb
+      .from("magnet_leads")
+      .select("email_status,linkedin_url")
+      .eq("magnet_id", magnet.id);
+    for (const r of (rows ?? []) as Record<string, unknown>[]) {
+      const st = String(r.email_status ?? "");
+      if (st === "catch_all") reach.catchAll += 1;
+      else if (st) reach.verified += 1;
+      if (r.linkedin_url) reach.linkedin += 1;
+    }
+  }
   return {
     brief,
     name: String(data.name ?? ""),
     owner: String(data.owner_name ?? ""),
     domain: (data.domain as string | null) || undefined,
     leadCount,
+    reach,
   };
 });
 
