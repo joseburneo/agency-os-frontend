@@ -55,6 +55,10 @@ export function LinkedInMark({ className }: { className?: string }) {
 // be recoloured. Both are fine here. All the glyphs read the same at a glance,
 // and these three are meant to be the loud items in a rail that is otherwise
 // deliberately quiet.
+// `char` is written as the literal glyph, never as a \u escape. A JSX attribute
+// in quotes is HTML-ish and does NOT process escape sequences, so char="\u{1F9E0}"
+// shipped the text "u{1F9E0}" into the sidebar. Node processes the escape, which is
+// exactly why checking it there passed and the page still broke.
 function EmojiMark({ char, className }: { char: string; className?: string }) {
   return (
     <span
@@ -70,18 +74,18 @@ function EmojiMark({ char, className }: { char: string; className?: string }) {
 }
 
 export function BrainMark({ className }: { className?: string }) {
-  return <EmojiMark char="\u{1F9E0}" className={className} />;
+  return <EmojiMark char="🧠" className={className} />;
 }
 
 // The two pipelines. Ice, not a snowflake: at 15px a snowflake is spindly and
 // washes out beside the flame's mass, and the pair has to balance because they
 // sit one above the other.
 export function HotMark({ className }: { className?: string }) {
-  return <EmojiMark char="\u{1F525}" className={className} />;
+  return <EmojiMark char="🔥" className={className} />;
 }
 
 export function ColdMark({ className }: { className?: string }) {
-  return <EmojiMark char="\u{1F9CA}" className={className} />;
+  return <EmojiMark char="🧊" className={className} />;
 }
 
 export function SectionLabel({ children, className }: { children: React.ReactNode; className?: string }) {
