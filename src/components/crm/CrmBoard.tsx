@@ -508,9 +508,10 @@ const CHANNEL_BRAND: Record<string, string> = {
 // Per-source brand identity for the conversation. Each thread block is one mailbox/channel,
 // so a burner email reads as Instantly, jose@luxvance.com as Gmail, and LinkedIn/WhatsApp
 // as themselves. The bar/ring tint the bubbles so the thread feels wired to the real tool.
-type Src = "gmail" | "instantly" | "linkedin" | "whatsapp";
+type Src = "gmail" | "outlook" | "instantly" | "linkedin" | "whatsapp";
 const SRC: Record<Src, { logo: string; name: string; bar: string; ring: string; tint: string }> = {
   gmail:     { logo: "gmail.com",    name: "Gmail",     bar: "#EA4335", ring: "rgba(234,67,53,.30)",  tint: "rgba(234,67,53,.08)" },
+  outlook:   { logo: "outlook.com",  name: "Outlook",   bar: "#0A66C2", ring: "rgba(10,102,194,.30)", tint: "rgba(10,102,194,.08)" },
   instantly: { logo: "instantly.ai", name: "Instantly", bar: "#6D5EF7", ring: "rgba(109,94,247,.32)", tint: "rgba(109,94,247,.09)" },
   linkedin:  { logo: "linkedin.com", name: "LinkedIn",  bar: "#0A66C2", ring: "rgba(10,102,194,.35)", tint: "rgba(10,102,194,.10)" },
   whatsapp:  { logo: "whatsapp.com", name: "WhatsApp",  bar: "#25D366", ring: "rgba(37,211,102,.35)", tint: "rgba(37,211,102,.10)" },
@@ -520,6 +521,12 @@ function convoSource(c: Convo): Src {
   const ch = `${c.channel || ""} ${c.kind || ""}`.toLowerCase();
   if (ch.includes("linkedin")) return "linkedin";
   if (ch.includes("whatsapp") || ch.includes("wa_")) return "whatsapp";
+  // The client's OWN connected mailbox. It used to fall through to "instantly" with
+  // everything else, so a message Paul sent from his iPhone was captioned "via
+  // Instantly" and the thread header read "Instantly · pherrick@arcoirish.com" — the
+  // one sentence that must never appear, since a client's real domain never carries
+  // cold mail. The backend now says which kind each conversation is.
+  if (c.kind === "client_mailbox") return c.channel === "outlook" ? "outlook" : "gmail";
   return c.kind === "work_mailbox" ? "gmail" : "instantly";
 }
 
@@ -2048,6 +2055,24 @@ function Composer({ c }: { c: ComposerCtl }) {
         </div>
       )}
 
+      {/* From, directly under To — Jose's placement, and it is the right one. Which
+          mailbox this leaves from is a property of the message, like its recipient, not
+          a setting hidden beside the Send button where it was only read after the
+          writing was done. It is also the one control that decides whether this goes out
+          on a disposable burner or on the client's real address, which is not a decision
+          to discover at the last second. */}
+      {chan === "email" && sendOpts.length > 0 && (
+        <div className="flex items-center flex-wrap gap-1.5 mb-2 text-[11px]">
+          <span className="text-muted-foreground">From:</span>
+          <SenderSelect opts={sendOpts} value={fromKey} onChange={setFromKey} />
+          {threadAcct.account && !threadAcct.alive && (
+            <span className="text-gold-ink">
+              Original mailbox ({threadAcct.account}) is gone — this sends as a continuation of the same thread.
+            </span>
+          )}
+        </div>
+      )}
+
       {/* the dialer sits above the notes: on the Call tab the phone is the action,
           the talking points below it are the preparation */}
       {chan === "call" && <CallPanel d={d} onTouched={c.refresh} />}
@@ -2109,17 +2134,6 @@ function Composer({ c }: { c: ComposerCtl }) {
       )}
       {(
         <>
-        {chan === "email" && sendOpts.length > 0 && (
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[11px] text-muted-foreground shrink-0">Send from</span>
-            <SenderSelect opts={sendOpts} value={fromKey} onChange={setFromKey} />
-            {threadAcct.account && !threadAcct.alive && (
-              <span className="text-[11px] text-gold-ink">
-                Original mailbox ({threadAcct.account}) is gone — this sends as a continuation of the same thread.
-              </span>
-            )}
-          </div>
-        )}
         <div className="flex items-center gap-2 flex-wrap">
           {canSendEmail ? (
             <button onClick={send} disabled={sending || !text.trim() || (sendOpts.length > 0 && !selectedOpt)}
@@ -2705,7 +2719,16 @@ function ContactActions({ d, onChanged, compact }: { d: Detail; onChanged: () =>
   // The email-thread scan runs automatically server-side when the record opens, so
   // there is no "find in thread" button. The only button is Clay (paid, optional).
   const shopClay = async () => {
-    if (finding || triedClay || d.phone) return; // never fire a second paid lookup
+    // `d.phone` used to be part of this guard, which made the button dead for exactly
+    // the contact it was added for. It is drawn when a phone EXISTS and something else
+    // is missing — a profile, a city, a title — and those come from the two free Clay
+    // searches, not from the paid waterfall. Karl has a number and four gaps: pressing
+    // this did nothing at all, silently.
+    //
+    // Dropping it spends nothing extra. The server refuses to start the paid lookup
+    // when a phone is already on file — it returns before the waterfall — so the guard
+    // was protecting a door the backend already holds shut.
+    if (finding || triedClay) return;
     setFinding(true); setFindNote("Searching Clay…");
     try {
       // Start the cheapest-first waterfall, then poll the same route with the run_id
@@ -2718,11 +2741,18 @@ function ContactActions({ d, onChanged, compact }: { d: Detail; onChanged: () =>
         j = await fetch(`${API}/api/crm/prospect/${d.id}/find-phone?source=clay&run_id=${encodeURIComponent(runId)}`, { method: "POST" }).then((r) => r.json());
         runId = j.run_id || runId;
       }
-      if (j.found) { onChanged(); }                     // number arrived → the button is gone
+      // Say what came back. The free searches answer in a second or two, and silence
+      // after a click reads as a broken button even when it worked.
+      const filled: string[] = j.also_filled || [];
+      if (j.found) {
+        onChanged();
+        setFindNote(filled.length ? `Clay filled ${filled.join(", ")}.` : "");
+      }
       else if (j.queued) { setFindNote("Still searching Clay — reopen the card in a minute."); }
       else {
         setTriedClay(true);
-        setFindNote(j.note || "No mobile found via Clay.");
+        setFindNote(filled.length ? `Clay filled ${filled.join(", ")}.`
+                                  : (j.note || "No mobile found via Clay."));
         // Even with no phone, Clay may have found + saved a LinkedIn — reload so it
         // shows in the contact block and the "Add LinkedIn" row disappears.
         if (j.linkedin_added) onChanged();
