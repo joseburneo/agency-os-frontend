@@ -1049,6 +1049,16 @@ function LinkedInStatus({ d }: { d: Detail }) {
   );
 }
 
+/** What the button will actually do. It said "Send via Instantly" for anything that was
+ *  not the jose@ path, which stopped being true the day a client could connect their own
+ *  mailbox: picking "pherrick@arcoirish.com · your own inbox" and reading "Send via
+ *  Instantly" is the button lying about the one thing the picker exists to choose. */
+function sendLabel(o?: SendOption): string {
+  if (!o) return "Send";
+  if (o.via === "instantly") return "Send via Instantly";
+  return `Send from ${o.eaccount}`;
+}
+
 function linkedinHint(d: Detail): string {
   const st = d.linkedin?.state ?? "unknown";
   // Name the profile rather than saying "yours". The backend resolves it with the same
@@ -1296,7 +1306,9 @@ function Conversation({ id, themName, themCompany = "", themDomain = "", fallbac
 // One way this reply can leave: on-thread via an alive Instantly account, or a
 // thread-resurrection send from the work mailbox (new email, In-Reply-To the stored
 // Message-ID, real history quoted) — that one survives any cancelled account.
-type SendOption = { via: "instantly" | "gmail"; eaccount: string; label: string; thread?: boolean; provider?: string };
+// "unipile" is the client's OWN mailbox, connected from Settings — the warm half of the
+// email channel, beside the Instantly burners that carry the cold campaigns.
+type SendOption = { via: "instantly" | "gmail" | "unipile"; eaccount: string; label: string; thread?: boolean; provider?: string };
 
 // ESP favicon for a mailbox row ("google" | "microsoft" from Instantly's
 // provider_code, resolved server-side — no extra requests, 2 cached favicons).
@@ -2112,7 +2124,7 @@ function Composer({ c }: { c: ComposerCtl }) {
             <button onClick={send} disabled={sending || !text.trim() || (sendOpts.length > 0 && !selectedOpt)}
               className="neon-btn inline-flex items-center gap-2 rounded-lg bg-gold px-4 py-2 text-sm font-semibold text-ink-inverse hover:bg-gold-hi disabled:opacity-40 transition-colors">
               {sending ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending…</>
-                : <><Send className="w-4 h-4" /> {selectedOpt?.via === "gmail" ? `Send from ${selectedOpt.eaccount}` : "Send via Instantly"}</>}
+                : <><Send className="w-4 h-4" /> {sendLabel(selectedOpt)}</>}
             </button>
           ) : chan === "linkedin" && d.linkedin?.can_invite ? (
             <>
