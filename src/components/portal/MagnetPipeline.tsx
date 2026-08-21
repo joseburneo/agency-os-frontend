@@ -57,7 +57,21 @@ function LockedAction({
   );
 }
 
-export function MagnetPipeline({ leads, owner }: { leads: Lead[]; owner?: string }) {
+export function MagnetPipeline({
+  leads,
+  owner,
+  showStages = true,
+}: {
+  leads: Lead[];
+  owner?: string;
+  // The stage rail is a teaching device, and it only teaches once. On the COLD
+  // pipeline every one of the ten sits in the same column by definition, so five
+  // buttons with four zeroes beside them spend the widest part of the screen
+  // saying nothing. The journey is shown where it means something, on the Hot
+  // pipeline next door, and this page gives the space back to the card (Jose,
+  // 2026-08-21).
+  showStages?: boolean;
+}) {
   const [stage, setStage] = useState<string>("cold");
   const [openId, setOpenId] = useState<string | null>(leads[0]?.id ?? null);
 
@@ -67,22 +81,25 @@ export function MagnetPipeline({ leads, owner }: { leads: Lead[]; owner?: string
     return c;
   }, [leads]);
 
-  const shown = leads.filter((l) => stageOf(l) === stage);
+  const shown = showStages ? leads.filter((l) => stageOf(l) === stage) : leads;
   const open = leads.find((l) => l.id === openId) ?? shown[0] ?? null;
 
   return (
     <div className="pb-10">
       <div className="mb-5">
-        <h1 className="text-xl font-semibold text-foreground">Your pipeline</h1>
+        <h1 className="text-xl font-semibold text-foreground">
+          {showStages ? "Your pipeline" : "Cold pipeline"}
+        </h1>
         <p className="text-[13.5px] text-muted-foreground mt-1 max-w-2xl leading-relaxed">
-          The same cockpit our clients work in, loaded with your ten. Every lead starts
-          cold and moves right as they answer. Open a card to see everything we found on
-          that person and exactly what would go out to them.
+          {showStages
+            ? "The same cockpit our clients work in, loaded with your ten. Every lead starts cold and moves right as they answer. Open a card to see everything we found on that person and exactly what would go out to them."
+            : "The same cockpit our clients work in, loaded with your ten. Nobody has been contacted yet, which is what cold means. Open a card to see everything we found on that person and exactly what would go out to them."}
         </p>
       </div>
 
       <div className="flex flex-col lg:flex-row gap-5 items-start">
         {/* The stages. All ten sit at "never contacted" because that is true. */}
+        {showStages && (
         <nav className="w-full lg:w-52 shrink-0 flex lg:flex-col gap-1.5 overflow-x-auto">
           {STAGES.map((s) => {
             const n = counts[s.key] ?? 0;
@@ -111,6 +128,7 @@ export function MagnetPipeline({ leads, owner }: { leads: Lead[]; owner?: string
             );
           })}
         </nav>
+        )}
 
         {/* The cards */}
         <div className="w-full lg:w-72 shrink-0 space-y-1.5">
@@ -185,17 +203,52 @@ export function MagnetPipeline({ leads, owner }: { leads: Lead[]; owner?: string
                 </div>
 
                 <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {/* The address WITH how sure we are of it. This said "Verified,
+                      yours to use" on every row, which stopped being true the day
+                      catch-all addresses started shipping: on the two magnets built
+                      on 2026-08-21 only one lead in ten was actually confirmed. A
+                      deliverability company that overstates a mail server's answer
+                      loses the only argument it has. */}
                   {open.hasEmail && (
                     <a
                       href={`mailto:${open.emailDisplay}`}
-                      className="flex items-center gap-2.5 rounded-lg border border-signal/30 bg-signal/[0.06] px-3 py-2.5 hover:bg-signal/10 transition-colors"
+                      title={
+                        open.emailQuality === "catch_all"
+                          ? "Their mail server accepts every address and confirms none, which is how most large companies are set up. This one follows their exact pattern, so it is very likely right. LinkedIn is the safer first touch."
+                          : "MillionVerifier confirmed this mailbox exists."
+                      }
+                      className={cn(
+                        "flex items-center gap-2.5 rounded-lg border px-3 py-2.5 transition-colors",
+                        open.emailQuality === "catch_all"
+                          ? "border-warn/30 bg-warn/[0.06] hover:bg-warn/10"
+                          : "border-signal/30 bg-signal/[0.06] hover:bg-signal/10"
+                      )}
                     >
-                      <Mail className="w-4 h-4 text-signal-ink shrink-0" />
+                      <Mail className={cn("w-4 h-4 shrink-0",
+                        open.emailQuality === "catch_all" ? "text-warn" : "text-signal-ink")} />
                       <span className="min-w-0">
                         <span className="block text-[12.5px] text-foreground truncate">{open.emailDisplay}</span>
-                        <span className="block text-[11px] text-signal-ink leading-tight">Verified, yours to use</span>
+                        <span className={cn("block text-[11px] leading-tight",
+                          open.emailQuality === "catch_all" ? "text-warn" : "text-signal-ink")}>
+                          {open.emailQuality === "catch_all"
+                            ? "Catch-all server, very likely right"
+                            : "Verified, yours to use"}
+                        </span>
                       </span>
                     </a>
+                  )}
+                  {/* No address is not a hole in the row, it is a different way in.
+                      Saying so turns a gap into a route. */}
+                  {!open.hasEmail && open.linkedinUrl && (
+                    <div className="flex items-center gap-2.5 rounded-lg border border-info/30 bg-info/[0.06] px-3 py-2.5">
+                      <Linkedin className="w-4 h-4 shrink-0" style={{ color: "var(--info)" }} />
+                      <span className="min-w-0">
+                        <span className="block text-[12.5px] text-foreground leading-tight">Reach them on LinkedIn</span>
+                        <span className="block text-[11px] text-info leading-tight mt-0.5">
+                          Their mail server would not confirm any address, so we did not invent one
+                        </span>
+                      </span>
+                    </div>
                   )}
                   {open.linkedinUrl && (
                     <a

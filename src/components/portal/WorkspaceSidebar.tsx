@@ -5,11 +5,11 @@ import { RailConstellation } from "@/components/portal/RailConstellation";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useState, useEffect } from "react";
 import {
-  LayoutDashboard, Target, Mail, Brain, ChevronsUpDown, ArrowLeft, Check,
+  LayoutDashboard, Target, Mail, ChevronsUpDown, ArrowLeft, Check,
   Settings, LogOut, PanelLeftClose, PanelLeftOpen, ShieldBan, Route, Menu, X,
   Flame, FileText, Snowflake,
 } from "lucide-react";
-import { cn, Linkedin, LinkedInMark } from "./ui";
+import { BrainMark, cn, Linkedin, LinkedInMark } from "./ui";
 import { CompanyMark } from "./CompanyMark";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import type { Workspace } from "@/lib/portal/types";
@@ -89,7 +89,7 @@ function buildNav(w: Workspace | null, enabled: Set<string>, slug: string, lists
         { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
         // "<Client> Brain" — the client's name owns the module (Jose, 2026-07-25):
         // Arco Irish Brain, Kcal Brain. The agent's editable memory, not a "library".
-        { key: "library", label: w?.name ? `${w.name} Brain` : "Brain", icon: Brain },
+        { key: "library", label: w?.name ? `${w.name} Brain` : "Brain", icon: BrainMark },
       ],
     },
     {
@@ -106,7 +106,10 @@ function buildNav(w: Workspace | null, enabled: Set<string>, slug: string, lists
         // snowflake would fight a meaning we rely on.
         { key: "crm", label: "Hot Pipeline", icon: Flame, tone: "hot",
           badge: w && w.warmLeads > 0 ? String(w.warmLeads) : undefined },
-        { key: "cold", label: "Cold Pipeline", icon: Snowflake, tone: "cold" },
+        // The count rides on Cold, which is where every sourced lead actually is.
+        // It used to sit on Target Lists, and that module is gone for a magnet.
+        { key: "cold", label: "Cold Pipeline", icon: Snowflake, tone: "cold",
+          badge: w && w.coldLeads > 0 ? w.coldLeads.toLocaleString() : undefined },
       ],
     },
     {

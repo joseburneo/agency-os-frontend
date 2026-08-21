@@ -41,6 +41,39 @@ export function LinkedInMark({ className }: { className?: string }) {
   return <Linkedin className={className} width={16} height={16} style={{ color: "var(--li-blue)" }} />;
 }
 
+// The Brain, drawn as a MARK rather than an outline icon.
+//
+// It sits directly under LinkedIn's blue "in" in the rail, and a hairline lucide
+// glyph beside a filled brand mark reads as a placeholder next to the real thing
+// (Jose, 2026-08-21). So: a filled, lumpy brain in the brand gold with a Signal
+// Green spark, which is the palette doing what it always does here — yellow
+// leads, green means live. Built from overlapping circles instead of one clever
+// path because this renders at 16px in a sidebar, where a detailed silhouette
+// turns to mush and a lumpy blob with a split down the middle still reads as a
+// brain.
+export function BrainMark({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" width={16} height={16} className={className}
+         aria-hidden="true" focusable="false">
+      <g fill="var(--gold)">
+        <circle cx="8.6" cy="8.4" r="3.5" />
+        <circle cx="15.4" cy="8.4" r="3.5" />
+        <circle cx="7.7" cy="12.8" r="3.4" />
+        <circle cx="16.3" cy="12.8" r="3.4" />
+        <circle cx="12" cy="10.4" r="4.1" />
+        <circle cx="12" cy="14.6" r="3.1" />
+      </g>
+      {/* The fissure. Painted in the page ground so the two halves read apart at
+          any size, and it follows the surface rather than the icon's own colour. */}
+      <path d="M12 6.4v11.6" stroke="var(--background)" strokeWidth="1.25"
+            strokeLinecap="round" fill="none" />
+      {/* The spark: energy, and the only green on the icon. */}
+      <path d="M19.4 2.6l.72 1.78 1.78.72-1.78.72-.72 1.78-.72-1.78L16.9 5.1l1.78-.72z"
+            fill="var(--signal)" />
+    </svg>
+  );
+}
+
 export function SectionLabel({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
     <div className={cn("text-[11px] uppercase tracking-[0.2em] text-muted-foreground", className)}>

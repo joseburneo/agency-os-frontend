@@ -347,7 +347,7 @@ export function MagnetOverview({
       <section>
         <SectionLabel>Your list</SectionLabel>
         <Link
-          href={`/w/${slug}/target-lists`}
+          href={`/w/${slug}/cold`}
           className="mt-2 flex items-center gap-3 rounded-xl border border-gold/30 bg-gold/[0.05] px-4 py-3.5 hover:bg-gold/10 transition-colors"
         >
           <div className="min-w-0">
@@ -355,7 +355,9 @@ export function MagnetOverview({
               {str(pa.label) || "Your targeted leads"}
             </div>
             <div className="text-[12.5px] text-muted-foreground mt-0.5">
-              Each one with a verified address, their LinkedIn profile, the dated reason we picked them, and the email and LinkedIn message already written.
+              Each one with their LinkedIn profile, the dated reason we picked them, an
+              address where their mail server would confirm one, and the email and LinkedIn
+              message already written.
             </div>
           </div>
           <ArrowRight className="w-4 h-4 text-gold-ink ml-auto shrink-0" />

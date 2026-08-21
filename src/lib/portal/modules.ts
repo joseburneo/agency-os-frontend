@@ -90,7 +90,14 @@ export const DEMO_MODULES: ModuleKey[] = ["dashboard", "prospecting", "target-li
 // of a demonstration. It is only safe to offer because it is populated — the
 // magnet's own ten leads, in the real Cold/MQL/SQL vocabulary — since an empty tab
 // reads as an unfinished product, which is exactly why the others stay out.
-export const MAGNET_MODULES: ModuleKey[] = ["dashboard", "prospecting", "target-lists", "crm", "library"];
+// Target Lists came out on 2026-08-21 and the CRM split in two. A target list and
+// a cold pipeline were the same ten people rendered twice, once as a table and
+// once as cards, and the table was the weaker of the two: it shows the row and
+// not the person. So the leads live in the Cold pipeline, and the Hot pipeline
+// beside it stands deliberately empty to show where a lead goes when it answers.
+// Both together read as the cockpit a paying client works in, which is the whole
+// argument the magnet is making.
+export const MAGNET_MODULES: ModuleKey[] = ["dashboard", "prospecting", "cold", "crm", "library"];
 
 // Per-magnet extras: a magnet that has advanced past "gift" into a live deal can
 // earn additional modules (e.g. the proposal delivered as a Client Success

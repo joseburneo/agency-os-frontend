@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { db } from "@/lib/portal/server";
-import { portalMode } from "@/lib/portal/access";
+import { canEditBrain } from "@/lib/portal/access";
 
 // The Brain's operational fields — the exact values every generation surface
 // reads verbatim (client_brain.sender_identity on Render): the client's own
 // booking link, warm-reply signature, writing language and hard rules. They
 // live as columns on `workspaces`; prose knowledge stays in the library table.
-// Agency or the owning client may write; a demo prospect never can.
+// Agency, the owning client, and a prospect inside their own magnet may write
+// (see canEditBrain).
 const FIELDS = ["booking_link", "signature_html", "brain_language", "brain_rules"] as const;
 
 export async function POST(request: NextRequest) {
@@ -15,8 +16,9 @@ export async function POST(request: NextRequest) {
   const slug = String(body?.slug ?? "").trim();
   if (!slug) return NextResponse.json({ error: "slug required" }, { status: 400 });
 
-  const mode = await portalMode(slug);
-  if (mode === "demo") return NextResponse.json({ error: "unauthorized" }, { status: 403 });
+  if (!(await canEditBrain(slug))) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 403 });
+  }
 
   const sb = db();
   if (!sb) return NextResponse.json({ error: "no database" }, { status: 503 });

@@ -1,6 +1,6 @@
 import { assertModuleVisible, isAgency } from "@/lib/portal/access";
 import { CrmBoard } from "@/components/crm/CrmBoard";
-import { MagnetPipeline } from "@/components/portal/MagnetPipeline";
+import { MagnetHotPipeline } from "@/components/portal/MagnetHotPipeline";
 import { loadTargetLists, loadWorkspaceKind } from "@/lib/portal/data";
 
 // The full CRM (same board the agency cockpit uses), scoped to this workspace.
@@ -25,10 +25,14 @@ export default async function WorkspaceCrmPage({ params }: { params: Promise<{ s
   const { slug } = await params;
   await assertModuleVisible(slug, "crm");
 
+  // A magnet's leads moved to the Cold pipeline on 2026-08-21, where they belong:
+  // not one of them has been contacted. This board is the hot half, and it is
+  // honestly empty. The six columns are the point — they show the prospect where
+  // a lead goes the moment it answers, which is the argument for the paid plan.
   const kind = await loadWorkspaceKind(slug);
   if (kind === "magnet") {
     const live = await loadTargetLists(slug, { unmask: true });
-    return <MagnetPipeline leads={live?.leads ?? []} owner={live?.ws?.owner} />;
+    return <MagnetHotPipeline coldHref={`/w/${slug}/cold`} count={live?.leads?.length ?? 0} />;
   }
 
   const agency = await isAgency();

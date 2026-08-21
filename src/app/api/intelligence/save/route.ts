@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { db } from "@/lib/portal/server";
-import { portalMode } from "@/lib/portal/access";
+import { canEditBrain } from "@/lib/portal/access";
 
 const KINDS = [
   "playbook", "overview", "founder", "voice", "icp", "offer", "differentiator",
@@ -10,15 +10,16 @@ const KINDS = [
 
 // Create or update one Intelligence Library section. This is the client's brain —
 // the single source of truth every agent reads — so edits flow straight to Supabase
-// and take effect everywhere at once. Agency or the owning client may write; a demo
-// prospect never can.
+// and take effect everywhere at once. Agency, the owning client, and a prospect
+// inside their own magnet may write (see canEditBrain).
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const slug = String(body?.slug ?? "").trim();
   if (!slug) return NextResponse.json({ error: "slug required" }, { status: 400 });
 
-  const mode = await portalMode(slug);
-  if (mode === "demo") return NextResponse.json({ error: "unauthorized" }, { status: 403 });
+  if (!(await canEditBrain(slug))) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 403 });
+  }
 
   const sb = db();
   if (!sb) return NextResponse.json({ error: "no database" }, { status: 503 });
