@@ -144,7 +144,8 @@ type Detail = Card & {
                // by the same function the send uses. Empty when this workspace has no
                // connected LinkedIn — in which case the send refuses, it does not borrow
                // somebody else's.
-               sender?: string };
+               sender?: string;
+               sender_profile?: { name?: string; headline?: string; picture?: string; profile_url?: string } };
   // What enrichment could still go and fetch, decided by the server so the label
   // beside the button and the button itself cannot disagree.
   gaps?: string[];
@@ -2423,8 +2424,21 @@ function AddLinkedin({ d, onChanged }: { d: Detail; onChanged: () => void }) {
 //
 // Every row now says what the channel can do RIGHT NOW and offers the one action that
 // makes sense there, and the action always lands in the same composer.
-function ChannelStrip({ d, onChannel }: { d: Detail; onChannel: (ch: Chan) => void }) {
+/** Google or Microsoft, from the provider the mailbox was connected with. Falls back to
+ *  Gmail's mark rather than to nothing: a missing logo reads as a broken row. */
+function mailLogo(provider?: string): string {
+  const p = (provider || "").toLowerCase();
+  if (p.includes("microsoft") || p.includes("outlook")) return "outlook.com";
+  return "gmail.com";
+}
+
+function ChannelStrip({ d, onChannel, sendOpts }:
+  { d: Detail; onChannel: (ch: Chan, via?: SendOption["via"]) => void; sendOpts?: SendOption[] }) {
   const ws = useContext(WorkspaceCtx);
+  // The workspace's own mailbox, connected from Settings. Its presence is what splits
+  // the email row in two — see the rows below.
+  const ownBox = (sendOpts || []).find((o) => o.via === "unipile");
+  const hasInstantly = (sendOpts || []).some((o) => o.via === "instantly");
   const [q, setQ] = useState<{ remaining: number; cap: number } | null>(null);
   // `false` = this workspace has no LinkedIn account connected at all. That case was
   // indistinguishable from "we do not have their profile": the row read "no profile"
@@ -2443,12 +2457,34 @@ function ChannelStrip({ d, onChannel }: { d: Detail; onChannel: (ch: Chan) => vo
   }, [ws]);
 
   const li = d.linkedin?.state ?? "unknown";
-  const rows: { ch: Chan; logo?: string; label: string; state: string;
-                tone: "go" | "warn" | "off"; action: string | null; note?: string }[] = [
-    { ch: "email", logo: "gmail.com", label: "Email",
+  const rows: { ch: Chan; via?: SendOption["via"]; logo?: string; label: string; state: string;
+                tone: "go" | "warn" | "off"; action: string | null; note?: string;
+                face?: boolean }[] = [
+    // TWO email rows, one channel underneath. A campaign leaving on an Instantly burner
+    // and the client writing from their real address are not the same act — different
+    // domain, different rules, cold against warm — so the strip shows them apart. What
+    // is NOT split is `channel` in the database: both are email, and Karl's thread
+    // proves why it must stay that way. It started on a burner and continues in Paul's
+    // own inbox, and it is ONE conversation. Two channel values would cut it in half
+    // and hide the second half from the reply engine, which reads by channel.
+    //
+    // So both rows open the same composer and differ only in which sender they
+    // preselect. Five things to reach a person with; one conversation with them.
+    ...(ownBox ? [{
+      ch: "email" as Chan, via: "unipile" as const, logo: mailLogo(ownBox.provider),
+      label: "Your inbox",
+      state: d.email ? ownBox.eaccount : "no address",
+      tone: (d.email ? "go" : "off") as "go" | "off",
+      action: d.email ? "Write" : null,
+      face: true,
+    }] : []),
+    ...(hasInstantly || !ownBox ? [{
+      ch: "email" as Chan, via: "instantly" as const, logo: "instantly.ai",
+      label: "Instantly",
       state: d.can_send_email ? "on thread" : d.email ? "no live thread" : "no address",
-      tone: d.can_send_email ? "go" : d.email ? "warn" : "off",
-      action: d.email ? "Write" : null },
+      tone: (d.can_send_email ? "go" : d.email ? "warn" : "off") as "go" | "warn" | "off",
+      action: d.email ? "Write" : null,
+    }] : []),
     { ch: "linkedin", logo: "linkedin.com", label: "LinkedIn",
       // No session of our own comes FIRST. Everything below it is a fact about the
       // prospect, and none of those facts can be known until someone connects.
@@ -2480,13 +2516,25 @@ function ChannelStrip({ d, onChannel }: { d: Detail; onChannel: (ch: Chan) => vo
       {rows.map((r) => (
         <div key={r.ch} className="flex flex-col">
           <div className="flex items-center gap-2 py-1">
-            {r.logo
+            {r.face && d.linkedin?.sender_profile?.picture ? (
+              // The sender's face on the row that sends as them. A mailbox has no
+              // photograph of its own — Unipile returns none — so this is the
+              // workspace's connected LinkedIn, which is the same person doing the
+              // sending. Jose asked for it here specifically: "tenía que aparecer la
+              // foto de Paul al lado de su Gmail".
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={d.linkedin.sender_profile.picture}
+                alt={d.linkedin.sender_profile.name || "You"}
+                title={`Sends as ${d.linkedin.sender_profile.name || "you"}`}
+                width={16} height={16}
+                className="w-4 h-4 rounded-full object-cover border border-border shrink-0" />
+            ) : r.logo
               ? <Favicon domain={r.logo} size={13} className={r.tone === "off" ? "opacity-30 grayscale" : ""} />
               : <Phone className={`w-3.5 h-3.5 ${r.tone === "off" ? "text-subtle opacity-40" : "text-signal-ink"}`} />}
             <span className="text-[12px] text-foreground w-[4.6rem] shrink-0">{r.label}</span>
             <span className={`text-[11px] flex-1 min-w-0 truncate ${toneCls[r.tone]}`}>{r.state}</span>
             {r.action && (
-              <button type="button" onClick={() => onChannel(r.ch)}
+              <button type="button" onClick={() => onChannel(r.ch, r.via)}
                 className="shrink-0 rounded-md border border-border px-2 py-0.5 text-[11px] text-muted-foreground hover:border-gold/40 hover:text-gold-ink transition-colors">
                 {r.action}
               </button>
@@ -2944,7 +2992,9 @@ function FoldSection({ id, title, children, defaultOpen = true }: {
   );
 }
 
-function DealRail({ d, both, reload, onChannel }: { d: Detail; both: () => void; reload: (f?: boolean) => void; onChannel: (ch: Chan) => void }) {
+function DealRail({ d, both, reload, onChannel, sendOpts }:
+  { d: Detail; both: () => void; reload: (f?: boolean) => void;
+    onChannel: (ch: Chan, via?: SendOption["via"]) => void; sendOpts?: SendOption[] }) {
   const [editContact, setEditContact] = useState(false);
   // Agency only — see CanBuildCtx. A client sees the rest of the rail unchanged.
   const canBuild = useContext(CanBuildCtx);
@@ -3201,7 +3251,7 @@ function DealRail({ d, both, reload, onChannel }: { d: Detail; both: () => void;
                 <Phone className={`w-3 h-3 ${d.phone ? "text-signal-ink" : "text-subtle opacity-40"}`} />
               </div>
             </div>
-            <ChannelStrip d={d} onChannel={onChannel} />
+            <ChannelStrip d={d} onChannel={onChannel} sendOpts={sendOpts} />
             <ContactActions d={d} onChanged={() => reload(true)} compact />
           </div>
         </div>
@@ -3458,7 +3508,18 @@ function RecordBody({ d, id, themName, reload, both }: { d: Detail; id: number; 
     <div className="flex-1 min-h-0 overflow-y-auto lg:overflow-hidden grid grid-cols-1 lg:grid-cols-[23%_1fr_30%]">
       {/* LEFT rail */}
       <div className="lg:overflow-y-auto p-4 lg:p-5 lg:border-r border-border">
-        <DealRail d={d} both={both} reload={reload} onChannel={(ch) => { c.setChan(ch); c.setSent(null); }} />
+        <DealRail d={d} both={both} reload={reload} sendOpts={c.sendOpts}
+          // The strip's two email rows are one channel and two ROUTES, so picking one
+          // preselects its sender in the composer. Without this they would both open
+          // the same box on whatever sender happened to be selected, and the split
+          // would be decoration.
+          onChannel={(ch, via) => {
+            c.setChan(ch);
+            c.setSent(null);
+            if (!via) return;
+            const o = c.sendOpts.find((x) => x.via === via);
+            if (o) c.setFromKey(`${o.via}|${o.eaccount}`);
+          }} />
       </div>
 
       {/* CENTER — ONE continuous scroll: composer → action banner → full thread. Nothing is
