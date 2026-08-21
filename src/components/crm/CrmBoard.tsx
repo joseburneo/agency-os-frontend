@@ -136,6 +136,9 @@ type Detail = Card & {
   // only state LinkedIn lets you message in, so it is the only one that offers a Send.
   linkedin?: { state: "connected" | "invited" | "not_connected" | "bad_profile" | "unknown";
                can_message: boolean; can_invite?: boolean; invited_at?: string | null; handle?: string | null };
+  // What enrichment could still go and fetch, decided by the server so the label
+  // beside the button and the button itself cannot disagree.
+  gaps?: string[];
   can_send_email: boolean;
   intent_label: string;
   intent_summary: string;
@@ -556,10 +559,18 @@ const TLD_COUNTRY: Record<string, [string, string]> = {
 };
 function parseCountry(raw?: string): { code: string; name: string } | null {
   if (!raw) return null;
-  // "City, Region, Country" -> take the last segment, which is the country.
-  const name = raw.split(",").map((s) => s.trim()).filter(Boolean).pop() || raw.trim();
-  if (!name) return null;
-  return { code: COUNTRY_CODE[name.toLowerCase()] || "", name };
+  // "Dublin, County Dublin, Ireland" -> the flag comes from the LAST segment, which
+  // is the country, but what gets shown is "Dublin, Ireland". Knowing someone is in
+  // Ireland is nearly free; knowing they are in Dublin is why you open the card. The
+  // middle segment is dropped: "County Dublin" adds nothing next to "Dublin".
+  const parts = raw.split(",").map((s) => s.trim()).filter(Boolean);
+  const country = parts.pop() || raw.trim();
+  if (!country) return null;
+  const city = parts.length ? parts[0] : "";
+  return {
+    code: COUNTRY_CODE[country.toLowerCase()] || "",
+    name: city ? `${city}, ${country}` : country,
+  };
 }
 function companyCountryFromDomain(domain?: string): { code: string; name: string } | null {
   if (!domain) return null;
@@ -2375,10 +2386,19 @@ function AddLinkedin({ d, onChanged }: { d: Detail; onChanged: () => void }) {
 function ChannelStrip({ d, onChannel }: { d: Detail; onChannel: (ch: Chan) => void }) {
   const ws = useContext(WorkspaceCtx);
   const [q, setQ] = useState<{ remaining: number; cap: number } | null>(null);
+  // `false` = this workspace has no LinkedIn account connected at all. That case was
+  // indistinguishable from "we do not have their profile": the row read "no profile"
+  // for every prospect in every client workspace, forever, because the state it reads
+  // is written per CONNECTED ACCOUNT and no client had one. Two different problems,
+  // one sentence, and the sentence blamed the prospect.
+  const [linked, setLinked] = useState<boolean | null>(null);
   useEffect(() => {
     fetch(`${API}/api/crm/linkedin/status${ws ? `?workspace=${encodeURIComponent(ws)}` : ""}`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((j) => { if (j?.quota) setQ(j.quota); })
+      .then((j) => {
+        if (j?.quota) setQ(j.quota);
+        if (j) setLinked(j.ok !== false);
+      })
       .catch(() => {});
   }, [ws]);
 
@@ -2390,13 +2410,20 @@ function ChannelStrip({ d, onChannel }: { d: Detail; onChannel: (ch: Chan) => vo
       tone: d.can_send_email ? "go" : d.email ? "warn" : "off",
       action: d.email ? "Write" : null },
     { ch: "linkedin", logo: "linkedin.com", label: "LinkedIn",
-      state: li === "connected" ? "connected"
+      // No session of our own comes FIRST. Everything below it is a fact about the
+      // prospect, and none of those facts can be known until someone connects.
+      state: linked === false ? "not connected yet"
+           : li === "connected" ? "connected"
            : li === "invited" ? "invitation pending"
            : li === "not_connected" ? "not connected"
            : li === "bad_profile" ? "profile link is dead" : "no profile",
-      tone: li === "connected" ? "go" : li === "unknown" ? "off" : "warn",
-      action: li === "connected" ? "Write" : li === "not_connected" ? "Invite" : null,
-      note: li === "not_connected" && q ? `${q.remaining} of ${q.cap} invitations left · our limit` : undefined },
+      tone: linked === false ? "off"
+           : li === "connected" ? "go" : li === "unknown" ? "off" : "warn",
+      action: linked === false ? null
+           : li === "connected" ? "Write" : li === "not_connected" ? "Invite" : null,
+      note: linked === false
+        ? "Connect LinkedIn in Settings to see connections and send invitations"
+        : li === "not_connected" && q ? `${q.remaining} of ${q.cap} invitations left · our limit` : undefined },
     { ch: "whatsapp", logo: "whatsapp.com", label: "WhatsApp",
       state: d.phone ? "ready" : "no number",
       tone: d.phone ? "go" : "off",
@@ -2514,6 +2541,16 @@ function ContactEditor({ d, onDone }: { d: Detail; onDone: () => void }) {
 function ContactActions({ d, onChanged, compact }: { d: Detail; onChanged: () => void; compact?: boolean }) {
   // A profile we have PROVEN does not resolve counts as missing, not as present.
   const needsLinkedin = !d.linkedin_url || d.linkedin?.state === "bad_profile";
+  // The server's answer, not a second opinion computed here. It used to be "is the
+  // LinkedIn missing", which is why a contact with a phone and a profile and no
+  // location at all reported "Enriched · nothing missing".
+  const gaps = d.gaps ?? [];
+  const missing = needsLinkedin && !gaps.includes("linkedin_url")
+    ? [...gaps, "linkedin_url"] : gaps;
+  const GAP_WORD: Record<string, string> = {
+    phone: "mobile", linkedin_url: "LinkedIn", country: "location", job_title: "job title",
+  };
+  const gapList = missing.map((g) => GAP_WORD[g] || g).join(", ");
   const [finding, setFinding] = useState(false);
   const [findNote, setFindNote] = useState<string | null>(null);
   // Once Clay has run and come back empty for this contact, don't offer another
@@ -2628,22 +2665,22 @@ function ContactActions({ d, onChanged, compact }: { d: Detail; onChanged: () =>
                 here too: a contact with a phone but a dead or missing LinkedIn has a gap
                 Clay can close, and before this it was only offered when the phone was the
                 thing missing. */}
-            {needsLinkedin && !triedClay && (
+            {missing.length > 0 && !triedClay && (
               <button onClick={shopClay} disabled={finding}
-                title="Runs a paid Clay lookup. It returns a LinkedIn profile as well as a mobile."
+                title={`Runs a paid Clay lookup. It returns ${gapList}.`}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-[11.5px] text-foreground hover:border-gold/40 disabled:opacity-40 transition-colors">
                 {finding
                   ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Searching Clay…</>
-                  : <><Favicon domain="clay.com" label="Clay" size={13} /> Find LinkedIn with Clay</>}
+                  : <><Favicon domain="clay.com" label="Clay" size={13} /> Enrich with Clay <span className="text-[10px] text-subtle">· {gapList}</span></>}
               </button>
             )}
-            {needsLinkedin && triedClay && (
-              <span className="text-[11px] text-subtle">Searched Clay — no profile found</span>
+            {missing.length > 0 && triedClay && (
+              <span className="text-[11px] text-subtle">Searched Clay — still missing {gapList}</span>
             )}
             {/* Nothing missing: say so, quietly. A record with every field filled looks
                 identical to one nobody has checked, and the difference is exactly what
                 you want to know before working a card. */}
-            {!needsLinkedin && (
+            {missing.length === 0 && (
               <span className="inline-flex items-center gap-1.5 text-[10.5px] text-subtle">
                 <Favicon domain="clay.com" label="Clay" size={11} /> Enriched · nothing missing
               </span>
