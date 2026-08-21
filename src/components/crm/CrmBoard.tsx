@@ -2843,6 +2843,13 @@ function loadDetail(id: number, force = false): Promise<Detail | null> {
   if (!force && _detailCache.has(id)) return _detailCache.get(id)!;
   const p = fetch(`${API}/api/crm/prospect/${id}${force ? "?refresh=true" : ""}`)
     .then((r) => (r.ok ? (r.json() as Promise<Detail>) : null))
+    // `email` is nullable in the database since migration 039 — a person we only have
+    // on LinkedIn has no address, and Michael Foran, a first-degree connection of
+    // Paul's, is exactly that. The type here says string, so a null slipped straight
+    // past the compiler into `d.email.split("@")` and took the whole card down with a
+    // TypeError. Normalised at the one door every card comes through rather than at the
+    // dozen places that read it, half of which already guard and half of which did not.
+    .then((d) => (d ? { ...d, email: d.email ?? "" } : null))
     .catch(() => null);
   _detailCache.set(id, p);
   return p;
@@ -4031,7 +4038,13 @@ export function CrmBoard({ workspace, basePath = "/crm", live = true, canBuild =
     if (!live) { setRows([]); setFunnel(null); setLoading(false); return; }
     setLoading(true);
     fetch(`${API}/api/crm/prospects${workspace ? `?workspace=${encodeURIComponent(workspace)}` : ""}`).then((r) => r.json())
-      .then((j) => { setFunnel(j.funnel); setRows(j.prospects || []); })
+      // Same null as loadDetail: matchQuery does c.email.toLowerCase() with no guard,
+      // so one LinkedIn-only prospect in the book would crash the board the moment
+      // anyone typed in the search box.
+      .then((j) => {
+        setFunnel(j.funnel);
+        setRows(((j.prospects || []) as Card[]).map((r) => ({ ...r, email: r.email ?? "" })));
+      })
       .catch(() => { setFunnel(null); setRows([]); })
       .finally(() => setLoading(false));
   }, [live]);
