@@ -2707,8 +2707,17 @@ function ContactActions({ d, onChanged, compact }: { d: Detail; onChanged: () =>
                 thing missing. */}
             {missing.length > 0 && !triedClay && (
               <button onClick={shopClay} disabled={finding}
-                title={`Runs a paid Clay lookup. It returns ${gapList}.`}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-[11.5px] text-foreground hover:border-gold/40 disabled:opacity-40 transition-colors">
+                // The cost, honestly. Two Clay SEARCHES run first and cost nothing —
+                // sourcing spends no data credits, only reveals do — and they answer
+                // location, job title, industry and about half the time the profile URL
+                // too. The paid mobile waterfall only starts if a phone is still
+                // missing afterwards, so with a number already on file this button
+                // spends nothing at all. The old tooltip said "Runs a paid Clay lookup"
+                // in both cases, which made people afraid of a free button.
+                title={d.phone
+                  ? `Free. Two Clay searches fill ${gapList}; the paid mobile lookup only runs when a phone is missing, and this contact already has one.`
+                  : `Two free Clay searches fill ${gapList}. If a phone is still missing after them, the paid mobile waterfall runs.`}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-[11.5px] text-foreground hover:border-gold/50 hover:bg-gold/[0.08] hover:text-gold-ink active:scale-[0.98] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-card transition-all">
                 {finding
                   ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Searching Clay…</>
                   : <><Favicon domain="clay.com" label="Clay" size={13} /> Enrich with Clay <span className="text-[10px] text-subtle">· {gapList}</span></>}
@@ -2751,8 +2760,10 @@ function ContactActions({ d, onChanged, compact }: { d: Detail; onChanged: () =>
             </div>
           ) : (
             <button onClick={shopClay} disabled={finding}
-              title="Runs a paid Clay mobile lookup. Skipped when a number is already on file, and only once per contact."
-              className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-[12.5px] font-medium text-foreground hover:border-gold/40 disabled:opacity-40 transition-colors">
+              // This one IS the paid path: it is only drawn when the phone is the thing
+              // missing, which is the single field Clay charges for.
+              title="Two free Clay searches run first (location, job title, industry, often the profile). Only then does the paid mobile lookup start — once per contact."
+              className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-[12.5px] font-medium text-foreground hover:border-gold/50 hover:bg-gold/[0.08] hover:text-gold-ink active:scale-[0.98] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-card transition-all">
               {finding
                 ? <><Loader2 className="w-4 h-4 animate-spin" /> Enriching the number…</>
                 : <><Favicon domain="clay.com" label="Clay" size={15} /> Enrich with Clay <span className="text-[10px] text-subtle font-normal">· phone + LinkedIn</span></>}
