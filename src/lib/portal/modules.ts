@@ -37,6 +37,15 @@ export const ALL_MODULES: ModuleKey[] = [
   "roadmap",
 ];
 
+// Find Prospects went to every paying workspace on 2026-08-21 (Jose). It could not
+// before, because the allowance was one env var and they would all have drawn the same
+// 4,000 contacts a month; migration 041 put the number on the workspace and added a daily
+// pace limit, which is what made opening it safe.
+//
+// "local" — Find Local Businesses, the Google Maps side — is deliberately NOT here. The
+// page exists and its own text admits the Apify wiring was never built, so adding it
+// would give each client one working room and one empty one. That is exactly what the
+// 2026-08-13 cull was for.
 const OVERRIDES: Record<string, ModuleKey[]> = {
   // Arco Irish — cold-outreach engagement: email + CRM, plus its lead lists (the
   // Build), the sequence & schedule (cadence), intelligence library (the client
@@ -45,14 +54,14 @@ const OVERRIDES: Record<string, ModuleKey[]> = {
   // from the VIP lists (no LinkedIn sequencer running), so the LinkedIn Campaigns
   // module stays hidden until one exists — an empty tab reads as a broken product
   // (Jose, 2026-08-03).
-  "arco-irish": ["dashboard", "crm", "cold", "target-lists", "email", "library", "blocklist", "roadmap"],
+  "arco-irish": ["dashboard", "crm", "cold", "prospecting", "target-lists", "email", "library", "blocklist", "roadmap"],
 
   // Kcal and Connect Resources — email-led outbound. Same shape as Arco but without
   // LinkedIn: both ran on email only, and an empty LinkedIn tab reads as a broken
   // product rather than a channel they have not switched on. Add "linkedin" back the
   // day either one starts a LinkedIn sequence.
-  "kcal": ["dashboard", "crm", "cold", "target-lists", "email", "library", "blocklist", "roadmap"],
-  "connect-resources": ["dashboard", "crm", "cold", "target-lists", "email", "library", "blocklist", "roadmap"],
+  "kcal": ["dashboard", "crm", "cold", "prospecting", "target-lists", "email", "library", "blocklist", "roadmap"],
+  "connect-resources": ["dashboard", "crm", "cold", "prospecting", "target-lists", "email", "library", "blocklist", "roadmap"],
 };
 
 export function enabledModules(slug: string): ModuleKey[] {
