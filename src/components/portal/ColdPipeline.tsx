@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, Check, Clock, ExternalLink, Mail, Search, UserPlus } from "lucide-react";
+import { Check, Clock, Search, UserPlus } from "lucide-react";
 import type { Lead, TargetList } from "@/lib/portal/types";
-import { Linkedin, Panel, SectionLabel, cn } from "./ui";
+import { Panel, cn } from "./ui";
 import { CompanyMark } from "./CompanyMark";
+import { ProspectCard } from "@/components/crm/CrmBoard";
 
 /**
  * The Cold Pipeline for a CLIENT workspace — the lists, worked one person at a time.
@@ -110,11 +111,6 @@ function Stat({
   );
 }
 
-type Copy = {
-  emailSubject: string; emailBody: string;
-  emailBody2: string; emailBody3: string; linkedinNote: string;
-};
-
 type Status = {
   ok: boolean;
   healthy?: boolean;
@@ -139,13 +135,11 @@ export function ColdPipeline({
   const [q, setQ] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
   const [status, setStatus] = useState<Status | null>(null);
-  // The copy is fetched for the one person on screen, never shipped with the list.
-  // With all 1,147 bodies attached this page was 4.2 MB and five seconds; without
-  // them it is a fraction of that and the body you open arrives in a few hundred
-  // bytes. Kept per id so going back to somebody costs nothing.
-  const [copy, setCopy] = useState<Record<string, Copy>>({});
   const [opening, setOpening] = useState(false);
   const [openErr, setOpenErr] = useState("");
+  // lead id -> prospect id, or null when this person cannot become one. Cached so
+  // walking the list does not re-promote anybody.
+  const [pid, setPid] = useState<Record<string, number | null>>({});
 
   // The week's sending, which only LinkedIn and our own message store know. Everything
   // else on this page is already in the leads we were handed, so this is the one call.
@@ -211,48 +205,40 @@ export function ColdPipeline({
   const list = lists.find((l) => l.id === listId);
   const qt = status?.quota;
 
-  const openIdReal = open?.id ?? "";
-  useEffect(() => {
-    if (!openIdReal || copy[openIdReal]) return;
-    let live = true;
-    fetch(`/api/portal/lead-copy?workspace=${encodeURIComponent(workspace)}&id=${encodeURIComponent(openIdReal)}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((c) => { if (live && c) setCopy((m) => ({ ...m, [openIdReal]: c })); })
-      .catch(() => {});
-    return () => { live = false; };
-  }, [openIdReal, workspace, copy]);
-  const c = open ? copy[open.id] : undefined;
-
-  // The list is where you CHOOSE; the card is where you WORK. Rather than grow a second
-  // cockpit here, this hands the person over to the one that already exists — the same
-  // three columns the hot pipeline uses (the contact, the conversation, what we know)
-  // with the copilot and every channel in it.
+  // Picking somebody opens their card right here, rather than sending them to another
+  // page and back. Promotion is what makes that possible — a target_list_lead is a row
+  // in a list, an engaged_prospect is somebody being worked, and the card hangs off the
+  // second — and it is safe to do on selection now that the sidebar counts hot by
+  // category rather than by "a row exists" (migration 040). Before that, browsing your
+  // own list pushed the Hot Pipeline badge up by one per click.
   //
-  // Promotion is what makes that possible: a target_list_lead is a row in a list, an
-  // engaged_prospect is somebody being worked, and the card hangs off the second. The
-  // endpoint is idempotent, so pressing this twice lands on the same person rather than
-  // creating a duplicate.
-  const openCard = async () => {
-    if (!open || opening) return;
+  // The endpoint is idempotent, so coming back to somebody costs a lookup and creates
+  // nothing. Results are cached per lead so walking up and down the list is instant
+  // after the first pass.
+  useEffect(() => {
+    const lead = open;
+    if (!lead || pid[lead.id] !== undefined) return;
+    let live = true;
     setOpening(true);
     setOpenErr("");
-    try {
-      const r = await fetch(`/api/crm/lead/${encodeURIComponent(open.id)}/work`, { method: "POST" });
-      const j = await r.json().catch(() => null);
-      if (!r.ok || !j?.prospect_id) {
-        // Since migration 039 an address is no longer required — LinkedIn is a channel,
-        // not a consolation. What is still refused is somebody with neither an address
-        // nor a profile, and the backend says so in those words.
-        setOpenErr(j?.detail || j?.error || "Could not open this card.");
-        return;
-      }
-      window.location.href = `/w/${encodeURIComponent(workspace)}/crm?lead=${j.prospect_id}`;
-    } catch {
-      setOpenErr("Could not open this card.");
-    } finally {
-      setOpening(false);
-    }
-  };
+    fetch(`/api/crm/lead/${encodeURIComponent(lead.id)}/work`, { method: "POST" })
+      .then(async (r) => {
+        const j = await r.json().catch(() => null);
+        if (!live) return;
+        if (!r.ok || !j?.prospect_id) {
+          // Since migration 039 an address is no longer required — LinkedIn is a
+          // channel, not a consolation. What is still refused is somebody with neither
+          // an address nor a profile, and the backend says so in those words.
+          setPid((m) => ({ ...m, [lead.id]: null }));
+          setOpenErr(j?.detail || j?.error || "This person cannot be opened as a card yet.");
+          return;
+        }
+        setPid((m) => ({ ...m, [lead.id]: j.prospect_id as number }));
+      })
+      .catch(() => { if (live) setOpenErr("Could not open this card."); })
+      .finally(() => { if (live) setOpening(false); });
+    return () => { live = false; };
+  }, [open, pid]);
 
   return (
     <div className="pb-10">
@@ -317,39 +303,41 @@ export function ColdPipeline({
         )}
       </Panel>
 
-      <div className="flex flex-col lg:flex-row gap-5 items-start">
-        {/* The lists. */}
-        <nav className="w-full lg:w-60 shrink-0 flex lg:flex-col gap-1.5 overflow-x-auto">
-          {lists.map((l) => {
-            const s = perList[l.id] ?? { connected: 0, invited: 0, total: 0 };
-            const active = l.id === listId;
-            return (
-              <button
-                key={l.id}
-                onClick={() => { setListId(l.id); setOpenId(null); }}
-                className={cn(
-                  "text-left rounded-lg px-3 py-2.5 border transition-colors shrink-0 min-w-[190px] lg:min-w-0",
-                  active ? "border-gold/40 bg-gold/[0.07]" : "border-border bg-card/40 hover:bg-card"
-                )}
-              >
-                <span className="flex items-center gap-2">
-                  <span className={cn("text-[13px] font-medium leading-tight",
-                    active ? "text-foreground" : "text-muted-foreground")}>
-                    {l.name}
-                  </span>
-                  <span className="ml-auto text-[12px] tabular-nums text-subtle">{s.total}</span>
+      {/* The lists, across the top. They were a left rail, which cost a whole column of
+          width to six items that are picked once and then not touched again — width the
+          card needs, because the card is itself three columns. */}
+      <nav className="flex gap-1.5 mb-4 overflow-x-auto pb-1">
+        {lists.map((l) => {
+          const s = perList[l.id] ?? { connected: 0, invited: 0, total: 0 };
+          const active = l.id === listId;
+          return (
+            <button
+              key={l.id}
+              onClick={() => { setListId(l.id); setOpenId(null); }}
+              className={cn(
+                "text-left rounded-lg px-3 py-2 border transition-colors shrink-0",
+                active ? "border-gold/40 bg-gold/[0.07]" : "border-border bg-card/40 hover:bg-card"
+              )}
+            >
+              <span className="flex items-center gap-2">
+                <span className={cn("text-[13px] font-medium leading-tight whitespace-nowrap",
+                  active ? "text-foreground" : "text-muted-foreground")}>
+                  {l.name}
                 </span>
-                <span className="mt-1 flex items-center gap-2 text-[11px] text-subtle">
-                  <span className="text-signal-ink tabular-nums">{s.connected}</span> connected
-                  <span className="tabular-nums">{s.invited}</span> pending
-                </span>
-              </button>
-            );
-          })}
-        </nav>
+                <span className="text-[12px] tabular-nums text-subtle">{s.total}</span>
+              </span>
+              <span className="mt-0.5 flex items-center gap-2 text-[11px] text-subtle whitespace-nowrap">
+                <span className="text-signal-ink tabular-nums">{s.connected}</span> connected
+                <span className="tabular-nums">{s.invited}</span> pending
+              </span>
+            </button>
+          );
+        })}
+      </nav>
 
+      <div className="flex flex-col lg:flex-row gap-5 items-stretch">
         {/* The people in it. */}
-        <div className="w-full lg:w-[19rem] shrink-0">
+        <div className="w-full lg:w-[18rem] shrink-0">
           <div className="flex items-center gap-2 mb-2">
             <div className="relative flex-1">
               <Search className="w-3.5 h-3.5 text-subtle absolute left-2.5 top-1/2 -translate-y-1/2" />
@@ -428,187 +416,38 @@ export function ColdPipeline({
           </div>
         </div>
 
-        {/* The person. */}
-        <div className="flex-1 w-full min-w-0 space-y-4">
+        {/* The person, in the card the hot pipeline uses. Cold and hot are not two
+            places — they are one question, has this person written back — so it is one
+            card, and for somebody cold it is honestly empty. The written email and
+            LinkedIn message are not shown here as a read-only block any more: they are
+            loaded into the composer, so this is where you press send rather than where
+            you copy and paste. */}
+        <div className="flex-1 w-full min-w-0 rounded-xl border border-border bg-card/40 overflow-hidden min-h-[70vh] lg:h-[76vh] flex flex-col">
           {!open ? (
-            <Panel className="text-[13px] text-muted-foreground">
+            <div className="p-6 text-[13px] text-muted-foreground">
               Pick someone on the left to open their card.
-            </Panel>
+            </div>
+          ) : pid[open.id] ? (
+            <ProspectCard id={pid[open.id] as number} workspace={workspace} />
+          ) : opening ? (
+            <div className="p-6 text-[13px] text-muted-foreground">Opening {open.name}…</div>
           ) : (
-            <>
-              <Panel>
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="flex items-start gap-3 min-w-0">
-                    <CompanyMark name={open.company} domain={open.domain} size={40} />
-                    <div className="min-w-0">
-                      <div className="text-[17px] font-semibold text-foreground leading-tight">{open.name}</div>
-                      <div className="text-[13px] text-muted-foreground mt-1 leading-snug">{open.role}</div>
-                      <div className="text-[13px] text-foreground/80 leading-snug">
-                        {open.company}
-                        {open.sector ? <span className="text-subtle"> · {open.sector}</span> : null}
-                      </div>
-                      {open.country && (
-                        <div className="text-[12px] text-subtle mt-0.5">{open.country}</div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="shrink-0 flex flex-col items-end gap-2">
-                    <StatePill lead={open} />
-                    <button
-                      onClick={openCard}
-                      disabled={opening}
-                      title="Open the full card: the conversation on every channel, everything we researched, and the copilot."
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-gold/40 bg-gold/[0.09] px-3 py-2 text-[12.5px] font-medium text-foreground hover:bg-gold/[0.14] transition-colors disabled:opacity-60"
-                    >
-                      {opening ? "Opening…" : "Work this person"}
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+            // A person with neither an address nor a profile cannot become a card. The
+            // row is still worth showing: it says who they are and why nothing can be
+            // done about them yet, instead of an empty panel.
+            <div className="p-6">
+              <div className="flex items-start gap-3">
+                <CompanyMark name={open.company} domain={open.domain} size={40} />
+                <div className="min-w-0">
+                  <div className="text-[17px] font-semibold text-foreground leading-tight">{open.name}</div>
+                  <div className="text-[13px] text-muted-foreground mt-1">{open.role}</div>
+                  <div className="text-[13px] text-foreground/80">{open.company}</div>
                 </div>
-                {openErr && <p className="mt-2 text-[11.5px] text-gold-ink">{openErr}</p>}
-
-                {/* What to do about this person, and only what is true for them.
-                    A connection gets "Message", somebody pending gets nothing to
-                    press, and only the untouched get an invitation link. */}
-                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {open.linkedinUrl && liStateOf(open) === "connected" && (
-                    <a
-                      href={open.linkedinUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2.5 rounded-lg border border-signal/30 bg-signal/[0.06] px-3 py-2.5 hover:bg-signal/10 transition-colors"
-                    >
-                      <Linkedin width={16} height={16} className="shrink-0 text-signal-ink" />
-                      <span className="min-w-0">
-                        <span className="block text-[12.5px] text-foreground leading-tight">Message on LinkedIn</span>
-                        <span className="block text-[11px] text-signal-ink leading-tight mt-0.5">
-                          Already connected — costs no invitation
-                        </span>
-                      </span>
-                      <ExternalLink className="w-3 h-3 text-subtle ml-auto shrink-0" />
-                    </a>
-                  )}
-                  {open.linkedinUrl && liStateOf(open) === "invited" && (
-                    <a
-                      href={open.linkedinUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2.5 rounded-lg border border-border bg-card/60 px-3 py-2.5 hover:bg-card transition-colors"
-                    >
-                      <Linkedin width={16} height={16} className="shrink-0 text-muted-foreground" />
-                      <span className="min-w-0">
-                        <span className="block text-[12.5px] text-foreground leading-tight">Invitation pending</span>
-                        <span className="block text-[11px] text-subtle leading-tight mt-0.5">
-                          {shortDate(open.liInvitedAt) ? `Sent ${shortDate(open.liInvitedAt)}` : "Waiting"} — open their profile
-                        </span>
-                      </span>
-                      <ExternalLink className="w-3 h-3 text-subtle ml-auto shrink-0" />
-                    </a>
-                  )}
-                  {open.linkedinUrl && (liStateOf(open) === "not_connected" || liStateOf(open) === "none") && (
-                    <a
-                      href={open.linkedinUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2.5 rounded-lg border border-info/30 bg-info/[0.06] px-3 py-2.5 hover:bg-info/10 transition-colors"
-                    >
-                      <Linkedin width={16} height={16} className="shrink-0" style={{ color: "var(--info)" }} />
-                      <span className="min-w-0">
-                        <span className="block text-[12.5px] text-foreground leading-tight">Invite on LinkedIn</span>
-                        <span className="block text-[11px] text-info leading-tight mt-0.5">
-                          Not connected yet
-                        </span>
-                      </span>
-                      <ExternalLink className="w-3 h-3 text-subtle ml-auto shrink-0" />
-                    </a>
-                  )}
-                  {open.hasEmail && (
-                    <a
-                      href={
-                        c?.emailBody
-                          ? `mailto:${open.emailDisplay}?subject=${encodeURIComponent(c.emailSubject)}&body=${encodeURIComponent(c.emailBody)}`
-                          : `mailto:${open.emailDisplay}`
-                      }
-                      title={
-                        open.emailQuality === "catch_all"
-                          ? "Their mail server accepts every address and confirms none, which is how most large companies are set up. This one follows their exact pattern, so it is very likely right."
-                          : "MillionVerifier confirmed this mailbox exists."
-                      }
-                      className={cn(
-                        "flex items-center gap-2.5 rounded-lg border px-3 py-2.5 transition-colors",
-                        open.emailQuality === "catch_all"
-                          ? "border-warn/30 bg-warn/[0.06] hover:bg-warn/10"
-                          : "border-border bg-card/60 hover:bg-card"
-                      )}
-                    >
-                      <Mail className={cn("w-4 h-4 shrink-0",
-                        open.emailQuality === "catch_all" ? "text-warn" : "text-muted-foreground")} />
-                      <span className="min-w-0">
-                        <span className="block text-[12.5px] text-foreground truncate leading-tight">{open.emailDisplay}</span>
-                        <span className={cn("block text-[11px] leading-tight mt-0.5",
-                          open.emailQuality === "catch_all" ? "text-warn" : "text-subtle")}>
-                          {open.emailQuality === "catch_all" ? "Catch-all server, very likely right" : "Opens in your mail app"}
-                        </span>
-                      </span>
-                    </a>
-                  )}
-                  {open.linkedinCompany && (
-                    <a
-                      href={open.linkedinCompany}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2.5 rounded-lg border border-border bg-card/60 px-3 py-2.5 hover:bg-card transition-colors"
-                    >
-                      <Linkedin width={16} height={16} className="text-muted-foreground shrink-0" />
-                      <span className="text-[12.5px] text-foreground">Company page</span>
-                      <ExternalLink className="w-3 h-3 text-subtle ml-auto shrink-0" />
-                    </a>
-                  )}
-                </div>
-              </Panel>
-
-              {open.whyNow && (
-                <section>
-                  <SectionLabel>Why them, and why now</SectionLabel>
-                  <Panel className="mt-2">
-                    <p className="text-[13.5px] text-foreground/90 leading-relaxed">{open.whyNow}</p>
-                  </Panel>
-                </section>
-              )}
-
-              {c?.linkedinNote && (
-                <section>
-                  <SectionLabel>The LinkedIn message written for them</SectionLabel>
-                  <Panel className="mt-2">
-                    <p className="text-[13.5px] text-foreground/90 leading-relaxed whitespace-pre-line">
-                      {c.linkedinNote}
-                    </p>
-                    <button
-                      onClick={() => navigator.clipboard?.writeText(c.linkedinNote)}
-                      className="mt-3 rounded-md border border-border bg-card px-2.5 py-1.5 text-[12px] text-foreground hover:border-white/20 transition-colors"
-                    >
-                      Copy
-                    </button>
-                  </Panel>
-                </section>
-              )}
-
-              {c?.emailBody && (
-                <section>
-                  <SectionLabel>The email written for them</SectionLabel>
-                  <Panel className="mt-2">
-                    {c.emailSubject && (
-                      <div className="text-[13px] font-medium text-foreground pb-2 mb-2 border-b border-border">
-                        {c.emailSubject}
-                      </div>
-                    )}
-                    <p className="text-[13.5px] text-foreground/90 leading-relaxed whitespace-pre-line">
-                      {c.emailBody}
-                    </p>
-                  </Panel>
-                </section>
-              )}
-            </>
+              </div>
+              <p className="mt-4 text-[12.5px] text-gold-ink">
+                {openErr || "This person cannot be opened as a card yet."}
+              </p>
+            </div>
           )}
         </div>
       </div>

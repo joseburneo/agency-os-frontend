@@ -115,6 +115,10 @@ type Funnel = {
 };
 
 type Detail = Card & {
+  // The email and LinkedIn note written for this person before anyone spoke to them,
+  // read from the list row they were promoted from (which survives promotion). Absent
+  // for anybody who did not come from a list.
+  written?: { email_subject?: string; email?: string; linkedin?: string; whatsapp?: string };
   reply_text: string;
   reply_subject: string;
   phone: string;
@@ -1378,7 +1382,18 @@ function useComposer(d: Detail, onSent: () => void) {
       .then((j) => { if (j?.quota) setLiQuota(j.quota); })
       .catch(() => {});
   }, [liQuota, ws]);
-  const [drafts, setDrafts] = useState<Record<Chan, string>>({ email: "", linkedin: "", whatsapp: "", call: "" });
+  // Seeded with the copy already written for this person, when they came from a list.
+  // That text used to be shown on the list as a read-only block to copy by hand, which
+  // is the same words doing a worse job — the point of having written a personalised
+  // email is that it can be sent, not retyped. It seeds the DRAFT rather than replacing
+  // it: whatever is typed here wins, and switching prospect starts the next one fresh
+  // because the whole composer is keyed on the id.
+  const [drafts, setDrafts] = useState<Record<Chan, string>>({
+    email: d.written?.email ?? "",
+    linkedin: d.written?.linkedin ?? "",
+    whatsapp: d.written?.whatsapp ?? "",
+    call: "",
+  });
   const [drafting, setDrafting] = useState(false);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState<string | null>(null);
@@ -3499,6 +3514,61 @@ function FunnelStepper({ d, onChanged }: { d: Detail; onChanged: () => void }) {
     </div>
   );
 }
+
+/**
+ * The prospect card WITHOUT the modal around it, for a page that already has its own
+ * layout — the Cold Pipeline picks somebody on the left and shows them here.
+ *
+ * Jose's model, and it is what made this component worth extracting: cold and hot are not
+ * two places, they are one question — has this person written back? So there is one card,
+ * and for somebody cold it is simply empty. The composer, the copilot, the research panel
+ * and the four channels are the same ones the hot pipeline uses, because they ARE the
+ * same ones.
+ *
+ * What is deliberately dropped versus `Record`: the overlay, the close button and the J/K
+ * queue. A page that owns its own selection does not want a second one fighting it.
+ */
+export function ProspectCard({ id, workspace, onChanged }:
+  { id: number; workspace?: string; onChanged?: () => void }) {
+  const [d, setD] = useState<Detail | null>(null);
+  const [loading, setLoading] = useState(true);
+  // Which load is current. Clicking down a list flips `id` while the previous person's
+  // detail is still in flight, and a card that is half one prospect and half another is
+  // how a message gets sent to the wrong one.
+  const seq = useRef(0);
+
+  const reload = useCallback((force = false) => {
+    const mine = ++seq.current;
+    setLoading(true);
+    loadDetail(id, force)
+      .then((j) => { if (mine === seq.current) setD(j); })
+      .finally(() => { if (mine === seq.current) setLoading(false); });
+  }, [id]);
+  useEffect(() => { setD(null); reload(); }, [id, reload]);
+
+  const both = () => { reload(true); onChanged?.(); };
+  const themName = d?.name?.trim().split(/\s+/)[0] || "Them";
+
+  if (loading && !d) {
+    return <div className="p-6 text-muted-foreground text-sm">Loading…</div>;
+  }
+  if (!d) {
+    return <div className="p-6 text-muted-foreground text-sm">Could not load this prospect.</div>;
+  }
+  return (
+    // The provider is not optional here. Inside the CRM the board supplies it; on a page
+    // that renders this card on its own, without it the LinkedIn quota call goes out
+    // with no workspace and an agency session gets somebody else's numbers beside the
+    // button that spends them.
+    <WorkspaceCtx.Provider value={workspace}>
+      <div className="flex flex-col min-h-0 h-full">
+        <FunnelStepper d={d} onChanged={both} />
+        <RecordBody key={id} d={d} id={id} themName={themName} reload={reload} both={both} />
+      </div>
+    </WorkspaceCtx.Provider>
+  );
+}
+
 
 function Record({ id, initial, queue, onNavigate, onClose, onChanged }: { id: number; initial?: Card; queue?: number[]; onNavigate?: (id: number) => void; onClose: () => void; onChanged: () => void }) {
   const qidx = queue ? queue.indexOf(id) : -1;
