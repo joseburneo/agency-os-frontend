@@ -6,6 +6,7 @@ import type { Lead, TargetList } from "@/lib/portal/types";
 import { Panel, cn } from "./ui";
 import { CompanyMark } from "./CompanyMark";
 import { ProspectCard } from "@/components/crm/CrmBoard";
+import { ConnectedAccounts } from "./ConnectedAccount";
 
 /**
  * The Cold Pipeline for a CLIENT workspace — the lists, worked one person at a time.
@@ -242,13 +243,19 @@ export function ColdPipeline({
 
   return (
     <div className="pb-10">
-      <div className="mb-4">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
+        <div>
         <h1 className="text-xl font-semibold text-foreground">Cold pipeline</h1>
         <p className="text-[13.5px] text-muted-foreground mt-1 max-w-2xl leading-relaxed">
           Your lists, worked one person at a time. Connected first — those you can message
           today without spending an invitation — then the invitations still pending, then
           the people nobody has reached yet.
         </p>
+        </div>
+        {/* Whose accounts this workspace actually sends from. Up here rather than beside
+            the send button because it answers a question you ask once — is this me? —
+            and then stop asking. */}
+        <ConnectedAccounts workspace={workspace} className="shrink-0" />
       </div>
 
       {/* The strip. Where the list stands, and what has gone out this week. */}
