@@ -208,6 +208,79 @@ function WriteOutreach({ listId, pending }: { listId: string; pending: number })
  *  the card's whole job is a conversation. Showing a button that can only 409 is
  *  worse than showing why it is not there.
  */
+/** The three groups Paul asked for on the 2026-08-21 call, in his order: the people he
+ *  is already connected to (he can write today, no invitation, no quota), then the ones
+ *  whose invitation is still pending (nothing to do but wait), then the ones still to
+ *  invite — which is the actual work queue. 3 is a row with no profile at all.
+ *
+ *  Grouping replaces remembering. He had been working a 596-row list from the top down
+ *  where 184 invitations were already out, and the only thing telling him where he had
+ *  stopped was his own memory of it. */
+function liRank(l: Lead): number {
+  return l.liState === "connected" ? 0 : l.liState === "invited" ? 1
+    : l.liState === "not_connected" ? 2 : 3;
+}
+
+/** "12 Aug" — how long a pending invitation has been sitting. Past 30 days it is worth
+ *  withdrawing: a pile of ignored invitations drags the acceptance rate LinkedIn
+ *  watches, and one cannot be re-sent for about three weeks after a withdrawal. */
+function invitedLabel(iso?: string): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? "" : d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+}
+
+/** The LinkedIn cell: where this person stands, and the one thing to do about it.
+ *
+ *  connected     already a first-degree connection -> write to them, no invitation,
+ *                no weekly quota spent, no risk. The cheapest reach in the pipeline.
+ *  invited       the invitation is out and waiting. Nothing to do; the date says how
+ *                long, so an old one can be withdrawn rather than sit there.
+ *  not connected the work queue. This is the only state where "Connect" is honest.
+ *  no state yet  we have the profile but have not asked LinkedIn — the plain link,
+ *                exactly as it behaved before, so a workspace with no connected
+ *                account loses nothing.
+ */
+function LinkedInCell({ lead }: { lead: Lead }) {
+  const label =
+    lead.liState === "connected" ? "Message"
+      : lead.liState === "invited" ? "Invited"
+        : "Connect";
+  const tone =
+    lead.liState === "connected" ? "text-signal-ink"
+      : lead.liState === "invited" ? "text-subtle"
+        : "text-blue-300 hover:text-blue-200";
+  const since = lead.liState === "invited" ? invitedLabel(lead.liInvitedAt) : "";
+  const title =
+    lead.liState === "connected" ? "Already a connection — you can message them now"
+      : lead.liState === "invited" ? `Invitation sent${since ? ` on ${since}` : ""}, still pending`
+        : "Not connected yet — this one needs an invitation";
+
+  const inner = (
+    <>
+      {label}
+      {since && <span className="text-[11px] font-mono">{since}</span>}
+      <ExternalLink className="w-3 h-3" />
+    </>
+  );
+  return lead.linkedinUrl ? (
+    <a
+      href={lead.linkedinUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={title}
+      className={`inline-flex items-center gap-1 text-[13px] ${tone}`}
+    >
+      {inner}
+    </a>
+  ) : (
+    <span title={title} className={`inline-flex items-center gap-1 text-[13px] ${tone}`}>
+      {inner}
+    </span>
+  );
+}
+
 /** 0 confirmed, 1 catch-all, 2 no address. Sorts the strongest rows to the top. */
 function emailRank(l: Lead): number {
   if (l.emailQuality === "verified") return 0;
@@ -370,12 +443,21 @@ export function TargetListsView({
       .filter((l) =>
         !term ? true : [l.name, l.company, l.sector, l.role, l.hrLeadName ?? ""].some((f) => f.toLowerCase().includes(term))
       )
-      // Well-ordered: ready-to-send first, then by how sure we are of the address
-      // (confirmed, then catch-all, then LinkedIn only). Whoever opens this table
-      // reads three rows and decides, so the three strongest have to be on top.
+      // Grouped by where the person stands on LinkedIn first — connected, invited,
+      // still to invite — because that is what somebody working the list needs before
+      // anything else. Underneath, the old order holds: ready-to-send first, then by
+      // how sure we are of the address (confirmed, catch-all, LinkedIn only).
+      //
+      // The last tie-break is the id, and it is not cosmetic: without a final
+      // deterministic key, equal rows keep whatever order the database happened to
+      // return, which is exactly how this list reshuffled itself under Paul while he
+      // was working down it.
       .sort(
         (a, b) =>
-          Number(b.hasDraft) - Number(a.hasDraft) || emailRank(a) - emailRank(b)
+          liRank(a) - liRank(b) ||
+          Number(b.hasDraft) - Number(a.hasDraft) ||
+          emailRank(a) - emailRank(b) ||
+          a.id.localeCompare(b.id)
       );
   }, [data.leads, activeList, q]);
 
@@ -687,19 +769,12 @@ export function TargetListsView({
                       that the targeting is real and the people exist. */}
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      {l.linkedin && l.linkedinUrl ? (
-                        <a
-                          href={l.linkedinUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-[13px] text-blue-300 hover:text-blue-200"
-                        >
-                          Connect <ExternalLink className="w-3 h-3" />
-                        </a>
-                      ) : l.linkedin ? (
-                        <span className="inline-flex items-center gap-1 text-[13px] text-blue-300">
-                          Connect <ExternalLink className="w-3 h-3" />
-                        </span>
+                      {l.linkedin ? (
+                        // One link, three labels. Saying "Connect" to somebody who
+                        // accepted six weeks ago is not a small cosmetic problem: it is
+                        // the reason 100 accepted connections sat untouched, because
+                        // nothing on screen said they had been accepted.
+                        <LinkedInCell lead={l} />
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}

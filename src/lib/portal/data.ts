@@ -225,7 +225,7 @@ async function loadMagnetLists(
 // count — the dashboard and the channel modules — pass withBodies:false and move
 // ~100KB instead.
 const LEAD_COLS =
-  "id,list_id,list_segment,full_name,role,company,sector,domain,country,email,linkedin_url,linkedin_company,has_draft,phone,why_now,hr_lead_name,hr_lead_title";
+  "id,list_id,list_segment,full_name,role,company,sector,domain,country,email,linkedin_url,linkedin_company,has_draft,phone,why_now,hr_lead_name,hr_lead_title,li_state,li_invited_at";
 // Email 1 (previewed + sent from the table) and the VIP's prepared LinkedIn note.
 // Email 2/3 and linkedin2 are per-lead in the DB but nothing renders them yet;
 // they stay out so the table doesn't carry another megabyte for nothing.
@@ -272,11 +272,21 @@ export const loadTargetLists = cache(async function loadTargetLists(
   const cols = withBodies ? `${LEAD_COLS},${LEAD_BODY_COLS}` : LEAD_COLS;
   // `cols` is built at runtime, so supabase-js can't infer the row shape from the
   // select literal — hence the cast to a plain record, which the mapper below reads.
+  // ORDER BY is not decoration here, it is what makes the paging correct. Postgres is
+  // free to return rows in any order without one, and that order changes as rows are
+  // updated — so page 2 can repeat a row from page 1 and drop another entirely. Paul
+  // found it from the outside on 2026-08-21: he had worked List 1 from the top down
+  // sending invitations, came back, and the order had changed. "Michael York and
+  // Emmett Kilduff I connected with. I haven't even tried to connect with Owen, and
+  // he's third on the list." created_at is not unique on a bulk-loaded list, so id
+  // breaks the tie and the sequence is stable for good.
   const page = async (from: number): Promise<Record<string, unknown>[]> => {
     const { data } = await sb
       .from("target_list_leads")
       .select(cols)
       .eq("workspace_id", wsId)
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
       .range(from, from + PAGE - 1);
     return (data ?? []) as unknown as Record<string, unknown>[];
   };
@@ -326,6 +336,8 @@ export const loadTargetLists = cache(async function loadTargetLists(
       linkedinCompany: (r.linkedin_company as string | null) || undefined,
       hasEmail: Boolean(email),
       hasDraft: Boolean(r.has_draft ?? body),
+      liState: (r.li_state as Lead["liState"]) || undefined,
+      liInvitedAt: (r.li_invited_at as string | null) || undefined,
       emailSubject: subject || undefined,
       emailBody: body || undefined,
       emailBody2: String(r.email2_body ?? "") || undefined,

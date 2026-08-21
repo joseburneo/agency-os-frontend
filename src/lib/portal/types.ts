@@ -86,6 +86,12 @@ export interface Lead {
   // route beside it and shrank one build from nine leads to two.
   emailQuality?: "verified" | "catch_all";
   hasDraft: boolean;
+  // Where this person stands on the client's OWN LinkedIn, refreshed in bulk from the
+  // connected account (migration 038). This is what lets the list be WORKED: without it
+  // every row offered "Connect", including the 45 who already accepted and the 184 whose
+  // invitation is still pending, and the only way to tell them apart was to remember.
+  liState?: "connected" | "invited" | "not_connected";
+  liInvitedAt?: string; // ISO; how long a pending invitation has been waiting
   // Draft/Preview payload — present in the owner (client) view so Paul can read
   // and send the rendered Email 1. Built server-side; mailto carries the raw
   // recipient (the owner sends to their own leads).
