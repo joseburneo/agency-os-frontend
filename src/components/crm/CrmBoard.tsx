@@ -139,7 +139,12 @@ type Detail = Card & {
   // Where they stand on LinkedIn, cached server-side (migration 032). "connected" is the
   // only state LinkedIn lets you message in, so it is the only one that offers a Send.
   linkedin?: { state: "connected" | "invited" | "not_connected" | "bad_profile" | "unknown";
-               can_message: boolean; can_invite?: boolean; invited_at?: string | null; handle?: string | null };
+               can_message: boolean; can_invite?: boolean; invited_at?: string | null; handle?: string | null;
+               // Whose profile the send would actually leave from, resolved server-side
+               // by the same function the send uses. Empty when this workspace has no
+               // connected LinkedIn — in which case the send refuses, it does not borrow
+               // somebody else's.
+               sender?: string };
   // What enrichment could still go and fetch, decided by the server so the label
   // beside the button and the button itself cannot disagree.
   gaps?: string[];
@@ -1046,7 +1051,15 @@ function LinkedInStatus({ d }: { d: Detail }) {
 
 function linkedinHint(d: Detail): string {
   const st = d.linkedin?.state ?? "unknown";
-  if (st === "connected") return "You are connected — sends from your LinkedIn";
+  // Name the profile rather than saying "yours". The backend resolves it with the same
+  // function the send uses, so this is not a label that could drift from the truth — it
+  // IS the account that will send. In a client workspace opened by the agency, "your
+  // LinkedIn" was true and useless: the whole question is WHOSE.
+  if (st === "connected") {
+    const who = d.linkedin?.sender;
+    return who ? `You are connected — sends from ${who}'s LinkedIn`
+               : "You are connected — sends from this workspace's LinkedIn";
+  }
   if (st === "invited") {
     const since = d.linkedin?.invited_at ? ` since ${fmtDate(d.linkedin.invited_at)}` : "";
     return `Invitation pending${since} — you can write once they accept`;
