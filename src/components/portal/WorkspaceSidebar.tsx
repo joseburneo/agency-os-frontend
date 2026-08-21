@@ -7,9 +7,9 @@ import { useState, useEffect } from "react";
 import {
   LayoutDashboard, Target, Mail, ChevronsUpDown, ArrowLeft, Check,
   Settings, LogOut, PanelLeftClose, PanelLeftOpen, ShieldBan, Route, Menu, X,
-  Flame, FileText, Snowflake,
+  FileText,
 } from "lucide-react";
-import { BrainMark, cn, Linkedin, LinkedInMark } from "./ui";
+import { BrainMark, ColdMark, HotMark, cn, Linkedin, LinkedInMark } from "./ui";
 import { CompanyMark } from "./CompanyMark";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import type { Workspace } from "@/lib/portal/types";
@@ -104,11 +104,11 @@ function buildNav(w: Workspace | null, enabled: Set<string>, slug: string, lists
         // have been the obvious second pick and it is spoken for: green means
         // live and positive everywhere else in this product, so a green
         // snowflake would fight a meaning we rely on.
-        { key: "crm", label: "Hot Pipeline", icon: Flame, tone: "hot",
+        { key: "crm", label: "Hot Pipeline", icon: HotMark,
           badge: w && w.warmLeads > 0 ? String(w.warmLeads) : undefined },
         // The count rides on Cold, which is where every sourced lead actually is.
         // It used to sit on Target Lists, and that module is gone for a magnet.
-        { key: "cold", label: "Cold Pipeline", icon: Snowflake, tone: "cold",
+        { key: "cold", label: "Cold Pipeline", icon: ColdMark,
           badge: w && w.coldLeads > 0 ? w.coldLeads.toLocaleString() : undefined },
       ],
     },
@@ -348,9 +348,10 @@ export function WorkspaceSidebar({ slug, ws, workspaces, lists = [], demo = fals
                   <Icon
                     className={cn(
                       "w-[17px] h-[17px] shrink-0",
-                      // Only the two pipelines are tinted. If every icon carried a
-                      // colour the tint would stop meaning anything, and the eye
-                      // would have nothing to land on.
+                      // The tint is for a STROKED icon. The two pipelines and the
+                      // Brain carry emoji now, which bring their own colour and
+                      // ignore a text class, so the tone is left for whatever
+                      // stroked icon needs it next.
                       tone === "hot" && "text-[var(--gold)]",
                       tone === "cold" && "text-cyan"
                     )}
