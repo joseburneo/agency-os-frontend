@@ -240,9 +240,9 @@ export function ColdPipeline({
       const r = await fetch(`/api/crm/lead/${encodeURIComponent(open.id)}/work`, { method: "POST" });
       const j = await r.json().catch(() => null);
       if (!r.ok || !j?.prospect_id) {
-        // engaged_prospects.email is NOT NULL UNIQUE, so somebody we only have on
-        // LinkedIn cannot open a card yet. 205 of Paul's 1,147 are in that position —
-        // but only 4 of the 99 he can message today, so this is a message, not a wall.
+        // Since migration 039 an address is no longer required — LinkedIn is a channel,
+        // not a consolation. What is still refused is somebody with neither an address
+        // nor a profile, and the backend says so in those words.
         setOpenErr(j?.detail || j?.error || "Could not open this card.");
         return;
       }
