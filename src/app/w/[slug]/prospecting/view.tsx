@@ -23,7 +23,7 @@ type ExportJob = {
   state: "running" | "done" | "error";
   total: number; found: number; verified: number; written: number;
   charged: number; skipped: number; reused: number; error?: string;
-  credits?: { remaining: number; allowance: number };
+  credits?: Credits;
 };
 
 // The filters a salesperson actually reaches for, in the order they think of
@@ -203,6 +203,16 @@ function FieldControl({ field, value, onChange }: {
 
 // ----------------------------------------------------------------- view
 
+type Credits = {
+  remaining: number;            // the smaller of the two — what the export gate honours
+  allowance: number;            // the month's
+  month_remaining?: number;
+  daily_allowance?: number;
+  daily_remaining?: number;
+  used_today?: number;
+  limit?: "day" | "month";      // which one is biting
+};
+
 export function ProspectingView({ slug, canExport }: { slug: string; canExport: boolean }) {
   const [source, setSource] = useState<Source>("people");
   const [fields, setFields] = useState<Record<Source, Field[]>>({ people: [], companies: [] });
@@ -216,7 +226,7 @@ export function ProspectingView({ slug, canExport }: { slug: string; canExport: 
   const [error, setError] = useState("");
   const [showAll, setShowAll] = useState(false);
   const [wall, setWall] = useState(false);
-  const [credits, setCredits] = useState<{ remaining: number; allowance: number } | null>(null);
+  const [credits, setCredits] = useState<Credits | null>(null);
   const [job, setJob] = useState<ExportJob | null>(null);
 
   const schema = fields[source];
@@ -446,12 +456,22 @@ export function ProspectingView({ slug, canExport }: { slug: string; canExport: 
               </div>
             </div>
             {credits && (
+              // `remaining` is already the smaller of the month and the day, so this is
+              // the number that will actually be honoured. When the day is what is
+              // biting, say so underneath: "0 left" with 3,600 sitting in the month
+              // reads as a bug and earns a support message.
               <div className="text-right">
                 <div className="text-[11px] uppercase tracking-[0.18em] text-subtle">Credits left</div>
                 <div className="text-lg font-semibold tabular-nums text-foreground">
                   {credits.remaining.toLocaleString()}
                   <span className="text-[11px] font-normal text-subtle"> / {credits.allowance.toLocaleString()}</span>
                 </div>
+                {credits.limit === "day" && credits.daily_allowance != null && (
+                  <div className="text-[11px] text-subtle mt-0.5" title="A daily pace limit, so a month cannot be spent in one afternoon. It resets tomorrow.">
+                    {credits.daily_remaining?.toLocaleString() ?? 0} of today&apos;s{" "}
+                    {credits.daily_allowance.toLocaleString()}
+                  </div>
+                )}
               </div>
             )}
             <button type="button" onClick={runSearch} disabled={searching || activeCount === 0}
