@@ -1,11 +1,18 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getWorkspace, getWorkspaceData } from "@/lib/portal/mock";
 import { assertModuleVisible, portalMode } from "@/lib/portal/access";
-import { loadTargetLists } from "@/lib/portal/data";
+import { loadTargetLists, loadWorkspaceKind } from "@/lib/portal/data";
 import { TargetListsView } from "./view";
 
 export default async function TargetListsPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
+
+  // A magnet's leads moved to the Cold pipeline on 2026-08-21 and this module left
+  // its menu. Send an old bookmark to where the list actually lives rather than to
+  // a not-found page: nothing links here any more, but a prospect who saved the URL
+  // should land on his ten, not on a dead end.
+  if ((await loadWorkspaceKind(slug)) === "magnet") redirect(`/w/${slug}/cold`);
+
   await assertModuleVisible(slug, "target-lists");
   const mode = await portalMode(slug);
 
