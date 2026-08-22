@@ -1413,12 +1413,18 @@ function useComposer(d: Detail, onSent: () => void) {
   // for is a number nobody checks.
   const [liQuota, setLiQuota] = useState<{ sent_this_week: number; cap: number; remaining: number;
                                            messages_this_week?: number } | null>(null);
+  // Null until the status call answers, and null must not read as "free": the
+  // hint below only warns when we KNOW the plan is free.
+  const [liPremium, setLiPremium] = useState<boolean | null>(null);
   const ws = useContext(WorkspaceCtx);
   useEffect(() => {
     if (liQuota) return;
     fetch(`${API}/api/crm/linkedin/status${ws ? `?workspace=${encodeURIComponent(ws)}` : ""}`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((j) => { if (j?.quota) setLiQuota(j.quota); })
+      .then((j) => {
+        if (j?.quota) setLiQuota(j.quota);
+        if (typeof j?.premium === "boolean") setLiPremium(j.premium);
+      })
       .catch(() => {});
   }, [liQuota, ws]);
   // Seeded with the copy already written for this person, when they came from a list.
@@ -1664,7 +1670,7 @@ function useComposer(d: Detail, onSent: () => void) {
   const canSendChannel = (chan === "whatsapp" && !!d.phone)
     || (chan === "linkedin" && !!d.linkedin?.can_message);
   const gmailLive = d.live_channel === "gmail";
-  return { d, chan, setChan, text, setDraft, send, logTouch, refresh: onSent, askCopilot, drafting, sending, sent, setSent, co, setCo, coBusy, coLog, coCtx, coStream, coSaved, clearChat, canSendEmail, canSendChannel, invite, liQuota, gmailLive, threadKey, sendOpts, fromKey, setFromKey, selectedOpt, threadAcct, routeTo, routeCc, setRouteCc, ccAdd, setCcAdd, clientCc, sigInfo };
+  return { d, chan, setChan, text, setDraft, send, logTouch, refresh: onSent, askCopilot, drafting, sending, sent, setSent, co, setCo, coBusy, coLog, coCtx, coStream, coSaved, clearChat, canSendEmail, canSendChannel, invite, liQuota, liPremium, gmailLive, threadKey, sendOpts, fromKey, setFromKey, selectedOpt, threadAcct, routeTo, routeCc, setRouteCc, ccAdd, setCcAdd, clientCc, sigInfo };
 }
 type ComposerCtl = ReturnType<typeof useComposer>;
 
@@ -1977,7 +1983,7 @@ function CallPanel({ d, onTouched }: { d: Detail; onTouched: () => void }) {
 }
 
 function Composer({ c }: { c: ComposerCtl }) {
-  const { d, chan, setChan, text, setDraft, send, invite, logTouch, drafting, sending, sent, setSent, canSendEmail, canSendChannel, liQuota, gmailLive, sendOpts, fromKey, setFromKey, selectedOpt, threadAcct, routeTo, routeCc, setRouteCc, ccAdd, setCcAdd, clientCc } = c;
+  const { d, chan, setChan, text, setDraft, send, invite, logTouch, drafting, sending, sent, setSent, canSendEmail, canSendChannel, liQuota, liPremium, gmailLive, sendOpts, fromKey, setFromKey, selectedOpt, threadAcct, routeTo, routeCc, setRouteCc, ccAdd, setCcAdd, clientCc } = c;
   // Compact by default so an empty composer never steals the conversation's space; it opens
   // on click or as soon as there's a draft (incl. one the copilot / Draft-with-AI wrote).
   const [open, setOpen] = useState(false);
@@ -2160,7 +2166,9 @@ function Composer({ c }: { c: ComposerCtl }) {
                       text.trim().length > INVITE_NOTE_MAX
                         ? ` — ${text.trim().length - INVITE_NOTE_MAX} too many, LinkedIn will refuse it`
                         : ""}`
-                  : "Add a note above — it roughly doubles acceptance"}
+                  : liPremium === false
+                    ? "This account is on LinkedIn's free plan: about five invitations a month may carry a note, and it refuses the rest. Send it bare and write once they accept."
+                    : "Add a note above — it roughly doubles acceptance"}
               </span>
               {liQuota && (
                 <span className={`text-[11px] tabular-nums ${liQuota.remaining <= 10 ? "text-gold-ink" : "text-subtle"}`}
