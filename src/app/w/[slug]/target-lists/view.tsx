@@ -4,6 +4,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Target, Download, Search, ExternalLink, Eye, X, Send, Copy, Check, Phone, MessageCircle, Star, Lock, PenLine, Loader2, UserPlus } from "lucide-react";
 import type { Workspace, WorkspaceData, Lead } from "@/lib/portal/types";
+
+// A connection-request note is capped at 200 characters outside Premium, and
+// LinkedIn refuses a longer one outright instead of trimming it. This counter
+// said 300, which is the Premium figure (2026-08-22).
+const INVITE_NOTE_MAX = 200;
 import { ModuleHeader, Panel, Pill, CompanyMark, ChannelDots, cn } from "@/components/portal/ui";
 
 // Underline the parts of the email that are personalized to this lead — the
@@ -1019,8 +1024,12 @@ export function TargetListsView({
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Connection note</div>
-                    <div className="text-[10px] text-muted-foreground tabular-nums">
-                      {(preview.linkedinNote ?? "").length}/300 characters
+                    <div className={`text-[10px] tabular-nums ${
+                      (preview.linkedinNote ?? "").length > INVITE_NOTE_MAX
+                        ? "text-gold-ink" : "text-muted-foreground"}`}>
+                      {(preview.linkedinNote ?? "").length}/{INVITE_NOTE_MAX} characters
+                      {(preview.linkedinNote ?? "").length > INVITE_NOTE_MAX
+                        ? " — LinkedIn will refuse it" : ""}
                     </div>
                   </div>
                   <div className="rounded-lg border border-border bg-input p-4 text-[13px] leading-relaxed text-foreground whitespace-pre-wrap">
