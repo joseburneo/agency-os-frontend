@@ -10,6 +10,12 @@ import {
   PhoneCall, PhoneOff, Mic, MicOff, Smartphone, AlertTriangle,
 } from "lucide-react";
 import DOMPurify from "dompurify";
+
+// LinkedIn refuses a connection-request note over 200 characters unless the
+// sending account is Premium, and it refuses it outright rather than trimming.
+// This counter said 300 and clamped its own display at 300, so a 213-character
+// note looked fine right up until LinkedIn threw it out (2026-08-22).
+const INVITE_NOTE_MAX = 200;
 import { useSoftphone, fmtDuration, type CallMode } from "./useSoftphone";
 
 // Same-origin: every /api/crm/* call goes through src/app/api/crm/[...path], which
@@ -2150,7 +2156,10 @@ function Composer({ c }: { c: ComposerCtl }) {
               </button>
               <span className="text-[11px] text-muted-foreground">
                 {text.trim()
-                  ? `Note: ${Math.min(text.trim().length, 300)}/300 characters`
+                  ? `Note: ${text.trim().length}/${INVITE_NOTE_MAX} characters${
+                      text.trim().length > INVITE_NOTE_MAX
+                        ? ` — ${text.trim().length - INVITE_NOTE_MAX} too many, LinkedIn will refuse it`
+                        : ""}`
                   : "Add a note above — it roughly doubles acceptance"}
               </span>
               {liQuota && (
